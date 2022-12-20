@@ -1,0 +1,8 @@
+#!/bin/bash
+
+## This script builds and rebuilds the stacks
+
+docker compose build
+docker compose down
+docker compose up -d
+docker compose logs --follow

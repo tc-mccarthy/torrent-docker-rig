@@ -1,0 +1,53 @@
+version: "3"
+services:
+  vpn:
+    image: ghcr.io/bubuntux/nordlynx
+    network_mode: bridge
+    container_name: nordvpnwireguard
+    cap_add:
+      - NET_ADMIN # Required
+    environment:
+      - ALLOWED_IPS=0.0.0.0/0 # So this docker network can access it
+      - NET_LOCAL=172.16.0.0/16 # So it can be accessed within the local network
+      - PRIVATE_KEY=${NORDVPN_PRIVATE_KEY} # Your NordLynx private key. You can obtain this by running the get_nordvpn_private_key script
+      - QUERY="filters\[servers_groups\]\[identifier\]=legacy_p2p&filters\[country_id\]=228" # narrow the list of servers to US-based P2P servers
+    ports:
+      - 8088:8088
+      - 6881:6881
+      - "6881:6881/udp"
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1 # Recommended if using ipv4 only
+    restart: unless-stopped
+
+  torrent:
+    image: linuxserver/qbittorrent
+    container_name: qbitwireguard
+    network_mode: service:vpn # all traffic goes through vpn
+    environment:
+      - WEBUI_PORT=8088
+      - PUID=1000
+      - GUID=1000
+      - Umask=022
+      - TZ=America/New_York # Timezone used for logging
+    volumes:
+      - /media/tc:/media/tc # path to my volumes for download storage
+      - ./config:/config # qbittorrent config -- this mount allows you to script your own config and preserve the changes you make between container instances
+      - ./scripts:/scripts # health check script and more
+    depends_on:
+      - vpn # wait for vpn to start before starting
+    labels:
+      - "autoheal=true" # include in autoheal check
+    restart: unless-stopped
+    healthcheck:
+      test: bash ./scripts/health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      interval: 30s
+      retries: 0
+      timeout: 5s
+
+  autoheal:
+    image: willfarrell/autoheal:latest
+    tty: true
+    container_name: autoheal
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+## This is an example of a post complete file. This is specific to my needs but can serve as an example for you.
+## It is invoked by adding the following command to the qbittorrent gui under "Run on complete"
+## bash /scripts/post-complete "%F"
+
+## Accept torrent path as second parameter ("%F")
+torrent_path=$1
+
+## Move to torrent path
+cd "$torrent_path"
+
+## List everything for sake of log
+ls -la
+
+## Remove any subdirectories named "sample"
+find . -iname "sample" -type d -exec rm -Rf {} \;
+
+## Enable globstar
+shopt -s globstar
+
+## Find any .mp4 files in path and rename them to m4v
+for file in **/*.mp4; do 
+    echo "RENAMING $file" > ./rename.log
+    mv -- "$file" "${file%.mp4}.m4v" >> ./rename.log
+done
