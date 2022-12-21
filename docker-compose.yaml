@@ -47,6 +47,7 @@ services:
       - /media/tc:/media/tc # path to my volumes for download storage
       - ./config:/config # qbittorrent config -- this mount allows you to script your own config and preserve the changes you make between container instances
       - ./scripts:/scripts # health check script and more
+      - ./vuetorrent:/vuetorrent
     depends_on:
       - vpn # wait for vpn to start before starting
     labels:

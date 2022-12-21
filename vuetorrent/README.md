@@ -1,0 +1,1 @@
+I like to use the vuetorrent theme, but it's not mine to distribute. If you'd like to use it too grab the latest zip from https://github.com/WDaan/VueTorrent/releases extract the `public` directory and place it in here. You can then update qbittorrent to use an alternate web ui and point to /vuetorrent -- docker-compose handles the rest!
