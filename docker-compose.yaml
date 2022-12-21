@@ -75,7 +75,8 @@ services:
       - default
 
   certbot:
-    image: certbot/dns-cloudflare
+    image: certbot/dns-cloudflare # Generates a cert for qbittorrent reverse proxy.
+    # This expects cloudflare to be your DNS provider but certbot supports multiple providers. Google is your friend here.
     volumes:
       - ./certbot/etc:/etc/letsencrypt
       - ./certbot/cloudflare.ini:/root/cloudflare.ini
