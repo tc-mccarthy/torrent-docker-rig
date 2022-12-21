@@ -2,6 +2,11 @@
 
 ## This script builds and rebuilds the stacks
 
+if [[ -f ./.env ]]; then
+    echo ".env file detected. Loading variables"
+    source ./.env
+fi
+
 docker compose build
 docker compose down
 docker compose up -d
