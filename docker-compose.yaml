@@ -11,13 +11,25 @@ services:
       - NET_LOCAL=172.16.0.0/16 # So it can be accessed within the local network
       - PRIVATE_KEY=${NORDVPN_PRIVATE_KEY} # Your NordLynx private key. You can obtain this by running the get_nordvpn_private_key script
       - QUERY="filters\[servers_groups\]\[identifier\]=legacy_p2p&filters\[country_id\]=228" # narrow the list of servers to US-based P2P servers
+      - TZ=${TZ} # Timezone used for logging
     ports:
       - 8088:8088
       - 6881:6881
-      - "6881:6881/udp"
+      - 6881:6881/udp
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1 # Recommended if using ipv4 only
+      - net.ipv4.conf.all.rp_filter=2
+    volumes:
+      - ./scripts:/scripts # health check script and more
     restart: unless-stopped
+    labels:
+      - "autoheal=true" # include in autoheal check
+    healthcheck:
+      test: bash ./scripts/vpn-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      interval: 10s
+      retries: 3
+      timeout: 5s
+      start_period: 10s
     networks:
       - default
 
@@ -26,11 +38,11 @@ services:
     container_name: qbittorrent
     network_mode: service:vpn # all traffic goes through vpn
     environment:
-      - WEBUI_PORT=8088
+      - WEBUI_PORT=${QBIT_WEB_UI_PORT}
       - PUID=1000
       - GUID=1000
       - Umask=022
-      - TZ=America/New_York # Timezone used for logging
+      - TZ=${TZ} # Timezone used for logging
     volumes:
       - /media/tc:/media/tc # path to my volumes for download storage
       - ./config:/config # qbittorrent config -- this mount allows you to script your own config and preserve the changes you make between container instances
@@ -41,7 +53,7 @@ services:
       - "autoheal=true" # include in autoheal check
     restart: unless-stopped
     healthcheck:
-      test: bash ./scripts/health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash ./scripts/torrent-health-check # health check script confirms protected vpn connection and a connected qbittorrent
       interval: 30s
       retries: 0
       timeout: 5s
@@ -66,7 +78,7 @@ services:
       - "8080:80"
     environment:
       - NGINX_PORT=80
-      - WEBUI_PORT=8088
+      - WEBUI_PORT=${QBIT_WEB_UI_PORT}
       - SSL_HOST=${TORRENT_SSL_HOST}
     depends_on:
       - torrent

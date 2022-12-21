@@ -11,26 +11,26 @@ TORRENT_STATUS_URL="http://localhost:$WEBUI_PORT/api/v2/transfer/info"
 VPN_STATUS=$(curl "$VPN_STATUS_URL");
 TORRENT_STATUS=$(curl "$TORRENT_STATUS_URL")
 
-echo "$TIMESTAMP" > /scripts/health-check.log
-echo "VPN STATUS" >> /scripts/health-check.log
-echo "$VPN_STATUS" | jq . >> /scripts/health-check.log
+echo "$TIMESTAMP" > /scripts/torrent-health-check.log
+echo "VPN STATUS" >> /scripts/torrent-health-check.log
+echo "$VPN_STATUS" | jq . >> /scripts/torrent-health-check.log
 
-echo "TORRENT STATUS" >> /scripts/health-check.log
-echo "$TORRENT_STATUS" | jq . >> /scripts/health-check.log
+echo "TORRENT STATUS" >> /scripts/torrent-health-check.log
+echo "$TORRENT_STATUS" | jq . >> /scripts/torrent-health-check.log
 
 VPN_STATUS=$(echo "$VPN_STATUS" | jq .status)
 TORRENT_STATUS=$(echo "$TORRENT_STATUS" | jq .connection_status)
 
 ## IF WE'RE NOT VPN PROTECTED, FAIL
 if [[ "$VPN_STATUS" == "false" ]]; then
-    echo "Not connected to NordLynx. Marking unhealthy" >> /scripts/health-check.log
+    echo "Not connected to NordLynx. Marking unhealthy" >> /scripts/torrent-health-check.log
     exit 1;
 
 ## IF QBITTORRENT ISN'T SEEING ITSELF AS CONNECTED, FAIL
 elif [[ "$TORRENT_STATUS" != '"connected"' ]]; then
-    echo "qBittorrent not open to internet. Current Status: $TORRENT_STATUS. Marking unhealthy" >> /scripts/health-check.log
+    echo "qBittorrent not open to internet. Current Status: $TORRENT_STATUS. Marking unhealthy" >> /scripts/torrent-health-check.log
     exit 1;
 else
-    echo "All systems go" >> /scripts/health-check.log
+    echo "All systems go" >> /scripts/torrent-health-check.log
     exit 0;
 fi

@@ -1,0 +1,23 @@
+#!/bin/bash
+TIMESTAMP=$(date)
+
+## URL TO THE VPN STATUS CHECK TO CONFIRM THIS CONTAINER IS GOING OUT TO THE INTERNET PROTECTED
+VPN_STATUS_URL="https://nordvpn.com/wp-admin/admin-ajax.php?action=get_user_info_data"
+
+## CAPTURE STATUSES
+VPN_STATUS=$(curl "$VPN_STATUS_URL");
+
+echo "$TIMESTAMP" > /scripts/vpn-health-check.log
+echo "VPN STATUS" >> /scripts/vpn-health-check.log
+echo "$VPN_STATUS" | jq . >> /scripts/vpn-health-check.log
+
+VPN_STATUS=$(echo "$VPN_STATUS" | jq .status)
+
+## IF WE'RE NOT VPN PROTECTED, FAIL
+if [[ "$VPN_STATUS" == "false" ]]; then
+    echo "Not connected to NordLynx. Marking unhealthy" >> /scripts/vpn-health-check.log
+    exit 1;
+else
+    echo "VPN connected" >> /scripts/vpn-health-check.log
+    exit 0;
+fi
