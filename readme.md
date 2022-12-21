@@ -31,3 +31,33 @@ Copy `.env.sample` to `.env` and edit the file to populate it with your values
 ```
 bash ./build_stack
 ```
+
+## Configuration Recommendations
+
+### Setting filesystem permissions
+
+After your initial startup you may need to adjust your host FS permissions to be able to see certs and the qbittorrent config. As such, I recommend running the following after your initial start from within the parent directory
+
+```
+sudo chown -R $(whoami):$(whoami) .
+```
+
+This will take possession of all of the directories created by your containers. Run the build script again after doing this to ensure nginx can grab your cert
+
+### Locking down qBittorrent to only use nordlynx
+
+This stack has health checks on both the nordlynx and qbittorrent containers to ensure you're connected to nordvpn and that qbittorrent is actively using that connection. Containers will be restarted by autoheal if either of those things fails. However, I would also bind qbittorrent to the wg0 interface, ensuring that traffic only goes out over wireguard (nordlynx). You can do this by modifying the qbittorrent config
+
+`config/qBittorrent/qBittorrent.conf`
+
+Changing
+
+```
+Session\Interface=
+```
+
+to say
+
+```
+Session\Interface=wg0
+```
