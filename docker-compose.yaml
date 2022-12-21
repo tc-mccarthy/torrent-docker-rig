@@ -75,6 +75,7 @@ services:
       - default
 
   certbot:
+    container_name: certbot
     image: certbot/dns-cloudflare # Generates a cert for qbittorrent reverse proxy.
     # This expects cloudflare to be your DNS provider but certbot supports multiple providers. Google is your friend here.
     volumes:
@@ -88,6 +89,13 @@ services:
       --agree-tos --no-eff-email
       --force-renewal
       -d ${TORRENT_SSL_HOST}
+  ddns:
+    container_name: ddns
+    image: oznu/cloudflare-ddns
+    environment:
+      - API_KEY=${CLOUDFLARE_API_KEY}
+      - ZONE=${DDNS_ZONE}
+      - SUBDOMAIN=${DDNS_SUBDOMAIN}
 networks:
   default:
     name: torrent-rig
