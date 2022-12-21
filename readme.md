@@ -9,6 +9,7 @@ This stack currently includes:
 - A NordLynx container serving as the gateway to the web. It's server selection is configurable via docker-compose
 - A qBittorrent container with a built-in health check that ensures the container has a protected path to the internet (is actually going out over nordlynx) and that qBittorrent is "connected" not firewalled or disconnected (which can sometimes happen as a result of a race condition between the connection to Nord and the startup of the qbittorrent service)
 - Autoheal which monitors "unhealthy" container and restarts them until the become healthy. This, combined with the in-built IPTables config in nordlynx prevents connection issues and IP Leaks
+- NginX reverse proxy provides an SSL interface for when you access qbittorrent's web UI. This way, if you're managing your torrents remotely, you have an encrypted connection
 
 ## Getting started
 
