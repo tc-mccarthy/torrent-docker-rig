@@ -65,3 +65,9 @@ Session\Interface=wg0
 ### Use vuetorrent
 
 I say this simply because my use case has me monitoring and adding torrents from my phone, and vuetorrent is awesome for that. I included a /vuetorrent directory within the torrent container and it points to `./vuetorrent` -- it's not my project so I am not going to distribute it, but I dropped a readme file in there to tell you how to get it!
+
+### Sample config
+
+I have provided a sample configuration from my own qbittorrent config. I have removed usernames, passwords and my use of vuetorrent, but I've left my queue settings, speed limits and list of additional trackers to be added to every torrent. Please use it as a guide if you wish!
+
+`config/qBittorrent.conf.sample`
