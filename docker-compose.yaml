@@ -72,6 +72,7 @@ services:
   proxy:
     image: nginx:1.23.3-alpine
     container_name: proxy
+    restart: unless-stopped
     volumes:
       - ./nginx/sites-available:/etc/nginx/templates
       - ./certbot/etc:/ssl
@@ -89,6 +90,7 @@ services:
 
   certbot:
     container_name: certbot
+    restart: unless-stopped
     image: certbot/dns-cloudflare # Generates a cert for qbittorrent reverse proxy.
     # This expects cloudflare to be your DNS provider but certbot supports multiple providers. Google is your friend here.
     volumes:
@@ -104,6 +106,7 @@ services:
       -d ${TORRENT_SSL_HOST}
   ddns:
     container_name: ddns
+    restart: unless-stopped
     image: oznu/cloudflare-ddns
     environment:
       - API_KEY=${CLOUDFLARE_API_KEY}
