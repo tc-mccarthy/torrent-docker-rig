@@ -44,7 +44,7 @@ services:
       - Umask=022
       - TZ=${TZ} # Timezone used for logging
     volumes:
-      - /media/tc:/media/tc # path to my volumes for download storage
+      - ${TORRENT_STORAGE}:${TORRENT_STORAGE} # path to my volumes for download storage
       - ./config:/config # qbittorrent config -- this mount allows you to script your own config and preserve the changes you make between container instances
       - ./scripts:/scripts # health check script and more
       - ./vuetorrent:/vuetorrent
@@ -122,8 +122,8 @@ services:
       - TZ=${TZ}
     volumes:
       - ./duplicati/config:/config
-      - ./duplicati/backups:/backups
-      - /media/tc:/source
+      - ${BACKUP_DESTINATION}:/backups
+      - ${BACKUP_SOURCE}:/source
     ports:
       - 8200:8200
     restart: unless-stopped
