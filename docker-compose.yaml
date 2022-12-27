@@ -49,7 +49,8 @@ services:
       - ./scripts:/scripts # health check script and more
       - ./vuetorrent:/vuetorrent
     depends_on:
-      - vpn # wait for vpn to start before starting
+      vpn: # wait for vpn to start before starting
+        condition: service_healthy
     labels:
       - "autoheal=true" # include in autoheal check
     restart: unless-stopped
@@ -112,6 +113,20 @@ services:
       - API_KEY=${CLOUDFLARE_API_KEY}
       - ZONE=${DDNS_ZONE}
       - SUBDOMAIN=${DDNS_SUBDOMAIN}
+  duplicati:
+    image: lscr.io/linuxserver/duplicati:latest
+    container_name: duplicati
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+    volumes:
+      - ./duplicati/config:/config
+      - ./duplicati/backups:/backups
+      - /media/tc:/source
+    ports:
+      - 8200:8200
+    restart: unless-stopped
 networks:
   default:
     name: torrent-rig
