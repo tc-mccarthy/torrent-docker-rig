@@ -36,4 +36,8 @@
 
       proxy_cookie_path  /                  "/;";
     }
+
+    location /transcode/ {
+      root /public/transcode;
+    }
   }
