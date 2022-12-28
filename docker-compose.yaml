@@ -132,6 +132,8 @@ services:
 
   transcode:
     container_name: transcode
+    build: 
+      context: ./transcode
     environment:
       - TZ
     volumes:
