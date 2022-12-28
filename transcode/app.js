@@ -1,7 +1,7 @@
 import { exec } from "child_process";
 import async from "async";
 import ffmpeg from "fluent-ffmpeg";
-import * as fs from "fs";
+import { promises as fs } from 'fs';
 import trash from "trash";
 import moment from "moment";
 import path from "path";
