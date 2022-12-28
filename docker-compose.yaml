@@ -138,7 +138,7 @@ services:
       - TZ
     volumes:
       - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE} # path to my volumes for download storage
-      - ./:/usr/app
+      - ./transcode:/usr/app
     restart: unless-stopped
 networks:
   default:
