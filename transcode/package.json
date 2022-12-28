@@ -1,0 +1,28 @@
+{
+  "name": "plex-transcoder",
+  "version": "1.0.0",
+  "description": "",
+  "main": "transcode.js",
+  "type": "module",
+  "scripts": {
+    "start": "node ./app.js",
+    "start:dev": "npx nodemon -L ./app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tc-mccarthy/plex-transcoder.git"
+  },
+  "author": "TC McCarthy",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tc-mccarthy/plex-transcoder/issues"
+  },
+  "homepage": "https://github.com/tc-mccarthy/plex-transcoder#readme",
+  "dependencies": {
+    "async": "^3.2.4",
+    "fluent-ffmpeg": "^2.1.2",
+    "moment": "^2.29.4",
+    "nodemon": "^2.0.20",
+    "trash-cli": "^5.0.0"
+  }
+}
