@@ -1,7 +1,7 @@
 import { exec } from "child_process";
 import async from "async";
 import ffmpeg from "fluent-ffmpeg";
-import { promises as fs } from 'fs';
+import * as fs from "fs";
 import trash from "trash";
 import moment from "moment";
 import path from "path";
@@ -352,7 +352,7 @@ function transcode(file, filelist) {
           
           console.log(">> PROGRESS >>", output);
 
-          fs.writeFile("/usr/app/output/active.json", JSON.stringify({
+          fs.writeFileSync("/usr/app/output/active.json", JSON.stringify({
             ...conversion_profile,
             ffmpeg_cmd,
             file,
