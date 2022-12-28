@@ -139,6 +139,7 @@ services:
     volumes:
       - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE} # path to my volumes for download storage
       - ./transcode:/usr/app
+      - /usr/app/node_modules
     restart: unless-stopped
 networks:
   default:
