@@ -1,5 +1,9 @@
 FROM node:18-bullseye-slim
 
+# Install FFMPEG
+RUN apt-get -y update
+RUN apt-get -y install ffmpeg
+
 # Set up directories in advance so we can control the permissions
 RUN mkdir -p /usr/app && chown -R node:node /usr/app
 
