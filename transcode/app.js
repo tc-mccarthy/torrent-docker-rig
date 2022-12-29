@@ -357,7 +357,7 @@ function transcode(file, filelist) {
             ffmpeg_cmd,
             file,
             overall_progress: `(${list_idx}/${filelist.length})`,
-            output
+            output: JSON.parse(output)
           }));
         })
         .on("end", async function (stdout, stderr) {
