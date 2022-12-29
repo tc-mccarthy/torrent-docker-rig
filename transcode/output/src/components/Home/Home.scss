@@ -22,6 +22,8 @@ body,
 html {
   /* Sets default font-size to 16px, ensuring 1em = 16px; */
   font-size: 16px;
+  font-family: 'Lato', sans-serif;
+  background-color: #eee;
 }
 /** RESPONSIVE IMAGES */
 figure,
@@ -70,6 +72,13 @@ figcaption {
   display: block;
 }
 
+.overline {
+  max-width: 20%;
+  height: 1px;
+  border-bottom: 5px solid #3792cb;
+  margin: 10px 0 -10px 0;
+}
+
 /** Screens are the size of at least one device screen */
 .screen {
   width: 100%;
@@ -100,6 +109,28 @@ figcaption {
   left: 0;
   border: 0;
 }
+
+.widget {
+  background-color: #fff;
+  border-radius: 5px;
+  padding: 10px;
+  max-width: 800px;
+  margin-bottom: 10px;
+  text-align: center;
+
+  &.center {
+    margin: 0 auto 10px;
+  }
+
+  strong,
+  em {
+    display: block;
+  }
+
+  em {
+    font-size: 0.9rem;
+  }
+}
 /*********************************************************************
   YOUR TABLET/DESKTOP STYLES GO HERE
 *********************************************************************/
@@ -117,10 +148,19 @@ figcaption {
   .flex {
     display: flex;
     text-align: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    max-width: 800px;
+    margin: 0 auto;
 
     > div {
       flex: 1;
     }
+  }
+
+  .circle {
+    max-width: 40px;
+    margin: 0 auto;
   }
 }
 /*********************************************************************

@@ -3,6 +3,7 @@ import './Home.scss';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
+import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 
 async function getData (setData) {
   const d = await fetch('active.json').then((r) => r.json());
@@ -34,55 +35,66 @@ function Home () {
     );
   }
 
+  const [numerator, denominator] = data.overall_progress.replace(/[()]/g, '').split('/');
+
   return (
-    <div className="container">
+    <div className="container image">
+      <div className="overline" />
       <h1>Optimized video encoding</h1>
-      <div>
+      <div className="widget center">
         <strong>{data.file}</strong>
-        {' '}
-        {data.overall_progress}
       </div>
-      <div>
-        {data.output.timemark}
-        {' '}
-        |
-        {' '}
-        {data.name}
-      </div>
-      <LinearProgressWithLabel value={data.output.percent} />
+
       <div className="flex">
-        <div>
-          <strong>Elapsed:</strong>
-          {' '}
+        <div className="widget">
+          <strong>Elapsed</strong>
           {data.output.run_time}
         </div>
-        <div>
-          <strong>ETA:</strong>
-          {' '}
+        <div className="widget">
+          <strong>Timecode</strong>
+          {data.output.timemark}
+        </div>
+        <div className="widget">
+          <strong>Profile</strong>
+          {data.name}
+        </div>
+        <div className="widget">
+          <strong>ETA</strong>
           {data.output.time_remaining}
         </div>
       </div>
-      <div className="flex">
-        <div>
-          <strong>Original Size:</strong>
-          {' '}
-          {human_size(data.output.size.original)}
-        </div>
-        <div>
-          <strong>Progress:</strong>
-          {' '}
-          {human_size(data.output.size.progress)}
-        </div>
-        <div>
-          <strong>Estimated Final Size:</strong>
-          {' '}
-          {human_size(data.output.size.estimated_final)}
-          {' '}
-          (
-          {`${Math.round(+data.output.size.estimated_final.change.replace('%', '') * 100) / 100}%`}
-          )
+      <div className="widget center">
+        <LinearProgressWithLabel value={data.output.percent} />
+        <div className="circle">
+          <CircularProgressWithLabel numerator={numerator} denominator={denominator} />
         </div>
       </div>
+
+      <div className="flex">
+        <div className="widget">
+          <strong>Original Size</strong>
+          {human_size(data.output.size.original)}
+        </div>
+        <div className="widget">
+          <strong>Current Size</strong>
+          {human_size(data.output.size.progress)}
+        </div>
+        <div className="widget">
+          <strong>Est. Final Size</strong>
+          <em>{`${Math.round(+data.output.size.estimated_final.change.replace('%', '') * 100) / 100}%`}</em>
+          {human_size(data.output.size.estimated_final)}
+        </div>
+        <div className="widget">
+          <strong>ETA</strong>
+          {data.output.time_remaining}
+        </div>
+      </div>
+
+      <div className="widget center">
+        <strong>Command</strong>
+        {data.ffmpeg_cmd}
+      </div>
+
     </div>
   );
 }
