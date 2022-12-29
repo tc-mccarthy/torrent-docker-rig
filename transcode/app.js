@@ -7,6 +7,7 @@ import moment from "moment";
 import path from "path";
 
 const PATHS = [
+  "/media/tc/Drax/Disney",
   "/media/tc/Drax/Movies",
   "/media/tc/Danvers/TV Shows",
   "/media/tc/Ego/TV Shows",
@@ -71,16 +72,25 @@ async function generate_filelist() {
           .replace(/\s+/g, "\\s+"),
         "i"
       );
+      let episode_code = f.match(/(S[0-9]+E[0-9]+)/);
       console.log(">> LOCK FILE PATTERN >>", lock_file_pattern);
       const files = fs.readdirSync(curr_path);
       // console.log(files);
-      const lock_file = files.find((file) => lock_file_pattern.test(file));
+      let lock_file = files.find((file) => lock_file_pattern.test(file));
       // console.log("LOCK FILE", lock_file);
-
+      if (!lock_file && episode_code) {
+        episode_code = new RegExp(episode_code[1] + ".*tclock$");
+        lock_file = files.find((file) => episode_code.test(file));
+      }
       return !lock_file;
     });
 
+  fs.writeFileSync("./filelist.txt", filelist.join("\n"));
   return filelist;
+}
+
+function aspect_round(val) {
+  return Math.round(val * 10) / 10;
 }
 
 async function ffprobe(file) {
@@ -96,7 +106,7 @@ async function ffprobe(file) {
 
   const video = data.streams.find((s) => s.codec_type === "video");
 
-  video.aspect = Math.round((video.width / video.height) * 10) / 10;
+  video.aspect = aspect_round(video.width / video.height);
 
   return data;
 }
@@ -155,7 +165,7 @@ function transcode(file, filelist) {
           codec: /hevc/,
           audio_codec: /aac|ac3/,
         },
-      ];
+      ].map((x) => ({ ...x, aspect: aspect_round(x.aspect) }));
 
       const ffprobe_data = await ffprobe(file);
       console.log(">> FFPROBE DATA >>", ffprobe_data);
@@ -164,7 +174,10 @@ function transcode(file, filelist) {
       );
       //get the audio stream, in english, with the highest channel count
       const audio_stream = ffprobe_data.streams
-        .filter((s) => s.codec_type === "audio" && s.tags.language === "eng")
+        .filter(
+          (s) =>
+            s.codec_type === "audio" && (!s.tags || s.tags.language === "eng")
+        )
         .sort((a, b) => (a.channels > b.channels ? -1 : 1))[0];
       const subtitle_stream = ffprobe_data.streams.find(
         (s) => s.codec_type === "subtitle" && s.tags?.language === "eng"
