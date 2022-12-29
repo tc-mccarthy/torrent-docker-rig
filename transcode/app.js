@@ -396,8 +396,16 @@ async function run() {
       await transcode(file, filelist);
       return true;
     });
+    console.log("Requeuing in 30 seconds...")
+    setTimeout(() => {
+      run();
+    }, 30 * 1000)
   } catch (e) {
     console.log(">> ERROR >>", e);
+    console.log("Requeuing in 30 seconds...")
+    setTimeout(() => {
+      run();
+    }, 30 * 1000)
   }
 }
 
