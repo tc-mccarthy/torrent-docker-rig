@@ -63,10 +63,14 @@ function Home () {
           {data.output.time_remaining}
         </div>
       </div>
-      <div className="widget center">
-        <LinearProgressWithLabel value={data.output.percent} />
-        <div className="circle">
+      <div className="flex">
+        <div className="widget">
+          <strong>Overall Progress</strong>
           <CircularProgressWithLabel numerator={numerator} denominator={denominator} />
+        </div>
+        <div className="widget">
+          <strong>File Progress</strong>
+          <LinearProgressWithLabel value={data.output.percent} />
         </div>
       </div>
 
