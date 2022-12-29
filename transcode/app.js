@@ -6,14 +6,7 @@ import trash from "trash";
 import moment from "moment";
 import path from "path";
 
-const PATHS = [
-  "/media/tc/Drax/Disney",
-  "/media/tc/Drax/Movies",
-  "/media/tc/Danvers/TV Shows",
-  "/media/tc/Ego/TV Shows",
-  "/media/tc/Wanda/TV Shows",
-  "/media/tc/Drax/Random",
-];
+const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(path => "/" + path);
 
 function exec_promise(cmd) {
   return new Promise((resolve, reject) => {
