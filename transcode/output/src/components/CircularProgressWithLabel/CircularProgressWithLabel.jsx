@@ -8,7 +8,7 @@ export default function CircularProgressWithLabel ({ numerator, denominator }) {
   const value = numerator / denominator * 100;
   return (
     <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-      <CircularProgress variant="determinate" value={value} />
+      <CircularProgress variant="determinate" value={value} size={65} />
       <Box
         sx={{
           top: 0,
@@ -21,8 +21,9 @@ export default function CircularProgressWithLabel ({ numerator, denominator }) {
           justifyContent: 'center'
         }}
       >
-        <Typography variant="caption" component="div" color="text.secondary">
+        <Typography variant="caption" component="div" color="text.secondary" classes={{ caption: 'overall' }}>
           <div>{numerator}</div>
+          <div>of</div>
           <div>{denominator}</div>
         </Typography>
       </Box>

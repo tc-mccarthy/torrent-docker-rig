@@ -88,10 +88,6 @@ function Home () {
           <em>{`${Math.round(+data.output.size.estimated_final.change.replace('%', '') * 100) / 100}%`}</em>
           {human_size(data.output.size.estimated_final)}
         </div>
-        <div className="widget">
-          <strong>ETA</strong>
-          {data.output.time_remaining}
-        </div>
       </div>
 
       <div className="widget center">

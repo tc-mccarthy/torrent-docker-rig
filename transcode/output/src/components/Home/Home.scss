@@ -55,7 +55,7 @@ figcaption {
 }
 /** Images are allowed to be a little wider when broken out into their own container */
 .container.image {
-  max-width: 1200px;
+  max-width: 800px;
   padding: 0;
 }
 
@@ -70,6 +70,24 @@ figcaption {
 
 .mobile {
   display: block;
+}
+
+#app {
+  padding: 10px;
+
+  @media (min-width: 681px) {
+    padding: 0;
+  }
+}
+
+.overall {
+  > div {
+    margin-bottom: -8px;
+
+    &:first-child {
+      margin-top: -25%;
+    }
+  }
 }
 
 .overline {
