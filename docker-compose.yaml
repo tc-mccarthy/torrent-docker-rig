@@ -143,6 +143,21 @@ services:
       - ./transcode:/usr/app
       - /usr/app/node_modules
     restart: unless-stopped
+  
+  plex:
+    container_name: plex
+    image: lscr.io/linuxserver/plex:latest
+    network_mode: host
+    environment:
+      - TZ
+      - PUID=1000
+      - PGID=1000
+      - VERSION=docker
+    volumes:
+      - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE} # path to my volumes for download storage
+      - ./plex:/config
+    restart: unless-stopped
 networks:
   default:
     name: torrent-rig
+
