@@ -36,4 +36,10 @@
 
       proxy_cookie_path  /                  "/;";
     }
+
+    location /transcode {
+      root /public;
+      index index.html;
+      try_files $uri $uri/ =404;
+    }
   }
