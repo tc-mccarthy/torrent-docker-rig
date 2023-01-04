@@ -24,3 +24,6 @@ for file in **/*.mp4; do
     echo "RENAMING $file" > ./rename.log
     mv -- "$file" "${file%.mp4}.m4v" >> ./rename.log
 done
+
+## Remove NFO
+rm *.nfo
