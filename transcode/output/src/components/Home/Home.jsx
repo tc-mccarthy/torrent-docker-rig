@@ -12,7 +12,7 @@ async function getData (setData) {
 
   setTimeout(() => {
     getData(setData);
-  }, 2.5 * 1000);
+  }, 1 * 1000);
 }
 
 function human_size (size) {
