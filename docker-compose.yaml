@@ -13,9 +13,12 @@ services:
       - QUERY="filters\[servers_groups\]\[identifier\]=legacy_p2p&filters\[country_id\]=228" # narrow the list of servers to US-based P2P servers
       - TZ # Timezone used for logging
     ports:
-      - 8088:8088
-      - 6881:6881
-      - 6881:6881/udp
+      - 8088:8088 ## qbittorrent web ui
+      - 6881:6881 ## qbittorrent
+      - 6881:6881/udp ## qbittorrent udp
+      - 7878:7878 ## radarr
+      - 8989:8989 ## sonarr
+      - 9696:9696 ## prowlarr
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1 # Recommended if using ipv4 only
       - net.ipv4.conf.all.rp_filter=2
@@ -92,7 +95,6 @@ services:
 
   certbot:
     container_name: certbot
-    restart: unless-stopped
     image: certbot/dns-cloudflare # Generates a cert for qbittorrent reverse proxy.
     # This expects cloudflare to be your DNS provider but certbot supports multiple providers. Google is your friend here.
     volumes:
@@ -133,7 +135,7 @@ services:
 
   transcode:
     container_name: transcode
-    build: 
+    build:
       context: ./transcode
     environment:
       - TZ
@@ -143,7 +145,7 @@ services:
       - ./transcode:/usr/app
       - /usr/app/node_modules
     restart: unless-stopped
-  
+
   plex:
     container_name: plex
     image: lscr.io/linuxserver/plex:latest
@@ -157,7 +159,55 @@ services:
       - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE} # path to my volumes for download storage
       - ./plex:/config
     restart: unless-stopped
+
+  sonarr:
+    container_name: sonarr
+    image: lscr.io/linuxserver/sonarr:latest
+    network_mode: service:vpn # all traffic goes through vpn
+    environment:
+      - TZ
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE} # path to my volumes for download storage
+      - ./sonarr:/config
+    restart: unless-stopped
+    depends_on:
+      vpn: # wait for vpn to start before starting
+        condition: service_healthy
+
+  radarr:
+    container_name: radarr
+    image: lscr.io/linuxserver/radarr:latest
+    network_mode: service:vpn # all traffic goes through vpn
+    environment:
+      - TZ
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE} # path to my volumes for download storage
+      - ./radarr:/config
+    restart: unless-stopped
+    depends_on:
+      vpn: # wait for vpn to start before starting
+        condition: service_healthy
+
+  prowlarr:
+    container_name: prowlarr
+    image: lscr.io/linuxserver/prowlarr:latest
+    network_mode: service:vpn # all traffic goes through vpn
+    environment:
+      - TZ
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE} # path to my volumes for download storage
+      - ./prowlarr:/config
+    restart: unless-stopped
+    depends_on:
+      vpn: # wait for vpn to start before starting
+        condition: service_healthy
+
 networks:
   default:
     name: torrent-rig
-
