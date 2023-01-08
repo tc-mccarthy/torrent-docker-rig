@@ -9,7 +9,7 @@
     ssl_certificate_key /ssl/live/${SSL_HOST}/privkey.pem; 
 
     # HTTP requests redirected to https on same port
-    error_page 497 301 =307 https://$http_host$request_uri;
+    error_page 497 =307 https://$http_host$request_uri;
 
     location / {
       return 200 'gangnam style!';
@@ -73,14 +73,19 @@
       try_files $uri $uri/ =404;
     }
 
-    location /tinymediamanager {
-      proxy_set_header X-Forwarded-Proto https;
-        proxy_pass http://vpn:4000;
-        
-        # Enable websockets for the noVNC console to work
-        proxy_http_version 1.1;
-        proxy_set_header Connection $http_connection;
-        proxy_set_header Origin http://$host;
-        proxy_set_header Upgrade $http_upgrade;
+    location /tmm {
+      return 301 $scheme://$http_host/tinymediamanager/vnc.html?path=tinymediamanager/vnc&autoconnect=true&resize=remote&reconnect=true&show_dot=true&bell=false&view_only=false;
     }
+    
+    location /tinymediamanager/ {
+         proxy_pass http://vpn:4000/;
+
+         proxy_http_version 1.1;
+         proxy_set_header Upgrade $http_upgrade;
+         proxy_set_header Connection "Upgrade";
+         proxy_set_header Host $host;
+    }
+
+    
+
   }
