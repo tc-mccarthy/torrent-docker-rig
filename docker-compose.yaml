@@ -176,6 +176,10 @@ services:
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
+      prowlarr: # wait for index service to start before starting
+        condition: service_healthy
+      torrent: # wait for download client to start before starting
+        condition: service_healthy
 
   radarr:
     container_name: radarr
@@ -192,6 +196,10 @@ services:
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
+      prowlarr: # wait for index service to start before starting
+        condition: service_healthy
+      torrent: # wait for download client to start before starting
+        condition: service_healthy
 
   prowlarr:
     container_name: prowlarr
@@ -207,6 +215,8 @@ services:
     restart: unless-stopped
     depends_on:
       vpn: # wait for vpn to start before starting
+        condition: service_healthy
+      torrent: # wait for vpn to start before starting
         condition: service_healthy
 
   tmm:
