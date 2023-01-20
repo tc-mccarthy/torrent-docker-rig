@@ -177,7 +177,7 @@ services:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
       prowlarr: # wait for index service to start before starting
-        condition: service_healthy
+        condition: service_started
       torrent: # wait for download client to start before starting
         condition: service_healthy
 
@@ -197,7 +197,7 @@ services:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
       prowlarr: # wait for index service to start before starting
-        condition: service_healthy
+        condition: service_started
       torrent: # wait for download client to start before starting
         condition: service_healthy
 
