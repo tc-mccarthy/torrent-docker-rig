@@ -6,7 +6,9 @@ import trash from "trash";
 import moment from "moment";
 import path from "path";
 
-const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(path => "/" + path);
+const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(
+  (path) => "/" + path
+);
 
 function exec_promise(cmd) {
   return new Promise((resolve, reject) => {
@@ -113,7 +115,7 @@ function transcode(file, filelist) {
           name: "uhd",
           width: 3840,
           aspect: 16 / 9,
-          bitrate: 12,
+          bitrate: 18,
           codec: /hevc/,
           audio_codec: /aac|ac3/,
         },
@@ -355,16 +357,19 @@ function transcode(file, filelist) {
             file,
             overall_progress: `(${list_idx}/${filelist.length})`,
           });
-          
+
           console.log(">> PROGRESS >>", output);
 
-          fs.writeFileSync("/usr/app/output/active.json", JSON.stringify({
-            ...conversion_profile,
-            ffmpeg_cmd,
-            file,
-            overall_progress: `(${list_idx}/${filelist.length})`,
-            output: JSON.parse(output)
-          }));
+          fs.writeFileSync(
+            "/usr/app/output/active.json",
+            JSON.stringify({
+              ...conversion_profile,
+              ffmpeg_cmd,
+              file,
+              overall_progress: `(${list_idx}/${filelist.length})`,
+              output: JSON.parse(output),
+            })
+          );
         })
         .on("end", async function (stdout, stderr) {
           console.log("Transcoding succeeded!");
@@ -396,16 +401,16 @@ async function run() {
       await transcode(file, filelist);
       return true;
     });
-    console.log("Requeuing in 30 seconds...")
+    console.log("Requeuing in 30 seconds...");
     setTimeout(() => {
       run();
-    }, 30 * 1000)
+    }, 30 * 1000);
   } catch (e) {
     console.log(">> ERROR >>", e);
-    console.log("Requeuing in 30 seconds...")
+    console.log("Requeuing in 30 seconds...");
     setTimeout(() => {
       run();
-    }, 30 * 1000)
+    }, 30 * 1000);
   }
 }
 
