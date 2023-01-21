@@ -11,6 +11,7 @@ VPN_STATUS=$(curl "$VPN_STATUS_URL")
 
 echo "$TIMESTAMP" > "/scripts/$SERVICE_NAME-health-check.log"
 echo "VPN STATUS" >> "/scripts/$SERVICE_NAME-health-check.log"
+echo "$VPN_STATUS" >> "/scripts/$SERVICE_NAME-health-check.log"
 echo "$VPN_STATUS" | jq . >> "/scripts/$SERVICE_NAME-health-check.log"
 
 VPN_STATUS=$(echo "$VPN_STATUS" | jq .status)
@@ -19,7 +20,6 @@ VPN_STATUS=$(echo "$VPN_STATUS" | jq .status)
 if [[ "$VPN_STATUS" != "true" ]]; then
     echo "Not connected to NordLynx. Marking unhealthy" >> "/scripts/$SERVICE_NAME-health-check.log"
     exit 1;
-
 else
     if [[ "$API_KEY" != "" ]]; then
         echo "API KEY DETECTED. REFRESHING ${SERVICE_NAME} DOWNLOAD CLIENTS" >> "/scripts/$SERVICE_NAME-health-check.log"

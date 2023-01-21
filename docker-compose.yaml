@@ -178,8 +178,8 @@ services:
       - ./scripts:/scripts # health check script and more
     healthcheck:
       test: bash ./scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 30s
-      retries: 0
+      interval: 60s
+      retries: 3
       timeout: 5s
     restart: unless-stopped
     labels:
@@ -209,8 +209,8 @@ services:
       - ./scripts:/scripts # health check script and more
     healthcheck:
       test: bash ./scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 30s
-      retries: 0
+      interval: 60s
+      retries: 3
       timeout: 5s
     restart: unless-stopped
     labels:
@@ -240,8 +240,8 @@ services:
       - ./scripts:/scripts # health check script and more
     healthcheck:
       test: bash ./scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 30s
-      retries: 0
+      interval: 60s
+      retries: 3
       timeout: 5s
     labels:
       - "autoheal=true" # include in autoheal check
