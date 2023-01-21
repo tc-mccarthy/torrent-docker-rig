@@ -172,12 +172,18 @@ services:
     volumes:
       - ${SONARR_STORAGE}:${SONARR_STORAGE} # path to my volumes for download storage
       - ./sonarr:/config
+      - ./scripts:/scripts # health check script and more
+    healthcheck:
+      test: bash ./scripts/arr-health-check sonarr # health check script confirms protected vpn connection and a connected qbittorrent
+      interval: 30s
+      retries: 0
+      timeout: 5s
     restart: unless-stopped
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
       prowlarr: # wait for index service to start before starting
-        condition: service_started
+        condition: service_healthy
       torrent: # wait for download client to start before starting
         condition: service_healthy
 
@@ -192,12 +198,18 @@ services:
     volumes:
       - ${RADARR_STORAGE}:${RADARR_STORAGE} # path to my volumes for download storage
       - ./radarr:/config
+      - ./scripts:/scripts # health check script and more
+    healthcheck:
+      test: bash ./scripts/arr-health-check radarr # health check script confirms protected vpn connection and a connected qbittorrent
+      interval: 30s
+      retries: 0
+      timeout: 5s
     restart: unless-stopped
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
       prowlarr: # wait for index service to start before starting
-        condition: service_started
+        condition: service_healthy
       torrent: # wait for download client to start before starting
         condition: service_healthy
 
@@ -212,6 +224,12 @@ services:
     volumes:
       - ${PROWLARR_STORAGE}:${PROWLARR_STORAGE} # path to my volumes for download storage
       - ./prowlarr:/config
+      - ./scripts:/scripts # health check script and more
+    healthcheck:
+      test: bash ./scripts/arr-health-check prowlarr # health check script confirms protected vpn connection and a connected qbittorrent
+      interval: 30s
+      retries: 0
+      timeout: 5s
     restart: unless-stopped
     depends_on:
       vpn: # wait for vpn to start before starting
