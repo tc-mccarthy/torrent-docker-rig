@@ -7,7 +7,7 @@ VPN_STATUS_URL="https://nordvpn.com/wp-admin/admin-ajax.php?action=get_user_info
 ## CAPTURE STATUSES
 VPN_STATUS=$(curl "$VPN_STATUS_URL")
 
-SERVICE_NAME=$1
+
 
 echo "$TIMESTAMP" > "/scripts/$SERVICE_NAME-health-check.log"
 echo "VPN STATUS" >> "/scripts/$SERVICE_NAME-health-check.log"
@@ -21,6 +21,17 @@ if [[ "$VPN_STATUS" != "true" ]]; then
     exit 1;
 
 else
+    if [[ "$API_KEY" != "" ]]; then
+        echo "API KEY DETECTED. REFRESHING ${SERVICE_NAME} DOWNLOAD CLIENTS" >> "/scripts/$SERVICE_NAME-health-check.log"
+        curl "http://localhost:${SERVICE_PORT}/${SERVICE_NAME}/api/v3/downloadclient/testall" \
+            -X 'POST' \
+            -H 'Accept: application/json, text/javascript, */*; q=0.01' \
+            -H 'Accept-Language: en-US,en;q=0.9' \
+            -H 'Content-Length: 0' \
+            -H 'Content-Type: application/json' \
+            -H "X-Api-Key: ${API_KEY}" \
+            --compressed
+    fi
     echo "All systems go" >> "/scripts/$SERVICE_NAME-health-check.log"
     exit 0;
 fi

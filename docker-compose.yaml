@@ -169,12 +169,15 @@ services:
       - TZ
       - PUID=1000
       - PGID=1000
+      - SERVICE_NAME=${SONARR_SERVICE_NAME}
+      - SERVICE_PORT=${SONARR_SERVICE_PORT}
+      - API_KEY=${SONARR_API_KEY}
     volumes:
       - ${SONARR_STORAGE}:${SONARR_STORAGE} # path to my volumes for download storage
       - ./sonarr:/config
       - ./scripts:/scripts # health check script and more
     healthcheck:
-      test: bash ./scripts/arr-health-check sonarr # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash ./scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
       interval: 30s
       retries: 0
       timeout: 5s
@@ -197,12 +200,15 @@ services:
       - TZ
       - PUID=1000
       - PGID=1000
+      - SERVICE_NAME=${RADARR_SERVICE_NAME}
+      - SERVICE_PORT=${RADARR_SERVICE_PORT}
+      - API_KEY=${RADARR_API_KEY}
     volumes:
       - ${RADARR_STORAGE}:${RADARR_STORAGE} # path to my volumes for download storage
       - ./radarr:/config
       - ./scripts:/scripts # health check script and more
     healthcheck:
-      test: bash ./scripts/arr-health-check radarr # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash ./scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
       interval: 30s
       retries: 0
       timeout: 5s
@@ -225,12 +231,15 @@ services:
       - TZ
       - PUID=1000
       - PGID=1000
+      - SERVICE_NAME=${PROWLARR_SERVICE_NAME}
+      - SERVICE_PORT=${PROWLARR_SERVICE_PORT}
+      - API_KEY=${PROWLARR_API_KEY}
     volumes:
       - ${PROWLARR_STORAGE}:${PROWLARR_STORAGE} # path to my volumes for download storage
       - ./prowlarr:/config
       - ./scripts:/scripts # health check script and more
     healthcheck:
-      test: bash ./scripts/arr-health-check prowlarr # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash ./scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
       interval: 30s
       retries: 0
       timeout: 5s
