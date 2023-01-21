@@ -179,6 +179,8 @@ services:
       retries: 0
       timeout: 5s
     restart: unless-stopped
+    labels:
+      - "autoheal=true" # include in autoheal check
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
@@ -205,6 +207,8 @@ services:
       retries: 0
       timeout: 5s
     restart: unless-stopped
+    labels:
+      - "autoheal=true" # include in autoheal check
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
@@ -230,6 +234,8 @@ services:
       interval: 30s
       retries: 0
       timeout: 5s
+    labels:
+      - "autoheal=true" # include in autoheal check
     restart: unless-stopped
     depends_on:
       vpn: # wait for vpn to start before starting
