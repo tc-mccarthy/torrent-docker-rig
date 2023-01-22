@@ -30,7 +30,7 @@ services:
       - "autoheal=true" # include in autoheal check
     healthcheck:
       test: bash ./scripts/vpn-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 10s
+      interval: 30s
       retries: 3
       timeout: 5s
       start_period: 10s
@@ -265,6 +265,13 @@ services:
       - ${TMM_STORAGE}:${TMM_STORAGE} # path to my volumes for download storage
       - ./tmm:/data
     restart: unless-stopped
+    healthcheck:
+      test: bash ./scripts/tmm-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      interval: 60s
+      retries: 3
+      timeout: 5s
+    labels:
+      - "autoheal=true" # include in autoheal check
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
