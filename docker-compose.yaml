@@ -177,7 +177,7 @@ services:
       - ./sonarr:/config
       - ./scripts:/scripts # health check script and more
     healthcheck:
-      test: bash ./scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
       interval: 60s
       retries: 3
       timeout: 5s
@@ -208,7 +208,7 @@ services:
       - ./radarr:/config
       - ./scripts:/scripts # health check script and more
     healthcheck:
-      test: bash ./scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
       interval: 60s
       retries: 3
       timeout: 5s
@@ -239,7 +239,7 @@ services:
       - ./prowlarr:/config
       - ./scripts:/scripts # health check script and more
     healthcheck:
-      test: bash ./scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
       interval: 60s
       retries: 3
       timeout: 5s
@@ -267,7 +267,7 @@ services:
       - ./scripts:/scripts
     restart: unless-stopped
     healthcheck:
-      test: bash ./scripts/tmm-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash /scripts/tmm-health-check # health check script confirms protected vpn connection and a connected qbittorrent
       interval: 60s
       retries: 3
       timeout: 5s
