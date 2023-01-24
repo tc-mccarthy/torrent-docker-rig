@@ -264,6 +264,7 @@ services:
     volumes:
       - ${TMM_STORAGE}:${TMM_STORAGE} # path to my volumes for download storage
       - ./tmm:/data
+      - ./scripts:/scripts
     restart: unless-stopped
     healthcheck:
       test: bash ./scripts/tmm-health-check # health check script confirms protected vpn connection and a connected qbittorrent
