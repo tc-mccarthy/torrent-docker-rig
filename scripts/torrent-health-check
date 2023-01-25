@@ -1,6 +1,15 @@
 #!/bin/bash
 TIMESTAMP=$(date)
 
+$LOCK=$(find . -iname "torrent-health-check.lock" -mmin +10 | wc -l)
+
+echo "$TIMESTAMP" > /scripts/torrent-health-check.log
+
+if [[ "$LOCK" != "0" ]]; then
+    echo ">> LOCK DETECTED. SKIPPING HEALTHCHECK >>" >> /scripts/torrent-health-check.log
+    exit 0;
+fi
+
 ## URL TO THE VPN STATUS CHECK TO CONFIRM THIS CONTAINER IS GOING OUT TO THE INTERNET PROTECTED
 VPN_STATUS_URL="https://nordvpn.com/wp-admin/admin-ajax.php?action=get_user_info_data"
 
@@ -11,7 +20,6 @@ TORRENT_STATUS_URL="http://localhost:$WEBUI_PORT/api/v2/transfer/info"
 VPN_STATUS=$(curl "$VPN_STATUS_URL");
 TORRENT_STATUS=$(curl "$TORRENT_STATUS_URL")
 
-echo "$TIMESTAMP" > /scripts/torrent-health-check.log
 echo "VPN STATUS" >> /scripts/torrent-health-check.log
 echo "$VPN_STATUS" | jq . >> /scripts/torrent-health-check.log
 
@@ -32,5 +40,6 @@ elif [[ "$TORRENT_STATUS" != '"connected"' ]]; then
     exit 1;
 else
     echo "All systems go" >> /scripts/torrent-health-check.log
+    touch "./torrent-health-check.lock"
     exit 0;
 fi

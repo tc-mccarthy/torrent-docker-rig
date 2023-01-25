@@ -31,10 +31,10 @@ services:
       - "autoheal=true" # include in autoheal check
     healthcheck:
       test: bash ./scripts/vpn-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 90s
+      interval: 10s
       retries: 3
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
     networks:
       - default
 
@@ -61,9 +61,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: bash ./scripts/torrent-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 30s
+      interval: 10s
       retries: 0
       timeout: 5s
+      start_period: 30s
     networks:
       - default
 
@@ -179,10 +180,10 @@ services:
       - ./scripts:/scripts # health check script and more
     healthcheck:
       test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 300s
+      interval: 10s
       retries: 3
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
     restart: unless-stopped
     labels:
       - "autoheal=true" # include in autoheal check
@@ -211,7 +212,7 @@ services:
       - ./scripts:/scripts # health check script and more
     healthcheck:
       test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 300s
+      interval: 10s
       retries: 3
       timeout: 5s
       start_period: 10s
@@ -243,7 +244,7 @@ services:
       - ./scripts:/scripts # health check script and more
     healthcheck:
       test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 300s
+      interval: 10s
       retries: 3
       timeout: 5s
       start_period: 10s
@@ -272,10 +273,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: bash /scripts/tmm-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 300s
+      interval: 10s
       retries: 3
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
     labels:
       - "autoheal=true" # include in autoheal check
     depends_on:
@@ -284,9 +285,13 @@ services:
 
   portainer:
     image: portainer/portainer-ce:latest
+    network_mode: service:vpn # all traffic goes through vpn
     volumes:
       - ./portainer:/data
       - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      vpn: # wait for vpn to start before starting
+        condition: service_healthy
     restart: unless-stopped
 
 networks:

@@ -1,5 +1,13 @@
 #!/bin/bash
 TIMESTAMP=$(date)
+echo "$TIMESTAMP" > /scripts/vpn-health-check.log
+
+$LOCK=$(find . -iname "vpn-health-check.lock" -mmin +10 | wc -l)
+
+if [[ "$LOCK" != "0" ]]; then
+    echo ">> LOCK DETECTED. SKIPPING HEALTHCHECK >>" >> /scripts/vpn-health-check.log
+    exit 0;
+fi
 
 ## URL TO THE VPN STATUS CHECK TO CONFIRM THIS CONTAINER IS GOING OUT TO THE INTERNET PROTECTED
 VPN_STATUS_URL="https://nordvpn.com/wp-admin/admin-ajax.php?action=get_user_info_data"
@@ -7,7 +15,6 @@ VPN_STATUS_URL="https://nordvpn.com/wp-admin/admin-ajax.php?action=get_user_info
 ## CAPTURE STATUSES
 VPN_STATUS=$(curl "$VPN_STATUS_URL");
 
-echo "$TIMESTAMP" > /scripts/vpn-health-check.log
 echo "VPN STATUS" >> /scripts/vpn-health-check.log
 echo "$VPN_STATUS" | jq . >> /scripts/vpn-health-check.log
 
@@ -19,5 +26,6 @@ if [[ "$VPN_STATUS" == "false" ]]; then
     exit 1;
 else
     echo "VPN connected" >> /scripts/vpn-health-check.log
+    touch "./vpn-health-check.lock"
     exit 0;
 fi
