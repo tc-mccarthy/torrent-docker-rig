@@ -20,6 +20,7 @@ services:
       - 8989:8989 ## sonarr
       - 9696:9696 ## prowlarr
       - 4000:4000 ## tmm VNC
+      - 9443:9443 ## portainer
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1 # Recommended if using ipv4 only
       - net.ipv4.conf.all.rp_filter=2
@@ -280,6 +281,13 @@ services:
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    volumes:
+      - ./portainer:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
 
 networks:
   default:
