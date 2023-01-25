@@ -1,7 +1,7 @@
 #!/bin/bash
 TIMESTAMP=$(date)
 
-$LOCK=$(find . -iname "$SERVICE_NAME-health-check.lock" -mmin +10 | wc -l)
+$LOCK=$(find /scripts -iname "$SERVICE_NAME-health-check.lock" -mmin +10 | wc -l)
 
 echo "$TIMESTAMP" > "/scripts/$SERVICE_NAME-health-check.log"
 
@@ -40,6 +40,6 @@ else
             --compressed
     fi
     echo "All systems go" >> "/scripts/$SERVICE_NAME-health-check.log"
-    touch "./$SERVICE_NAME-health-check.lock"
+    touch "/scripts/$SERVICE_NAME-health-check.lock"
     exit 0;
 fi

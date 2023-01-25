@@ -2,7 +2,7 @@
 TIMESTAMP=$(date)
 echo "$TIMESTAMP" > /scripts/vpn-health-check.log
 
-$LOCK=$(find . -iname "vpn-health-check.lock" -mmin +10 | wc -l)
+$LOCK=$(find /scripts -iname "vpn-health-check.lock" -mmin +10 | wc -l)
 
 if [[ "$LOCK" != "0" ]]; then
     echo ">> LOCK DETECTED. SKIPPING HEALTHCHECK >>" >> /scripts/vpn-health-check.log
@@ -26,6 +26,6 @@ if [[ "$VPN_STATUS" == "false" ]]; then
     exit 1;
 else
     echo "VPN connected" >> /scripts/vpn-health-check.log
-    touch "./vpn-health-check.lock"
+    touch "/scripts/vpn-health-check.lock"
     exit 0;
 fi
