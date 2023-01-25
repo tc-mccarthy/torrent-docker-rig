@@ -30,7 +30,7 @@ services:
       - "autoheal=true" # include in autoheal check
     healthcheck:
       test: bash ./scripts/vpn-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 30s
+      interval: 90s
       retries: 3
       timeout: 5s
       start_period: 10s
@@ -178,9 +178,10 @@ services:
       - ./scripts:/scripts # health check script and more
     healthcheck:
       test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 60s
+      interval: 300s
       retries: 3
       timeout: 5s
+      start_period: 10s
     restart: unless-stopped
     labels:
       - "autoheal=true" # include in autoheal check
@@ -209,9 +210,10 @@ services:
       - ./scripts:/scripts # health check script and more
     healthcheck:
       test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 60s
+      interval: 300s
       retries: 3
       timeout: 5s
+      start_period: 10s
     restart: unless-stopped
     labels:
       - "autoheal=true" # include in autoheal check
@@ -240,9 +242,10 @@ services:
       - ./scripts:/scripts # health check script and more
     healthcheck:
       test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 60s
+      interval: 300s
       retries: 3
       timeout: 5s
+      start_period: 10s
     labels:
       - "autoheal=true" # include in autoheal check
     restart: unless-stopped
@@ -268,9 +271,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: bash /scripts/tmm-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 60s
+      interval: 300s
       retries: 3
       timeout: 5s
+      start_period: 10s
     labels:
       - "autoheal=true" # include in autoheal check
     depends_on:
