@@ -1,0 +1,45 @@
+#!/bin/bash
+TIMESTAMP=$(date)
+
+$LOCK=$(find /scripts -iname "$SERVICE_NAME-health-check.lock" -mmin +10 | wc -l)
+
+echo "$TIMESTAMP" > "/scripts/$SERVICE_NAME-health-check.log"
+
+if [[ "$LOCK" != "0" ]]; then
+    echo ">> LOCK DETECTED. SKIPPING HEALTHCHECK >>" >> "/scripts/$SERVICE_NAME-health-check.log"
+    exit 0;
+fi
+
+## URL TO THE VPN STATUS CHECK TO CONFIRM THIS CONTAINER IS GOING OUT TO THE INTERNET PROTECTED
+VPN_STATUS_URL="https://nordvpn.com/wp-admin/admin-ajax.php?action=get_user_info_data"
+
+## CAPTURE STATUSES
+VPN_STATUS=$(curl "$VPN_STATUS_URL")
+
+
+echo "VPN STATUS" >> "/scripts/$SERVICE_NAME-health-check.log"
+echo "$VPN_STATUS" >> "/scripts/$SERVICE_NAME-health-check.log"
+echo "$VPN_STATUS" | jq . >> "/scripts/$SERVICE_NAME-health-check.log"
+
+VPN_STATUS=$(echo "$VPN_STATUS" | jq .status)
+
+## IF WE'RE NOT VPN PROTECTED, FAIL
+if [[ "$VPN_STATUS" != "true" ]]; then
+    echo "Not connected to NordLynx. Marking unhealthy" >> "/scripts/$SERVICE_NAME-health-check.log"
+    exit 1;
+else
+    if [[ "$API_KEY" != "" ]]; then
+        echo "API KEY DETECTED. REFRESHING ${SERVICE_NAME} DOWNLOAD CLIENTS" >> "/scripts/$SERVICE_NAME-health-check.log"
+        curl "http://localhost:${SERVICE_PORT}/${SERVICE_NAME}/api/v3/downloadclient/testall" \
+            -X 'POST' \
+            -H 'Accept: application/json, text/javascript, */*; q=0.01' \
+            -H 'Accept-Language: en-US,en;q=0.9' \
+            -H 'Content-Length: 0' \
+            -H 'Content-Type: application/json' \
+            -H "X-Api-Key: ${API_KEY}" \
+            --compressed
+    fi
+    echo "All systems go" >> "/scripts/$SERVICE_NAME-health-check.log"
+    touch "/scripts/$SERVICE_NAME-health-check.lock"
+    exit 0;
+fi

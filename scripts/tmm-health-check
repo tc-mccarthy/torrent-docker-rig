@@ -1,0 +1,33 @@
+#!/bin/bash
+TIMESTAMP=$(date)
+
+$LOCK=$(find /scripts -iname "tmm-health-check.lock" -mmin +10 | wc -l)
+
+echo "$TIMESTAMP" > "/scripts/$SERVICE_NAME-health-check.log"
+
+if [[ "$LOCK" != "0" ]]; then
+
+    exit 0;
+fi
+
+## URL TO THE VPN STATUS CHECK TO CONFIRM THIS CONTAINER IS GOING OUT TO THE INTERNET PROTECTED
+VPN_STATUS_URL="https://nordvpn.com/wp-admin/admin-ajax.php?action=get_user_info_data"
+
+## CAPTURE STATUSES
+VPN_STATUS=$(wget -nv -O- "$VPN_STATUS_URL");
+
+echo "VPN STATUS" >> /scripts/tmm-health-check.log
+
+VPN_STATUS=$(echo "$VPN_STATUS" | python -c 'import json,sys;obj=json.load(sys.stdin);print obj["status"];');
+
+echo "$VPN_STATUS" >> /scripts/tmm-health-check.log
+
+## IF WE'RE NOT VPN PROTECTED, FAIL
+if [[ "$VPN_STATUS" != "False" && "$VPN_STATUS" != "True" ]]; then
+    echo "Not able to talk to DNS" >> /scripts/tmm-health-check.log
+    exit 1;
+else
+    echo "VPN connected" >> /scripts/tmm-health-check.log
+    touch "/scripts/tmm-health-check.lock"
+    exit 0;
+fi

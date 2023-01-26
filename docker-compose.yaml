@@ -20,6 +20,7 @@ services:
       - 8989:8989 ## sonarr
       - 9696:9696 ## prowlarr
       - 4000:4000 ## tmm VNC
+      - 9443:9443 ## portainer
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1 # Recommended if using ipv4 only
       - net.ipv4.conf.all.rp_filter=2
@@ -33,7 +34,7 @@ services:
       interval: 10s
       retries: 3
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
     networks:
       - default
 
@@ -60,9 +61,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: bash ./scripts/torrent-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-      interval: 30s
+      interval: 10s
       retries: 0
       timeout: 5s
+      start_period: 30s
     networks:
       - default
 
@@ -169,15 +171,27 @@ services:
       - TZ
       - PUID=1000
       - PGID=1000
+      - SERVICE_NAME=${SONARR_SERVICE_NAME}
+      - SERVICE_PORT=${SONARR_SERVICE_PORT}
+      - API_KEY=${SONARR_API_KEY}
     volumes:
       - ${SONARR_STORAGE}:${SONARR_STORAGE} # path to my volumes for download storage
       - ./sonarr:/config
+      - ./scripts:/scripts # health check script and more
+    healthcheck:
+      test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      interval: 10s
+      retries: 3
+      timeout: 5s
+      start_period: 30s
     restart: unless-stopped
+    labels:
+      - "autoheal=true" # include in autoheal check
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
       prowlarr: # wait for index service to start before starting
-        condition: service_started
+        condition: service_healthy
       torrent: # wait for download client to start before starting
         condition: service_healthy
 
@@ -189,15 +203,27 @@ services:
       - TZ
       - PUID=1000
       - PGID=1000
+      - SERVICE_NAME=${RADARR_SERVICE_NAME}
+      - SERVICE_PORT=${RADARR_SERVICE_PORT}
+      - API_KEY=${RADARR_API_KEY}
     volumes:
       - ${RADARR_STORAGE}:${RADARR_STORAGE} # path to my volumes for download storage
       - ./radarr:/config
+      - ./scripts:/scripts # health check script and more
+    healthcheck:
+      test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      interval: 10s
+      retries: 3
+      timeout: 5s
+      start_period: 10s
     restart: unless-stopped
+    labels:
+      - "autoheal=true" # include in autoheal check
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
       prowlarr: # wait for index service to start before starting
-        condition: service_started
+        condition: service_healthy
       torrent: # wait for download client to start before starting
         condition: service_healthy
 
@@ -209,9 +235,21 @@ services:
       - TZ
       - PUID=1000
       - PGID=1000
+      - SERVICE_NAME=${PROWLARR_SERVICE_NAME}
+      - SERVICE_PORT=${PROWLARR_SERVICE_PORT}
+      - API_KEY=${PROWLARR_API_KEY}
     volumes:
       - ${PROWLARR_STORAGE}:${PROWLARR_STORAGE} # path to my volumes for download storage
       - ./prowlarr:/config
+      - ./scripts:/scripts # health check script and more
+    healthcheck:
+      test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      interval: 10s
+      retries: 3
+      timeout: 5s
+      start_period: 10s
+    labels:
+      - "autoheal=true" # include in autoheal check
     restart: unless-stopped
     depends_on:
       vpn: # wait for vpn to start before starting
@@ -231,10 +269,30 @@ services:
     volumes:
       - ${TMM_STORAGE}:${TMM_STORAGE} # path to my volumes for download storage
       - ./tmm:/data
+      - ./scripts:/scripts
     restart: unless-stopped
+    healthcheck:
+      test: bash /scripts/tmm-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      interval: 10s
+      retries: 3
+      timeout: 5s
+      start_period: 30s
+    labels:
+      - "autoheal=true" # include in autoheal check
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    network_mode: service:vpn # all traffic goes through vpn
+    volumes:
+      - ./portainer:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      vpn: # wait for vpn to start before starting
+        condition: service_healthy
+    restart: unless-stopped
 
 networks:
   default:
