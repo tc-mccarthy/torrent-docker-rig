@@ -19,11 +19,23 @@ This docker stack has all of the pieces for setting up and maintaining a home gr
 - [![nodejs][nodejs]][nodejs-url]
 - [![nginx][nginx]][nginx-url]
 - [![cloudflare][cloudflare]][cloudflare-url]
+- [![plex][plex]][plex-url]
 - [![qbittorrent][qbittorrent]][qbittorrent-url]
 - [![Sonarr][sonarr]][sonarr-url]
 - [![Radarr][radarr]][radarr-url]
 - [![Prowlarr][prowlarr]][prowlarr-url]
 - [![tinyMediaManager][tinymediamanager]][tinymediamanager-url]
+
+### Included services
+
+- A NordLynx container serving as the gateway to the web. It's server selection is configurable via docker-compose
+- A qBittorrent container with a built-in health check that ensures the container has a protected path to the internet (is actually going out over nordlynx) and that qBittorrent is "connected" not firewalled or disconnected (which can sometimes happen as a result of a race condition between the connection to Nord and the startup of the qbittorrent service)
+- Autoheal which monitors "unhealthy" container and restarts them until the become healthy. This, combined with the in-built IPTables config in nordlynx prevents connection issues and IP Leaks
+- NginX reverse proxy provides an SSL interface for when you access qbittorrent's web UI. This way, if you're managing your torrents remotely, you have an encrypted connection
+- DDNS via cloudflare so that you can maintain an external record of your residential IP to have continual remote access to the stack (you'll still need to configure your router)
+- Sonarr, Radarr and Prowlarr for monitoring and torrent acquisition
+- Transcode service to optimize files in the background
+- Plex media server
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -162,3 +174,5 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 [nginx-url]: https://www.nginx.com/
 [cloudflare]: https://img.shields.io/badge/cloudflare-000000?style=for-the-badge&logo=cloudflare&logoColor=white
 [cloudflare-url]: https://www.cloudflare.com/
+[plex]: https://img.shields.io/badge/plex%20media%20server-000000?style=for-the-badge&logo=plex&logoColor=white
+[plex-url]: https://www.plex.tv/
