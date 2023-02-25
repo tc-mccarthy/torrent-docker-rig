@@ -255,9 +255,9 @@ services:
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
-      prowlarr: # wait for index service to start before starting
+      radarr: # wait for index service to start before starting
         condition: service_healthy
-      torrent: # wait for download client to start before starting
+      sonarr: # wait for download client to start before starting
         condition: service_healthy
 
   prowlarr:
