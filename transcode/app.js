@@ -44,6 +44,7 @@ async function generate_filelist() {
     "webm",
     "gif",
     "mpg",
+    "mp4",
   ];
   const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(" ")} \\( ${file_ext
     .map((ext) => `-iname "*.${ext}"`)

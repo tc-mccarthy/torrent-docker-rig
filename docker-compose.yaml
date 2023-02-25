@@ -21,6 +21,7 @@ services:
       - 9696:9696 ## prowlarr
       - 4000:4000 ## tmm VNC
       - 9443:9443 ## portainer
+      - 6767:6767 ## bazarr
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1 # Recommended if using ipv4 only
       - net.ipv4.conf.all.rp_filter=2
@@ -225,6 +226,38 @@ services:
       prowlarr: # wait for index service to start before starting
         condition: service_healthy
       torrent: # wait for download client to start before starting
+        condition: service_healthy
+
+  bazarr:
+    container_name: bazarr
+    image: lscr.io/linuxserver/bazarr:latest
+    network_mode: service:vpn # all traffic goes through vpn
+    environment:
+      - TZ
+      - PUID=1000
+      - PGID=1000
+      - SERVICE_NAME=${BAZARR_SERVICE_NAME}
+      - SERVICE_PORT=${BAZARR_SERVICE_PORT}
+      - API_KEY=${BAZARR_API_KEY}
+    volumes:
+      - ${BAZARR_STORAGE}:${BAZARR_STORAGE} # path to my volumes for download storage
+      - ./bazarr:/config
+      - ./scripts:/scripts # health check script and more
+    healthcheck:
+      test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      interval: 10s
+      retries: 3
+      timeout: 5s
+      start_period: 10s
+    restart: unless-stopped
+    labels:
+      - "autoheal=true" # include in autoheal check
+    depends_on:
+      vpn: # wait for vpn to start before starting
+        condition: service_healthy
+      radarr: # wait for index service to start before starting
+        condition: service_healthy
+      sonarr: # wait for download client to start before starting
         condition: service_healthy
 
   prowlarr:
