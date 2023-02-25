@@ -23,6 +23,7 @@ This docker stack has all of the pieces for setting up and maintaining a home gr
 - [![qbittorrent][qbittorrent]][qbittorrent-url]
 - [![Sonarr][sonarr]][sonarr-url]
 - [![Radarr][radarr]][radarr-url]
+- [![Bazarr][bazarr]][bazarr-url]
 - [![Prowlarr][prowlarr]][prowlarr-url]
 - [![tinyMediaManager][tinymediamanager]][tinymediamanager-url]
 
@@ -33,7 +34,7 @@ This docker stack has all of the pieces for setting up and maintaining a home gr
 - Autoheal which monitors "unhealthy" container and restarts them until the become healthy. This, combined with the in-built IPTables config in nordlynx prevents connection issues and IP Leaks
 - NginX reverse proxy provides an SSL interface for when you access qbittorrent's web UI. This way, if you're managing your torrents remotely, you have an encrypted connection
 - DDNS via cloudflare so that you can maintain an external record of your residential IP to have continual remote access to the stack (you'll still need to configure your router)
-- Sonarr, Radarr and Prowlarr for monitoring and torrent acquisition
+- Sonarr, Radarr, Bazarr and Prowlarr for monitoring and torrent acquisition as well as subtitle acquisition
 - Transcode service to optimize files in the background
 - Plex media server
 
@@ -156,6 +157,8 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 [sonarr-url]: https://sonarr.tv/
 [radarr]: https://img.shields.io/badge/radarr-000000?style=for-the-badge&logo=radarr&logoColor=white
 [radarr-url]: https://radarr.video/
+[bazarr]: https://img.shields.io/badge/bazarr-000000?style=for-the-badge&logo=bazarr&logoColor=white
+[bazarr-url]: https://www.bazarr.media/
 [prowlarr]: https://img.shields.io/badge/prowlarr-000000?style=for-the-badge&logo=prowlarr&logoColor=white
 [prowlarr-url]: https://prowlarr.com/
 [qbittorrent]: https://img.shields.io/badge/qbittorrent-000000?style=for-the-badge&logo=qbittorrent&logoColor=white
