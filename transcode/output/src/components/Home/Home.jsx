@@ -6,13 +6,19 @@ import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWi
 import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 
 async function getData (setData) {
-  const d = await fetch('active.json').then((r) => r.json());
+  try {
+    const d = await fetch('active.json').then((r) => r.json());
 
-  setData(d);
+    setData(d);
 
-  setTimeout(() => {
-    getData(setData);
-  }, 1 * 1000);
+    setTimeout(() => {
+      getData(setData);
+    }, 1 * 1000);
+  } catch (e) {
+    setTimeout(() => {
+      getData(setData);
+    }, 1 * 1000);
+  }
 }
 
 function human_size (size) {
@@ -85,7 +91,11 @@ function Home () {
         </div>
         <div className="widget">
           <strong>Est. Final Size</strong>
-          <em>{`${Math.round(+data.output.size.estimated_final.change.replace('%', '') * 100) / 100}%`}</em>
+          <em>
+            {`${
+            Math.round(+data.output.size.estimated_final.change.replace('%', '') * 100) / 100
+          }%`}
+          </em>
           {human_size(data.output.size.estimated_final)}
         </div>
       </div>
@@ -94,7 +104,6 @@ function Home () {
         <strong>Command</strong>
         {data.ffmpeg_cmd}
       </div>
-
     </div>
   );
 }
