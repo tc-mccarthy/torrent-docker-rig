@@ -356,6 +356,7 @@ function transcode(file, filelist) {
             ...conversion_profile,
             ffmpeg_cmd,
             file,
+            filelist: filelist.slice(list_idx + 1),
             overall_progress: `(${list_idx}/${filelist.length})`,
           });
 
@@ -367,6 +368,7 @@ function transcode(file, filelist) {
               ...conversion_profile,
               ffmpeg_cmd,
               file,
+              filelist: filelist.slice(list_idx + 1),
               overall_progress: `(${list_idx}/${filelist.length})`,
               output: JSON.parse(output),
             })
