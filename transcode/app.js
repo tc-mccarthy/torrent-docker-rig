@@ -309,7 +309,7 @@ function transcode(file, filelist) {
           ffmpeg_cmd = commandLine;
           fs.writeFileSync(
             "/usr/app/output/filelist.json",
-            JSON.stringify(filelist.slice(list_idx + 1))
+            JSON.stringify(filelist.slice(list_idx))
           );
         })
         .on("progress", function (progress) {
