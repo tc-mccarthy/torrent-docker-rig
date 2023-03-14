@@ -307,6 +307,10 @@ function transcode(file, filelist) {
           console.log("Spawned Ffmpeg with command: " + commandLine);
           start_time = moment();
           ffmpeg_cmd = commandLine;
+          fs.writeFileSync(
+            "/usr/app/output/filelist.json",
+            JSON.stringify(filelist.slice(list_idx + 1))
+          );
         })
         .on("progress", function (progress) {
           const elapsed = moment().diff(start_time, "seconds");
@@ -371,11 +375,6 @@ function transcode(file, filelist) {
               overall_progress: `(${list_idx}/${filelist.length})`,
               output: JSON.parse(output),
             })
-          );
-
-          fs.writeFileSync(
-            "/usr/app/output/filelist.json",
-            JSON.stringify(filelist.slice(list_idx + 1))
           );
         })
         .on("end", async function (stdout, stderr) {
