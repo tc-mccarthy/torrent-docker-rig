@@ -5,14 +5,24 @@ import Box from '@mui/material/Box';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
 import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 
-async function getData (setData) {
-  const d = await fetch('active.json').then((r) => r.json());
+async function getData (setData, setFileList) {
+  try {
+    const d = await fetch('active.json').then((r) => r.json());
 
-  setData(d);
+    setData(d);
 
-  setTimeout(() => {
-    getData(setData);
-  }, 1 * 1000);
+    const f = await fetch('filelist.json').then((r) => r.json());
+
+    setFileList(f);
+
+    setTimeout(() => {
+      getData(setData, setFileList);
+    }, 1 * 1000);
+  } catch (e) {
+    setTimeout(() => {
+      getData(setData, setFileList);
+    }, 1 * 1000);
+  }
 }
 
 function human_size (size) {
@@ -25,9 +35,10 @@ function human_size (size) {
 
 function Home () {
   const [data, setData] = useState(false);
+  const [filelist, setFileList] = useState(false);
 
   if (!data) {
-    getData(setData);
+    getData(setData, setFileList);
     return (
       <Box sx={{ display: 'flex' }}>
         <CircularProgress />
@@ -85,7 +96,11 @@ function Home () {
         </div>
         <div className="widget">
           <strong>Est. Final Size</strong>
-          <em>{`${Math.round(+data.output.size.estimated_final.change.replace('%', '') * 100) / 100}%`}</em>
+          <em>
+            {`${
+              Math.round(+data.output.size.estimated_final.change.replace('%', '') * 100) / 100
+            }%`}
+          </em>
           {human_size(data.output.size.estimated_final)}
         </div>
       </div>
@@ -95,6 +110,17 @@ function Home () {
         {data.ffmpeg_cmd}
       </div>
 
+      <div className="widget list">
+        <strong>Remaining files</strong>
+        {!filelist?.map && <em>Loading...</em>}
+        {filelist?.map && (
+          <ol>
+            {filelist.map((f) => (
+              <li>{f}</li>
+            ))}
+          </ol>
+        )}
+      </div>
     </div>
   );
 }

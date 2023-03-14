@@ -1,9 +1,9 @@
 {
-  "name": "webpack-template",
-  "version": "1.0.0",
-  "description": "Bare bones for a webpack compiler",
+  "name": "tc-transcode",
+  "version": "1.1.0",
+  "description": "Optimizes videos for storage",
   "main": "index.js",
-  "repository": "git@github.com:newsdaycom/webpack-template.git",
+  "repository": "git@github.com:tc-mccarthy/torrent-docker-rig.git",
   "author": "TC McCarthy <tc.mccarthy1@gmail.com>",
   "license": "MIT",
   "scripts": {

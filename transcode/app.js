@@ -13,7 +13,7 @@ const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(
 function exec_promise(cmd) {
   return new Promise((resolve, reject) => {
     console.log("Running", cmd);
-    exec(cmd, (error, stdout, stderr) => {
+    exec(cmd, { maxBuffer: 1024 * 1024 * 500 }, (error, stdout, stderr) => {
       if (error) {
         console.error(`exec error: ${error}`);
         reject(error);
@@ -62,6 +62,7 @@ async function generate_filelist() {
       const lock_file_pattern = new RegExp(
         path
           .basename(f)
+          .replace(/[+]/g, "[+]")
           .replace(/\.[A-Za-z0-9]+$/, ".*.tclock")
           .replace("(", "\\(")
           .replace(")", "\\)")
@@ -306,6 +307,10 @@ function transcode(file, filelist) {
           console.log("Spawned Ffmpeg with command: " + commandLine);
           start_time = moment();
           ffmpeg_cmd = commandLine;
+          fs.writeFileSync(
+            "/usr/app/output/filelist.json",
+            JSON.stringify(filelist.slice(list_idx))
+          );
         })
         .on("progress", function (progress) {
           const elapsed = moment().diff(start_time, "seconds");
