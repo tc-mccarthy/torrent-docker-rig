@@ -140,6 +140,19 @@ figcaption {
     margin: 0 auto 10px;
   }
 
+  &.list {
+    max-height: 100vh;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    ol,
+    ul {
+      text-align: left;
+      li {
+        padding-left: 10px;
+      }
+    }
+  }
+
   strong,
   em {
     display: block;

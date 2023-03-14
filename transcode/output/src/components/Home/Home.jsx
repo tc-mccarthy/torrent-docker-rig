@@ -110,9 +110,16 @@ function Home () {
         {data.ffmpeg_cmd}
       </div>
 
-      <div className="widget center">
+      <div className="widget list">
         <strong>Remaining files</strong>
-        <ol>{filelist?.map && filelist.map((f) => <li>{f}</li>)}</ol>
+        {!filelist?.map && <em>Loading...</em>}
+        {filelist?.map && (
+          <ol>
+            {filelist.map((f) => (
+              <li>{f}</li>
+            ))}
+          </ol>
+        )}
       </div>
     </div>
   );
