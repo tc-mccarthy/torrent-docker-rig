@@ -112,11 +112,7 @@ function Home () {
 
       <div className="widget center">
         <strong>Remaining files</strong>
-        <ol>
-          {filelist.map((f) => (
-            <li>{f}</li>
-          ))}
-        </ol>
+        <ol>{filelist?.map && filelist.map((f) => <li>{f}</li>)}</ol>
       </div>
     </div>
   );
