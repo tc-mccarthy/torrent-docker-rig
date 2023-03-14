@@ -13,7 +13,7 @@ const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(
 function exec_promise(cmd) {
   return new Promise((resolve, reject) => {
     console.log("Running", cmd);
-    exec(cmd, { maxBuffer: 1024 * 500 }, (error, stdout, stderr) => {
+    exec(cmd, { maxBuffer: 1024 * 1024 * 500 }, (error, stdout, stderr) => {
       if (error) {
         console.error(`exec error: ${error}`);
         reject(error);
