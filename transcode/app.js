@@ -62,6 +62,8 @@ async function generate_filelist() {
       const lock_file_pattern = new RegExp(
         path
           .basename(f)
+          .replace(/\[/g, "\\[")
+          .replace(/\]/g, "\\]")
           .replace(/[+]/g, "[+]")
           .replace(/\.[A-Za-z0-9]+$/, ".*.tclock")
           .replace("(", "\\(")
