@@ -262,6 +262,7 @@ function transcode(file, filelist) {
       if (transcode_video) {
         const pix_fmt =
           video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
+
         cmd = cmd.outputOptions([
           "-c:v libx265",
           "-profile:v main10",
@@ -269,13 +270,15 @@ function transcode(file, filelist) {
           `-pix_fmt ${pix_fmt}`,
         ]);
 
-        if (pix_fmt === "yuv420p10le") {
+        if (/arib[-]std[-]b67|smpte2084/i.test(video_stream.color_transfer)) {
           cmd = cmd.outputOptions([
             "-color_range tv",
             "-colorspace bt2020nc",
             "-color_primaries bt2020",
             "-color_trc smpte2084",
           ]);
+
+          conversion_profile.name += ` HDR`;
         }
       } else {
         cmd = cmd.outputOptions("-c:v copy");
