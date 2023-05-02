@@ -270,6 +270,7 @@ function transcode(file, filelist) {
           `-pix_fmt ${pix_fmt}`,
         ]);
 
+        // handle HDR
         if (/arib[-]std[-]b67|smpte2084/i.test(video_stream.color_transfer)) {
           cmd = cmd.outputOptions([
             "-color_range tv",
