@@ -1,0 +1,7 @@
+---
+javaHome: ""
+jvmOpts:
+  - "-Dtmm.contentfolder=/data"
+  - "-Dtmm.noupdate=true"
+  - "-Xmx512m"
+env: []

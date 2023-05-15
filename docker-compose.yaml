@@ -294,6 +294,8 @@ services:
     container_name: tinymediamanager
     image: tinymediamanager/tinymediamanager:latest
     network_mode: service:vpn # all traffic goes through vpn
+    volumes:
+      - ./tmm/launcher-extra.yml:/app/launcher-extra.yml
     environment:
       - TZ
       - USER_ID=1000
