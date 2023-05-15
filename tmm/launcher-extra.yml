@@ -3,5 +3,5 @@ javaHome: ""
 jvmOpts:
   - "-Dtmm.contentfolder=/data"
   - "-Dtmm.noupdate=true"
-  - "-Xmx512m"
+  - "-Xmx2048m"
 env: []
