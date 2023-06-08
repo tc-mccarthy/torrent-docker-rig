@@ -10,6 +10,8 @@ const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(
   (path) => "/" + path
 );
 
+const encode_version = "20230608a";
+
 function exec_promise(cmd) {
   return new Promise((resolve, reject) => {
     console.log("Running", cmd);
@@ -171,6 +173,16 @@ function transcode(file, filelist) {
       const video_stream = ffprobe_data.streams.find(
         (s) => s.codec_type === "video"
       );
+
+      const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".tc.mkv");
+      const lock_file = file.replace(/\.[A-Za-z0-9]+$/, ".tclock");
+
+      // if this file has already been encoded, short circuit
+      if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
+        await exec_promise(`mv ${file} ${dest_file}`);
+        return resolve();
+      }
+
       //get the audio stream, in english, with the highest channel count
       const audio_stream = ffprobe_data.streams
         .filter(
@@ -302,8 +314,7 @@ function transcode(file, filelist) {
         cmd = cmd.outputOptions(audio_filters);
       }
 
-      const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".tc.mkv");
-      const lock_file = file.replace(/\.[A-Za-z0-9]+$/, ".tclock");
+      cmd = cmd.outputOptions(`-metadata encode_version=${encode_version}`);
 
       let ffmpeg_cmd;
 
