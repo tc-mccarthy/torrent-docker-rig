@@ -179,7 +179,8 @@ function transcode(file, filelist) {
 
       // if this file has already been encoded, short circuit
       if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
-        await exec_promise(`mv ${file} ${dest_file}`);
+	console.log(">>>", file, "already transcoded. Renaming >>>");
+        await exec_promise(`mv "${file}" "${dest_file}"`);
         return resolve();
       }
 
