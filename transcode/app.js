@@ -57,34 +57,7 @@ async function generate_filelist() {
   const filelist = stdout
     .split("/media")
     .filter((j) => j)
-    .map((p) => `/media${p}`.replace("\x00", ""))
-    .filter((f) => {
-      const curr_path = path.dirname(f);
-      // console.log(">> curr_path >>", curr_path);
-      const lock_file_pattern = new RegExp(
-        path
-          .basename(f)
-          .replace("[", "\\[")
-          .replace("]", "\\]")
-          .replace("(", "\\(")
-          .replace(")", "\\)")
-          .replace(/[+]/g, "[+]")
-          .replace(/\.[A-Za-z0-9]+$/, ".*.tclock")
-          .replace(/\s+/g, "\\s+"),
-        "i"
-      );
-      let episode_code = f.match(/(S[0-9]+E[0-9]+)/);
-      console.log(">> LOCK FILE PATTERN >>", lock_file_pattern);
-      const files = fs.readdirSync(curr_path);
-      // console.log(files);
-      let lock_file = files.find((file) => lock_file_pattern.test(file));
-      // console.log("LOCK FILE", lock_file);
-      if (!lock_file && episode_code) {
-        episode_code = new RegExp(episode_code[1] + ".*tclock$");
-        lock_file = files.find((file) => episode_code.test(file));
-      }
-      return !lock_file;
-    });
+    .map((p) => `/media${p}`.replace("\x00", ""));
 
   fs.writeFileSync("./filelist.txt", filelist.join("\n"));
   return filelist;
@@ -175,11 +148,10 @@ function transcode(file, filelist) {
       );
 
       const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".tc.mkv");
-      const lock_file = file.replace(/\.[A-Za-z0-9]+$/, ".tclock");
 
       // if this file has already been encoded, short circuit
       if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
-	console.log(">>>", file, "already transcoded. Renaming >>>");
+        console.log(">>>", file, "already transcoded. Renaming >>>");
         await exec_promise(`mv "${file}" "${dest_file}"`);
         return resolve();
       }
@@ -397,8 +369,7 @@ function transcode(file, filelist) {
         })
         .on("end", async function (stdout, stderr) {
           console.log("Transcoding succeeded!");
-          console.log("Creating lockfile", lock_file);
-          await exec_promise(`touch "${lock_file}"`);
+
           await trash(file);
           resolve();
         })
