@@ -409,13 +409,14 @@ function get_disk_space() {
                 console.log(">> OBJ >>", obj.mounted);
 
                 if (obj.mounted?.indexOf) {
-                  return obj.mounted?.indexOf(path) > -1;
+                  return obj.mounted.indexOf(path) > -1;
                 } else {
+                  console.log(">> returning false on filter >>");
                   return false;
                 }
               }) > -1
           );
-
+        console.log(">> DISKS >>", rows);
         fs.writeFileSync("/usr/app/output/disk.json", JSON.stringify(rows));
         setTimeout(() => {
           get_disk_space();
