@@ -386,12 +386,53 @@ function transcode(file, filelist) {
   });
 }
 
+function get_disk_space() {
+  return new Promise((resolve, reject) => {
+    exec("df -h", (err, stdout, stderr) => {
+      if (err) {
+        reject(err);
+      } else {
+        let rows = stdout.split(/\n+/).map((row) => row.split(/\s+/));
+        rows = rows
+          .splice(1)
+          .map((row) => {
+            const obj = {};
+            rows[0].forEach((value, idx) => {
+              obj[value.toLowerCase().replace(/[^A-Za-z0-9]+/i, "")] = row[idx];
+            });
+            return obj;
+          })
+          .filter(
+            (obj) =>
+              PATHS.findIndex((path) => {
+                if (obj.mounted?.indexOf) {
+                  return obj.mounted?.indexOf(path) > -1;
+                } else {
+                  return false;
+                }
+              }) > -1
+          )
+          .filter(
+            (obj, idx, array) =>
+              array.findIndex((o) => o.mounted === obj.mounted) === idx
+          );
+
+        fs.writeFileSync("/usr/app/output/disk.json", JSON.stringify(rows));
+        setTimeout(() => {
+          get_disk_space();
+        }, 10 * 1000);
+        resolve(rows);
+      }
+    });
+  });
+}
+
 async function run() {
   try {
     await pre_sanitize();
     const filelist = await generate_filelist();
-
     console.log(">> FILELIST >>", filelist);
+    await get_disk_space();
     await async.eachSeries(filelist, async (file) => {
       await transcode(file, filelist);
       return true;
