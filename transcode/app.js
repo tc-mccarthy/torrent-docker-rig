@@ -411,10 +411,6 @@ function get_disk_space() {
                   return false;
                 }
               }) > -1
-          )
-          .filter(
-            (obj, idx, array) =>
-              array.findIndex((o) => o.mounted === obj.mounted) === idx
           );
 
         fs.writeFileSync("/usr/app/output/disk.json", JSON.stringify(rows));
