@@ -115,7 +115,7 @@ function Home () {
         {data.ffmpeg_cmd}
       </div>
 
-      <div className="flex">
+      <div className="flex quarter">
         {!disks?.map && <em>Loading...</em>}
         {disks?.map &&
           disks?.map((disk) => (
@@ -128,7 +128,6 @@ function Home () {
                 {disk.size}
               </em>
               <LinearProgressWithLabel value={parseFloat(disk.use.replace('%', ''))} />
-              ;
             </div>
           ))}
       </div>
