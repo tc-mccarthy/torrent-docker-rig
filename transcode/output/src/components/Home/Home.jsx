@@ -116,19 +116,21 @@ function Home () {
       </div>
 
       <div className="flex">
-        {disks.map((disk) => (
-          <div className="widget">
-            <strong>{disk.mounted}</strong>
-            <em>
-              {disk.used}
-              {' '}
-              of
-              {disk.size}
-            </em>
-            <LinearProgressWithLabel value={parseFloat(disk.use.replace('%', ''))} />
-            ;
-          </div>
-        ))}
+        {!disks?.map && <em>Loading...</em>}
+        {disks?.map &&
+          disks?.map((disk) => (
+            <div className="widget">
+              <strong>{disk.mounted}</strong>
+              <em>
+                {disk.used}
+                {' '}
+                of
+                {disk.size}
+              </em>
+              <LinearProgressWithLabel value={parseFloat(disk.use.replace('%', ''))} />
+              ;
+            </div>
+          ))}
       </div>
 
       <div className="widget list">
