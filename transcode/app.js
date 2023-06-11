@@ -405,6 +405,9 @@ function get_disk_space() {
           .filter(
             (obj) =>
               PATHS.findIndex((path) => {
+                console.log(">> PATH >>", path);
+                console.log(">> OBJ >>", obj.mounted);
+
                 if (obj.mounted?.indexOf) {
                   return obj.mounted?.indexOf(path) > -1;
                 } else {
