@@ -116,7 +116,7 @@ function Home () {
       </div>
 
       <div className="flex quarter">
-        {!disks?.map && <em>Loading...</em>}
+        {!disks?.map && <div className="widget center">Loading...</div>}
         {disks?.map &&
           disks?.map((disk) => (
             <div className="widget">
