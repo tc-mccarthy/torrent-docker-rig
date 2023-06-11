@@ -5,7 +5,7 @@ import Box from '@mui/material/Box';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
 import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 
-async function getData (setData, setFileList) {
+async function getData (setData, setFileList, setDisks) {
   try {
     const d = await fetch('active.json').then((r) => r.json());
 
@@ -15,8 +15,12 @@ async function getData (setData, setFileList) {
 
     setFileList(f);
 
+    const disks = await fetch('disk.json').then((r) => r.json());
+
+    setDisks(disks);
+
     setTimeout(() => {
-      getData(setData, setFileList);
+      getData(setData, setFileList, setDisks);
     }, 1 * 1000);
   } catch (e) {
     setTimeout(() => {
@@ -36,9 +40,10 @@ function human_size (size) {
 function Home () {
   const [data, setData] = useState(false);
   const [filelist, setFileList] = useState(false);
+  const [disks, setDisks] = useState(false);
 
   if (!data) {
-    getData(setData, setFileList);
+    getData(setData, setFileList, setDisks);
     return (
       <Box sx={{ display: 'flex' }}>
         <CircularProgress />
@@ -108,6 +113,22 @@ function Home () {
       <div className="widget center">
         <strong>Command</strong>
         {data.ffmpeg_cmd}
+      </div>
+
+      <div className="flex">
+        {disks.map((disk) => (
+          <div className="widget">
+            <strong>{disk.mounted}</strong>
+            <em>
+              {disk.used}
+              {' '}
+              of
+              {disk.size}
+            </em>
+            <LinearProgressWithLabel value={parseFloat(disk.use.replace('%', ''))} />
+            ;
+          </div>
+        ))}
       </div>
 
       <div className="widget list">

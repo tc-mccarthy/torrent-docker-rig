@@ -405,9 +405,6 @@ function get_disk_space() {
           .filter(
             (obj) =>
               PATHS.findIndex((path) => {
-                console.log(">> PATH >>", path);
-                console.log(">> OBJ >>", obj.mounted);
-
                 if (obj.mounted) {
                   return path.indexOf(obj.mounted) > -1;
                 } else {
@@ -415,7 +412,6 @@ function get_disk_space() {
                 }
               }) > -1
           );
-        console.log(">> DISKS >>", rows);
         fs.writeFileSync("/usr/app/output/disk.json", JSON.stringify(rows));
         setTimeout(() => {
           get_disk_space();
