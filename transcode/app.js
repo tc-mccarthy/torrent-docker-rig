@@ -54,10 +54,23 @@ async function generate_filelist() {
 
   const { stdout, stderr } = await exec_promise(findCMD);
 
-  const filelist = stdout
+  let filelist = stdout
     .split("/media")
     .filter((j) => j)
     .map((p) => `/media${p}`.replace("\x00", ""));
+
+  await async.eachLimit(filelist, 10, async (file) => {
+    const file_idx = filelist.indexOf(file);
+    const ffprobe_data = await ffprobe(file);
+
+    // if the file is already encoded, remove it from the list
+    if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
+      filelist[file_idx] = null;
+    }
+  });
+
+  // remove falsey values from the list
+  filelist = filelist.filter((file) => file);
 
   fs.writeFileSync("./filelist.txt", filelist.join("\n"));
   return filelist;
