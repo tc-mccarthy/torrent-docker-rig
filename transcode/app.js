@@ -67,6 +67,8 @@ async function generate_filelist() {
     if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
       filelist[file_idx] = null;
     }
+
+    return true;
   });
 
   // remove falsey values from the list
