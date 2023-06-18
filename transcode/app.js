@@ -4,13 +4,14 @@ import ffmpeg from "fluent-ffmpeg";
 import * as fs from "fs";
 import trash from "trash";
 import moment from "moment";
-import path from "path";
+import Knex from "knex";
 
 const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(
   (path) => "/" + path
 );
 
 const encode_version = "20230608a";
+const concurrent_file_checks = 30;
 
 function exec_promise(cmd) {
   return new Promise((resolve, reject) => {
@@ -31,6 +32,34 @@ async function pre_sanitize() {
   )} -iname ".deletedByTMM" -type d -exec rm -Rf {} \\;`;
   const { stdout, stderr } = await exec_promise(findCMD);
   console.log(stdout);
+}
+
+async function set_up_sql() {
+  try {
+    const knex = Knex({
+      client: "sqlite3", // or 'better-sqlite3'
+      connection: {
+        filename: "/usr/app/data/transcoder.sqlite3",
+      },
+      useNullAsDefault: true,
+    });
+
+    const timestamp = new Date();
+    await knex("encoded")
+      .insert({
+        path: "test",
+        version: "test",
+        created_at: timestamp,
+        updated_at: timestamp,
+      })
+      .onConflict("path")
+      .merge(["path", "version", "updated_at"]);
+
+    console.log(">> KNEX CONFIGURED >>");
+    return knex;
+  } catch (e) {
+    console.log(">> COULD NOT CONFIGURE SQL >>", e);
+  }
 }
 
 async function generate_filelist() {
@@ -57,18 +86,38 @@ async function generate_filelist() {
   let filelist = stdout
     .split("/media")
     .filter((j) => j)
-    .map((p) => `/media${p}`.replace("\x00", ""));
+    .map((p) => `/media${p}`.replace("\x00", ""))
+    .slice(1);
 
-  await async.eachLimit(filelist, 10, async (file) => {
+  await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
     const file_idx = filelist.indexOf(file);
-    const ffprobe_data = await ffprobe(file);
+    try {
+      const ffprobe_data = await ffprobe(file);
 
-    // if the file is already encoded, remove it from the list
-    if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
-      filelist[file_idx] = null;
+      // if the file is already encoded, remove it from the list
+      if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
+        filelist[file_idx] = null;
+      }
+
+      return true;
+    } catch (e) {
+      console.log(">> FFPROBE ERROR >>", e);
+
+      // if the file itself wasn't readable by ffprobe, remove it from the list
+      if (/command\s+failed/i.test(e.message)) {
+        // if this is an unreadble file, trash it.
+        const ext_expression = new RegExp("." + file_ext.join("|"), "i");
+        if (ext_expression.test(e.message)) {
+          console.log(">> UNREADABLE VIDEO FILE. REMOVING FROM LIST >>");
+          trash(file);
+        }
+
+        // any ffprobe command failure, this should be removed from the list
+        filelist[file_idx] = null;
+      }
+
+      return true;
     }
-
-    return true;
   });
 
   // remove falsey values from the list
@@ -439,6 +488,7 @@ function get_disk_space() {
 
 async function run() {
   try {
+    const knex = await set_up_sql();
     await pre_sanitize();
     const filelist = await generate_filelist();
     console.log(">> FILELIST >>", filelist);

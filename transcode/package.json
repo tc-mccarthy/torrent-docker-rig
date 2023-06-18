@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node ./app.js",
-    "start:dev": "npx nodemon -L ./app.js"
+    "start:dev": "npx nodemon -L ./app.js",
+    "knex": "knex"
   },
   "repository": {
     "type": "git",
@@ -21,8 +22,10 @@
   "dependencies": {
     "async": "^3.2.4",
     "fluent-ffmpeg": "^2.1.2",
+    "knex": "^2.4.2",
     "moment": "^2.29.4",
     "nodemon": "^2.0.20",
+    "sqlite3": "^5.1.6",
     "trash-cli": "^5.0.0"
   }
 }
