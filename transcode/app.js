@@ -68,7 +68,7 @@ async function get_encoded_videos() {
 
     videos = videos.map((video) => video.path);
 
-    console.log(">> VIDEOS >>", videos);
+    return videos;
   } catch (e) {
     console.log(">> COULD NOT CONFIGURE SQL >>", e);
   }
@@ -508,7 +508,6 @@ function get_disk_space() {
 
 async function run() {
   try {
-    await add_encoded_video("/media/tc/Wanda/TV Shows/test.mp4");
     await pre_sanitize();
     const filelist = await generate_filelist();
     console.log(">> FILELIST >>", filelist);
