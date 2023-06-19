@@ -13,6 +13,14 @@ const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(
 const encode_version = "20230608a";
 const concurrent_file_checks = 30;
 
+const knex = Knex({
+  client: "sqlite3", // or 'better-sqlite3'
+  connection: {
+    filename: "/usr/app/data/transcoder.sqlite3",
+  },
+  useNullAsDefault: true,
+});
+
 function exec_promise(cmd) {
   return new Promise((resolve, reject) => {
     console.log("Running", cmd);
@@ -34,29 +42,33 @@ async function pre_sanitize() {
   console.log(stdout);
 }
 
-async function set_up_sql() {
+async function add_encoded_video(path) {
   try {
-    const knex = Knex({
-      client: "sqlite3", // or 'better-sqlite3'
-      connection: {
-        filename: "/usr/app/data/transcoder.sqlite3",
-      },
-      useNullAsDefault: true,
-    });
-
     const timestamp = new Date();
     await knex("encoded")
       .insert({
-        path: "test",
-        version: "test",
+        path,
+        version: encode_version,
         created_at: timestamp,
         updated_at: timestamp,
       })
       .onConflict("path")
       .merge(["path", "version", "updated_at"]);
+  } catch (e) {
+    console.log(">> COULD NOT CONFIGURE SQL >>", e);
+  }
+}
 
-    console.log(">> KNEX CONFIGURED >>");
-    return knex;
+async function get_encoded_videos() {
+  try {
+    const timestamp = new Date(new Date().setDate(new Date().getDate() - 30));
+    let videos = await knex("encoded")
+      .where("updated_at", ">=", timestamp)
+      .andWhere("version", "=", encode_version);
+
+    videos = videos.map((video) => video.path);
+
+    console.log(">> VIDEOS >>", videos);
   } catch (e) {
     console.log(">> COULD NOT CONFIGURE SQL >>", e);
   }
@@ -89,6 +101,12 @@ async function generate_filelist() {
     .map((p) => `/media${p}`.replace("\x00", ""))
     .slice(1);
 
+  const encoded_videos = await get_encoded_videos();
+
+  // filter out any paths in the filelist that are in the list of encoded videos as they've already been encoded
+  filelist = filelist.filter((file) => encoded_videos.indexOf(file) === -1);
+
+  // remove any videos that already have the current encode version in the metadata
   await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
     const file_idx = filelist.indexOf(file);
     try {
@@ -97,6 +115,7 @@ async function generate_filelist() {
       // if the file is already encoded, remove it from the list
       if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
         filelist[file_idx] = null;
+        await add_encoded_video(file);
       }
 
       return true;
@@ -435,6 +454,7 @@ function transcode(file, filelist) {
           console.log("Transcoding succeeded!");
 
           await trash(file);
+          await add_encoded_video(file);
           resolve();
         })
         .on("error", async function (err, stdout, stderr) {
@@ -488,7 +508,7 @@ function get_disk_space() {
 
 async function run() {
   try {
-    const knex = await set_up_sql();
+    await add_encoded_video("/media/tc/Wanda/TV Shows/test.mp4");
     await pre_sanitize();
     const filelist = await generate_filelist();
     console.log(">> FILELIST >>", filelist);
