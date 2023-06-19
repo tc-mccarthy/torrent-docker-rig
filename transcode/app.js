@@ -113,7 +113,7 @@ async function generate_filelist() {
       const ffprobe_data = await ffprobe(file);
 
       // if the file is already encoded, remove it from the list
-      if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
+      if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
         filelist[file_idx] = null;
         await add_encoded_video(file);
       }
@@ -243,7 +243,8 @@ function transcode(file, filelist) {
       const audio_stream = ffprobe_data.streams
         .filter(
           (s) =>
-            s.codec_type === "audio" && (!s.tags || s.tags.language === "eng")
+            s.codec_type === "audio" &&
+            (!s.tags?.language || s.tags.language === "eng")
         )
         .sort((a, b) => (a.channels > b.channels ? -1 : 1))[0];
       const subtitle_stream = ffprobe_data.streams.find(
@@ -454,7 +455,6 @@ function transcode(file, filelist) {
           console.log("Transcoding succeeded!");
 
           await trash(file);
-          await add_encoded_video(file);
           resolve();
         })
         .on("error", async function (err, stdout, stderr) {
