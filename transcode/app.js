@@ -234,8 +234,6 @@ function transcode(file, filelist) {
 
       // if this file has already been encoded, short circuit
       if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
-        console.log(">>>", file, "already transcoded. Renaming >>>");
-        await exec_promise(`mv "${file}" "${dest_file}"`);
         return resolve();
       }
 
@@ -455,6 +453,9 @@ function transcode(file, filelist) {
           console.log("Transcoding succeeded!");
 
           await trash(file);
+          await exec_promise(
+            `mv "${dest_file}" "${dest_file.replace(/\.tc/i, "")}"`
+          );
           resolve();
         })
         .on("error", async function (err, stdout, stderr) {
