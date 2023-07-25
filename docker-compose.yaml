@@ -21,6 +21,7 @@ services:
       - 4000:4000 ## tmm VNC
       - 9443:9443 ## portainer
       - 6767:6767 ## bazarr
+      - 8080:8080 ## usenet
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1 # Recommended if using ipv4 only
       - net.ipv4.conf.all.rp_filter=2
@@ -323,6 +324,32 @@ services:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
     restart: unless-stopped
+
+  usenet:
+    image: linuxserver/sabnzbd
+    container_name: usenet
+    network_mode: service:vpn # all traffic goes through vpn
+    environment:
+      - PUID=1000
+      - GUID=1000
+      - Umask=022
+      - TZ # Timezone used for logging
+    volumes:
+      - ${USENET_STORAGE}:${USENET_STORAGE} # path to my volumes for download storage
+      - ./sabnzbd:/config # qbittorrent config -- this mount allows you to script your own config and preserve the changes you make between container instances
+      - ./scripts:/scripts # health check script and more
+    depends_on:
+      vpn: # wait for vpn to start before starting
+        condition: service_healthy
+    labels:
+      - "autoheal=true" # include in autoheal check
+    restart: unless-stopped
+    # healthcheck:
+    #   test: bash ./scripts/torrent-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+    #   interval: 10s
+    #   retries: 0
+    #   timeout: 5s
+    #   start_period: 30s
 
 networks:
   default:
