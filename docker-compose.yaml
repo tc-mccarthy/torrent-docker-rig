@@ -341,8 +341,6 @@ services:
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
-      torrent: # wait for vpn to start before starting
-        condition: service_healthy
     labels:
       - "autoheal=true" # include in autoheal check
     restart: unless-stopped
