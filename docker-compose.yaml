@@ -91,7 +91,6 @@ services:
       - SSL_HOST=${TORRENT_SSL_HOST}
     depends_on:
       - torrent
-      - usenet
     networks:
       - default
 
@@ -341,6 +340,8 @@ services:
       - ./scripts:/scripts # health check script and more
     depends_on:
       vpn: # wait for vpn to start before starting
+        condition: service_healthy
+      torrent: # wait for vpn to start before starting
         condition: service_healthy
     labels:
       - "autoheal=true" # include in autoheal check
