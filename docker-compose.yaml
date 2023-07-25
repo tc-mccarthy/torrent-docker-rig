@@ -91,6 +91,7 @@ services:
       - SSL_HOST=${TORRENT_SSL_HOST}
     depends_on:
       - torrent
+      - usenet
     networks:
       - default
 
