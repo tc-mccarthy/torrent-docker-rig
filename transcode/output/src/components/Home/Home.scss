@@ -187,6 +187,12 @@ figcaption {
     > div {
       flex: 1;
     }
+
+    &.quarter {
+      > div {
+        flex-basis: 25%;
+      }
+    }
   }
 
   .circle {

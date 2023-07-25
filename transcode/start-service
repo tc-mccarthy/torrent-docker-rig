@@ -1,3 +1,4 @@
+yarn run knex migrate:latest --knexfile ./knexfile.cjs
 if [[ $ENV == "local" ]]; then
     npm run start:dev
 else

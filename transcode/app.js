@@ -4,11 +4,22 @@ import ffmpeg from "fluent-ffmpeg";
 import * as fs from "fs";
 import trash from "trash";
 import moment from "moment";
-import path from "path";
+import Knex from "knex";
 
 const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(
   (path) => "/" + path
 );
+
+const encode_version = "20230608a";
+const concurrent_file_checks = 30;
+
+const knex = Knex({
+  client: "sqlite3", // or 'better-sqlite3'
+  connection: {
+    filename: "/usr/app/data/transcoder.sqlite3",
+  },
+  useNullAsDefault: true,
+});
 
 function exec_promise(cmd) {
   return new Promise((resolve, reject) => {
@@ -29,6 +40,38 @@ async function pre_sanitize() {
   )} -iname ".deletedByTMM" -type d -exec rm -Rf {} \\;`;
   const { stdout, stderr } = await exec_promise(findCMD);
   console.log(stdout);
+}
+
+async function add_encoded_video(path) {
+  try {
+    const timestamp = new Date();
+    await knex("encoded")
+      .insert({
+        path,
+        version: encode_version,
+        created_at: timestamp,
+        updated_at: timestamp,
+      })
+      .onConflict("path")
+      .merge(["path", "version", "updated_at"]);
+  } catch (e) {
+    console.log(">> COULD NOT CONFIGURE SQL >>", e);
+  }
+}
+
+async function get_encoded_videos() {
+  try {
+    const timestamp = new Date(new Date().setDate(new Date().getDate() - 30));
+    let videos = await knex("encoded")
+      .where("updated_at", ">=", timestamp)
+      .andWhere("version", "=", encode_version);
+
+    videos = videos.map((video) => video.path);
+
+    return videos;
+  } catch (e) {
+    console.log(">> COULD NOT CONFIGURE SQL >>", e);
+  }
 }
 
 async function generate_filelist() {
@@ -52,37 +95,52 @@ async function generate_filelist() {
 
   const { stdout, stderr } = await exec_promise(findCMD);
 
-  const filelist = stdout
+  let filelist = stdout
     .split("/media")
     .filter((j) => j)
     .map((p) => `/media${p}`.replace("\x00", ""))
-    .filter((f) => {
-      const curr_path = path.dirname(f);
-      // console.log(">> curr_path >>", curr_path);
-      const lock_file_pattern = new RegExp(
-        path
-          .basename(f)
-          .replace("[", "\\[")
-          .replace("]", "\\]")
-          .replace("(", "\\(")
-          .replace(")", "\\)")
-          .replace(/[+]/g, "[+]")
-          .replace(/\.[A-Za-z0-9]+$/, ".*.tclock")
-          .replace(/\s+/g, "\\s+"),
-        "i"
-      );
-      let episode_code = f.match(/(S[0-9]+E[0-9]+)/);
-      console.log(">> LOCK FILE PATTERN >>", lock_file_pattern);
-      const files = fs.readdirSync(curr_path);
-      // console.log(files);
-      let lock_file = files.find((file) => lock_file_pattern.test(file));
-      // console.log("LOCK FILE", lock_file);
-      if (!lock_file && episode_code) {
-        episode_code = new RegExp(episode_code[1] + ".*tclock$");
-        lock_file = files.find((file) => episode_code.test(file));
+    .slice(1);
+
+  const encoded_videos = await get_encoded_videos();
+
+  // filter out any paths in the filelist that are in the list of encoded videos as they've already been encoded
+  filelist = filelist.filter((file) => encoded_videos.indexOf(file) === -1);
+
+  // remove any videos that already have the current encode version in the metadata
+  await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
+    const file_idx = filelist.indexOf(file);
+    try {
+      const ffprobe_data = await ffprobe(file);
+
+      // if the file is already encoded, remove it from the list
+      if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
+        filelist[file_idx] = null;
+        await add_encoded_video(file);
       }
-      return !lock_file;
-    });
+
+      return true;
+    } catch (e) {
+      console.log(">> FFPROBE ERROR >>", e);
+
+      // if the file itself wasn't readable by ffprobe, remove it from the list
+      if (/command\s+failed/i.test(e.message)) {
+        // if this is an unreadble file, trash it.
+        const ext_expression = new RegExp("." + file_ext.join("|"), "i");
+        if (ext_expression.test(e.message)) {
+          console.log(">> UNREADABLE VIDEO FILE. REMOVING FROM LIST >>");
+          trash(file);
+        }
+
+        // any ffprobe command failure, this should be removed from the list
+        filelist[file_idx] = null;
+      }
+
+      return true;
+    }
+  });
+
+  // remove falsey values from the list
+  filelist = filelist.filter((file) => file);
 
   fs.writeFileSync("./filelist.txt", filelist.join("\n"));
   return filelist;
@@ -171,11 +229,20 @@ function transcode(file, filelist) {
       const video_stream = ffprobe_data.streams.find(
         (s) => s.codec_type === "video"
       );
+
+      const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".tc.mkv");
+
+      // if this file has already been encoded, short circuit
+      if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
+        return resolve();
+      }
+
       //get the audio stream, in english, with the highest channel count
       const audio_stream = ffprobe_data.streams
         .filter(
           (s) =>
-            s.codec_type === "audio" && (!s.tags || s.tags.language === "eng")
+            s.codec_type === "audio" &&
+            (!s.tags?.language || s.tags.language === "eng")
         )
         .sort((a, b) => (a.channels > b.channels ? -1 : 1))[0];
       const subtitle_stream = ffprobe_data.streams.find(
@@ -302,8 +369,7 @@ function transcode(file, filelist) {
         cmd = cmd.outputOptions(audio_filters);
       }
 
-      const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".tc.mkv");
-      const lock_file = file.replace(/\.[A-Za-z0-9]+$/, ".tclock");
+      cmd = cmd.outputOptions(`-metadata encode_version=${encode_version}`);
 
       let ffmpeg_cmd;
 
@@ -385,9 +451,11 @@ function transcode(file, filelist) {
         })
         .on("end", async function (stdout, stderr) {
           console.log("Transcoding succeeded!");
-          console.log("Creating lockfile", lock_file);
-          await exec_promise(`touch "${lock_file}"`);
+
           await trash(file);
+          await exec_promise(
+            `mv "${dest_file}" "${dest_file.replace(/\.tc/i, "")}"`
+          );
           resolve();
         })
         .on("error", async function (err, stdout, stderr) {
@@ -403,12 +471,48 @@ function transcode(file, filelist) {
   });
 }
 
+function get_disk_space() {
+  return new Promise((resolve, reject) => {
+    exec("df -h", (err, stdout, stderr) => {
+      if (err) {
+        reject(err);
+      } else {
+        let rows = stdout.split(/\n+/).map((row) => row.split(/\s+/));
+        rows = rows
+          .splice(1)
+          .map((row) => {
+            const obj = {};
+            rows[0].forEach((value, idx) => {
+              obj[value.toLowerCase().replace(/[^A-Za-z0-9]+/i, "")] = row[idx];
+            });
+            return obj;
+          })
+          .filter(
+            (obj) =>
+              PATHS.findIndex((path) => {
+                if (obj.mounted) {
+                  return path.indexOf(obj.mounted) > -1;
+                } else {
+                  return false;
+                }
+              }) > -1
+          );
+        fs.writeFileSync("/usr/app/output/disk.json", JSON.stringify(rows));
+        setTimeout(() => {
+          get_disk_space();
+        }, 10 * 1000);
+        resolve(rows);
+      }
+    });
+  });
+}
+
 async function run() {
   try {
     await pre_sanitize();
     const filelist = await generate_filelist();
-
     console.log(">> FILELIST >>", filelist);
+    await get_disk_space();
     await async.eachSeries(filelist, async (file) => {
       await transcode(file, filelist);
       return true;
