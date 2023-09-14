@@ -119,6 +119,8 @@ Each service is accessible via http://<ip|localhost>:<service-port>. There is al
 
 I set this up this way so that, at your own risk, you can map some external DNS to your external IP and map a single external port back to your rig's port 8080.
 
+_Note for the purposes of your client to client communications (indexers, downloaders, etc) I recommend you use localhost:port, which is how the docker network is configured_
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- CONTRIBUTING -->
