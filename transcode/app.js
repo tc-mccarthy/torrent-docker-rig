@@ -91,12 +91,14 @@ async function generate_filelist() {
   ];
   const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(" ")} \\( ${file_ext
     .map((ext) => `-iname "*.${ext}"`)
-    .join(" -o ")} \\) -not \\( -iname "*.tc.mkv" \\) -print0 | sort -z`;
+    .join(
+      " -o "
+    )} \\) -not \\( -iname "*.tc.mkv" \\) -print0 | sort -z | xargs -0`;
 
   const { stdout, stderr } = await exec_promise(findCMD);
 
   let filelist = stdout
-    .split("/media")
+    .split(/\s*\/media/)
     .filter((j) => j)
     .map((p) => `/media${p}`.replace("\x00", ""))
     .slice(1);
