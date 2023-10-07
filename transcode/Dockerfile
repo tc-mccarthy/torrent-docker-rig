@@ -22,8 +22,6 @@ RUN mkdir -p /usr/app && chown -R node:node /usr/app
 # Set the work directory
 WORKDIR /usr/app
 
-## Dependencies are handled in their own layer so that we can leverage layer cache and save time on rebuild
-
 # Copy over the dependencies
 COPY --chown=node:node package.json .
 COPY --chown=node:node yarn.lock .
@@ -34,7 +32,6 @@ RUN yarn install
 # Copy over application files
 COPY --chown=node:node . .
 RUN chmod +x /usr/app/start-service
-
 
 # Start the service
 ENTRYPOINT [ "/bin/bash", "/usr/app/start-service" ]
