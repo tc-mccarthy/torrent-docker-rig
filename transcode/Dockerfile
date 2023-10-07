@@ -35,8 +35,6 @@ RUN yarn install
 COPY --chown=node:node . .
 RUN chmod +x /usr/app/start-service
 
-# Set the user
-USER node
 
 # Start the service
-ENTRYPOINT [ "/usr/app/start-service" ]
+ENTRYPOINT [ "/bin/bash", "/usr/app/start-service" ]
