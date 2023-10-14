@@ -1,4 +1,4 @@
-FROM ghcr.io/linuxserver/lspipepr-ffmpeg:6.0-cli-pkg-36adef80-dev-ced90f84f28deacf6d58b4ccfe585b7bb068689d-pr-40
+FROM lscr.io/linuxserver/ffmpeg:version-6.0-cli
 
 # Install NodeJS Dependencies and set up DEB repo
 ENV NODE_MAJOR=20
