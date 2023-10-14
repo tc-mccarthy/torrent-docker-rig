@@ -2,7 +2,7 @@ import { exec } from "child_process";
 import async from "async";
 import ffmpeg from "fluent-ffmpeg";
 import * as fs from "fs";
-import trash from "trash";
+// import trash from "trash";
 import moment from "moment";
 import Knex from "knex";
 
@@ -30,6 +30,19 @@ function exec_promise(cmd) {
         reject(error);
       }
       resolve({ stdout, stderr });
+    });
+  });
+}
+
+function trash(file) {
+  return new Promise((resolve, reject) => {
+    file = file.replace(/\/$/g, "").trim();
+    exec(`rm "${file}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`exec error: ${error}`);
+        reject(error);
+      }
+      resolve();
     });
   });
 }
@@ -179,50 +192,50 @@ function transcode(file, filelist) {
           name: "uhd",
           width: 3840,
           aspect: 16 / 9,
-          bitrate: 18,
-          codec: /hevc/,
-          audio_codec: /aac|ac3/,
+          bitrate: 25,
+          codec: /libsvtav1/,
+          audio_codec: /libopus/,
         },
         {
           name: "1080p",
           width: 1920,
           aspect: 16 / 9,
-          bitrate: 5,
-          codec: /hevc/,
-          audio_codec: /aac|ac3/,
+          bitrate: 7,
+          codec: /libsvtav1/,
+          audio_codec: /libopus/,
         },
         {
           name: "720p",
           width: 720,
           dest_width: 1920,
           aspect: 16 / 9,
-          bitrate: 5,
-          codec: /hevc/,
-          audio_codec: /aac|ac3/,
+          bitrate: 7,
+          codec: /libsvtav1/,
+          audio_codec: /libopus/,
         },
         {
           name: "hdv (1440p)",
           width: 1440,
           aspect: 4 / 3,
-          bitrate: 5,
-          codec: /hevc/,
-          audio_codec: /aac|ac3/,
+          bitrate: 7,
+          codec: /libsvtav1/,
+          audio_codec: /libopus/,
         },
         {
           name: "sd",
           width: 480,
           aspect: 4 / 3,
-          bitrate: 2.5,
-          codec: /hevc/,
-          audio_codec: /aac|ac3/,
+          bitrate: 3.5,
+          codec: /libsvtav1/,
+          audio_codec: /libopus/,
         },
         {
           name: "vertical",
           width: 1080,
           aspect: 9 / 16,
-          bitrate: 8,
-          codec: /hevc/,
-          audio_codec: /aac|ac3/,
+          bitrate: 12,
+          codec: /libsvtav1/,
+          audio_codec: /libopus/,
         },
       ].map((x) => ({ ...x, aspect: aspect_round(x.aspect) }));
 
@@ -248,7 +261,10 @@ function transcode(file, filelist) {
         )
         .sort((a, b) => (a.channels > b.channels ? -1 : 1))[0];
       const subtitle_stream = ffprobe_data.streams.find(
-        (s) => s.codec_type === "subtitle" && s.tags?.language === "eng"
+        (s) =>
+          s.codec_type === "subtitle" &&
+          s.tags?.language === "eng" &&
+          /srt|pgs/.test(s.codec_name)
       );
       let transcode_video = false;
       let transcode_audio = false;
@@ -271,7 +287,7 @@ function transcode(file, filelist) {
       // if the codec doesn't match the profile
       if (!conversion_profile.audio_codec.test(audio_stream.codec_name)) {
         transcode_audio = true;
-        audio_filters.push("-c:a:0 aac");
+        audio_filters.push("-c:a:0 libopus");
       }
 
       if (
@@ -295,16 +311,18 @@ function transcode(file, filelist) {
         console.log("more than two audio channels");
         transcode_audio = true;
         audio_filters = audio_filters.concat([
-          "-c:a:0 aac",
-          "-b:a:0 192k",
-          "-ac:a:0 2",
-          "-filter:a:0 volume=2",
-          "-c:a:1 copy",
-          "-metadata:s:a:0 title=Stereo",
-          "-metadata:s:a:0 language=eng",
-          `-metadata:s:a:1 title=Original`,
-          `-metadata:s:a:1 language=eng`,
+          "-c:a:0 libopus",
+          `-b:a:0 ${audio_stream.channels * 56}k`,
+          "-c:a:1 libopus",
+          "-b:a:1 112k",
+          "-ac:a:1 2",
+          "-metadata:s:a:1 title=Stereo",
+          "-metadata:s:a:1 language=eng",
         ]);
+
+        if (audio_stream.channels === 6) {
+          audio_filters.push("-af:0 channelmap=channel_layout=5.1");
+        }
       }
 
       const input_maps = [
@@ -333,9 +351,9 @@ function transcode(file, filelist) {
           video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
 
         cmd = cmd.outputOptions([
-          "-c:v libx265",
-          "-profile:v main10",
-          "-level:v 4.0",
+          "-c:v libsvtav1",
+          "-preset 8",
+          "-crf 35",
           `-pix_fmt ${pix_fmt}`,
         ]);
 
@@ -462,6 +480,14 @@ function transcode(file, filelist) {
         })
         .on("error", async function (err, stdout, stderr) {
           console.log("Cannot process video: ", err.message, stdout, stderr);
+          fs.appendFileSync(
+            "/usr/app/logs/ffmpeg.log",
+            JSON.stringify(
+              { error: err.message, stdout, stderr, ffmpeg_cmd },
+              true,
+              4
+            )
+          );
           await trash(dest_file);
           resolve();
         });
