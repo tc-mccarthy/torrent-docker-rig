@@ -292,7 +292,8 @@ function transcode(file, filelist) {
 
       if (
         ffprobe_data.format.bit_rate >
-        conversion_profile.bitrate * 1024 * 1024
+          conversion_profile.bitrate * 1024 * 1024 ||
+        ffprobe_data.format.codec_name !== "av1"
       ) {
         console.log("Video stream bitrate higher than conversion profile");
         transcode_video = true;
@@ -330,7 +331,8 @@ function transcode(file, filelist) {
         `-map 0:${audio_stream.index}`,
       ];
 
-      if (audio_filters.length > 0) {
+      // only map audio a second time if we're going to be down mixing to stereo
+      if (audio_stream.channels > 2) {
         input_maps.push(`-map 0:${audio_stream.index}`);
       }
 
