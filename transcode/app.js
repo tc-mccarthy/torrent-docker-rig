@@ -264,7 +264,7 @@ function transcode(file, filelist) {
         (s) =>
           s.codec_type === "subtitle" &&
           s.tags?.language === "eng" &&
-          /srt|pgs/.test(s.codec_name)
+          /srt|pgs/i.test(s.codec_name)
       );
       let transcode_video = false;
       let transcode_audio = false;
