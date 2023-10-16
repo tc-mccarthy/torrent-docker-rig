@@ -473,7 +473,7 @@ function transcode(file, filelist) {
             `mv "${dest_file}" "${dest_file.replace(/\.tc/i, "")}"`
           );
           await upsert_video({
-            path: file,
+            path: dest_file,
             error: undefined,
             encode_version,
           });
