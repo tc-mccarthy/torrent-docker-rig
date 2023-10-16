@@ -387,7 +387,7 @@ function transcode(file, filelist) {
 
       let start_time;
       cmd = cmd
-        .on("start", function (commandLine) {
+        .on("start", async function (commandLine) {
           console.log("Spawned Ffmpeg with command: " + commandLine);
           start_time = moment();
           ffmpeg_cmd = commandLine;
@@ -395,6 +395,10 @@ function transcode(file, filelist) {
             "/usr/app/output/filelist.json",
             JSON.stringify(filelist.slice(list_idx || list_idx + 1))
           );
+          await upsert_video({
+            path: file,
+            error: undefined,
+          });
         })
         .on("progress", function (progress) {
           const elapsed = moment().diff(start_time, "seconds");
