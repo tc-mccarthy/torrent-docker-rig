@@ -149,7 +149,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "8" # 8 cores
+          cpus: "12" # 12 cores
 
   plex:
     container_name: plex
