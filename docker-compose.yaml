@@ -150,7 +150,7 @@ services:
       resources:
         limits:
           cpus: "8" # 8 cores
-          memory: 2G # 2 gigs of memory
+          memory: 12G # 12 gigs of memory
 
   plex:
     container_name: plex
