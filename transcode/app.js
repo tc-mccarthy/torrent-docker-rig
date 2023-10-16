@@ -485,6 +485,11 @@ function transcode(file, filelist) {
             path: file,
             error: { error: err.message, stdout, stderr, ffmpeg_cmd },
           });
+
+          if (/Invalid\s+NAL\s+unit\s+size/.test(err.stderr)) {
+            console.log(">> INVALID NAL UNIT SIZE >>");
+            await trash(file);
+          }
           resolve();
         });
       cmd.save(dest_file);
