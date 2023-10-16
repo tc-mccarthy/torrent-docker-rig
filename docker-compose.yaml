@@ -146,6 +146,11 @@ services:
       - ./transcode:/usr/app
       - /usr/app/node_modules
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "8" # 8 cores
+          memory: 2G # 2 gigs of memory
 
   plex:
     container_name: plex
