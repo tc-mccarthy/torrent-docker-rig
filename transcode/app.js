@@ -481,7 +481,10 @@ function transcode(file, filelist) {
             )
           );
           await trash(dest_file);
-          await upsert_video({ path: file, error: err.message });
+          await upsert_video({
+            path: file,
+            error: { error: err.message, stdout, stderr, ffmpeg_cmd },
+          });
           resolve();
         });
       cmd.save(dest_file);
