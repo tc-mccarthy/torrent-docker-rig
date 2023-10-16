@@ -472,6 +472,11 @@ function transcode(file, filelist) {
           await exec_promise(
             `mv "${dest_file}" "${dest_file.replace(/\.tc/i, "")}"`
           );
+          await upsert_video({
+            path: file,
+            error: undefined,
+            encode_version,
+          });
           resolve();
         })
         .on("error", async function (err, stdout, stderr) {

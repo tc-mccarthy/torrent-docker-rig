@@ -164,7 +164,7 @@ services:
   mongo:
     container_name: torrent-mongo-local
     image: mongo:3.6.23-xenial
-    hostname: nd-mongo-local
+    hostname: torrent-mongo-local
     ports:
       - 27017:27017
     volumes:
@@ -328,6 +328,7 @@ services:
     container_name: portainer
     hostname: portainer
     image: portainer/portainer-ce:latest
+    network_mode: service:vpn # all traffic goes through vpn
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_db:/data
