@@ -331,7 +331,6 @@ services:
 
   portainer:
     container_name: portainer
-    hostname: portainer
     image: portainer/portainer-ce:latest
     network_mode: service:vpn # all traffic goes through vpn
     volumes:
