@@ -410,6 +410,8 @@ function transcode(file, filelist) {
           const output = JSON.stringify(
             {
               ...progress,
+              video_stream,
+              audio_stream,
               run_time,
               pct_per_second,
               pct_remaining,

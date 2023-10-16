@@ -59,6 +59,12 @@ function Home () {
       <h1>Optimized video encoding</h1>
       <div className="widget center">
         <strong>{data.file}</strong>
+        {' '}
+        (
+        {data.video_stream.codec_name}
+        /
+        {data.audio_stream.codec_name}
+        )
       </div>
 
       <div className="flex">
