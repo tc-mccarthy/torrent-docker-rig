@@ -36,4 +36,4 @@ const schema = new Schema(
 );
 
 // create a model object that uses the above schema
-module.exports = model(model_name, schema);
+export default model(model_name, schema);
