@@ -457,6 +457,8 @@ function transcode(file, filelist) {
             JSON.stringify({
               ...conversion_profile,
               ffmpeg_cmd,
+              audio_stream,
+              video_stream,
               file,
               overall_progress: `(${list_idx}/${filelist.length})`,
               output: JSON.parse(output),
