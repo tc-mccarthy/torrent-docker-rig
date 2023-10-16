@@ -2,9 +2,8 @@ import { exec } from "child_process";
 import async from "async";
 import ffmpeg from "fluent-ffmpeg";
 import * as fs from "fs";
-// import trash from "trash";
 import moment from "moment";
-import Knex from "knex";
+import File from "./models/files.js";
 
 const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(
   (path) => "/" + path
@@ -12,14 +11,6 @@ const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(
 
 const encode_version = "20230608a";
 const concurrent_file_checks = 30;
-
-const knex = Knex({
-  client: "sqlite3", // or 'better-sqlite3'
-  connection: {
-    filename: "/usr/app/data/transcoder.sqlite3",
-  },
-  useNullAsDefault: true,
-});
 
 function exec_promise(cmd) {
   return new Promise((resolve, reject) => {
@@ -55,18 +46,10 @@ async function pre_sanitize() {
   console.log(stdout);
 }
 
-async function add_encoded_video(path) {
+async function upsert_video(video) {
   try {
-    const timestamp = new Date();
-    await knex("encoded")
-      .insert({
-        path,
-        version: encode_version,
-        created_at: timestamp,
-        updated_at: timestamp,
-      })
-      .onConflict("path")
-      .merge(["path", "version", "updated_at"]);
+    const { path } = video;
+    await File.findOneAndUpdate({ path }, video, { upsert: true });
   } catch (e) {
     console.log(">> COULD NOT CONFIGURE SQL >>", e);
   }
@@ -75,9 +58,10 @@ async function add_encoded_video(path) {
 async function get_encoded_videos() {
   try {
     const timestamp = new Date(new Date().setDate(new Date().getDate() - 30));
-    let videos = await knex("encoded")
-      .where("updated_at", ">=", timestamp)
-      .andWhere("version", "=", encode_version);
+    let videos = await File.find({
+      updated_at: { $gte: timestamp },
+      encode_version,
+    });
 
     videos = videos.map((video) => video.path);
 
@@ -111,9 +95,9 @@ async function generate_filelist() {
   const { stdout, stderr } = await exec_promise(findCMD);
 
   let filelist = stdout
-    .split(/\s*\/media/)
+    .split(/\s*\/source_media/)
     .filter((j) => j)
-    .map((p) => `/media${p}`.replace("\x00", ""))
+    .map((p) => `/source_media${p}`.replace("\x00", ""))
     .slice(1);
 
   const encoded_videos = await get_encoded_videos();
@@ -130,8 +114,13 @@ async function generate_filelist() {
       // if the file is already encoded, remove it from the list
       if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
         filelist[file_idx] = null;
-        await add_encoded_video(file);
       }
+
+      await upsert_video({
+        path: file,
+        probe: ffprobe_data,
+        encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
+      });
 
       return true;
     } catch (e) {
@@ -491,6 +480,7 @@ function transcode(file, filelist) {
             )
           );
           await trash(dest_file);
+          await upsert_video({ path: file, error: err.message });
           resolve();
         });
       cmd.save(dest_file);

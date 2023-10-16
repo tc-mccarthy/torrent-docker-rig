@@ -142,7 +142,7 @@ services:
       - TZ
       - TRANSCODE_PATHS
     volumes:
-      - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE} # path to my volumes for download storage
+      - ${TRANSCODE_STORAGE}:/source_media # path to my volumes for download storage
       - ./transcode:/usr/app
       - /usr/app/node_modules
     restart: unless-stopped
@@ -160,6 +160,19 @@ services:
       - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE} # path to my volumes for download storage
       - ./plex:/config
     restart: unless-stopped
+
+  mongo:
+    container_name: nd-mongo-local
+    image: mongo:3.6.23-xenial
+    hostname: nd-mongo-local
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo_db:/data/db
+    networks:
+      - ace
+      - special-projects
+    restart: always
 
   sonarr:
     container_name: sonarr
@@ -315,11 +328,15 @@ services:
         condition: service_healthy
 
   portainer:
+    container_name: portainer
+    hostname: portainer
     image: portainer/portainer-ce:latest
-    network_mode: service:vpn # all traffic goes through vpn
     volumes:
-      - ./portainer:/data
       - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_db:/data
+    ports:
+      - 8000:8000
+      - 9443:9443
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
@@ -350,6 +367,9 @@ services:
     #   retries: 0
     #   timeout: 5s
     #   start_period: 30s
+volumes:
+  mongo_db:
+  portainer_db:
 
 networks:
   default:
