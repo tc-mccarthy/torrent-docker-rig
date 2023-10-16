@@ -495,7 +495,7 @@ function transcode(file, filelist) {
             error: { error: err.message, stdout, stderr, ffmpeg_cmd },
           });
 
-          if (/Invalid\s+NAL\s+unit\s+size/gi.test(err.stderr)) {
+          if (/Invalid\s+NAL\s+unit\s+size/gi.test(stderr)) {
             console.log(">> INVALID NAL UNIT SIZE >>");
             await trash(file);
           }
