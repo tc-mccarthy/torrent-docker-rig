@@ -4,6 +4,7 @@ import ffmpeg from "fluent-ffmpeg";
 import * as fs from "fs";
 import moment from "moment";
 import File from "./models/files.js";
+import mongo_connect from "./lib/mongo_connection.js";
 
 const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(
   (path) => "/" + path
@@ -65,7 +66,7 @@ async function get_encoded_videos() {
 
     videos = videos.map((video) => video.path);
 
-    return videos;
+    return videos || [];
   } catch (e) {
     console.log(">> COULD NOT CONFIGURE SQL >>", e);
   }
@@ -550,4 +551,10 @@ async function run() {
   }
 }
 
-run();
+mongo_connect()
+  .then(() => {
+    run();
+  })
+  .catch((e) => {
+    console.error(">> COULD NOT CONNECT TO MONGO >>", e);
+  });

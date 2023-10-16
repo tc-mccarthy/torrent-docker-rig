@@ -162,7 +162,7 @@ services:
     restart: unless-stopped
 
   mongo:
-    container_name: nd-mongo-local
+    container_name: torrent-mongo-local
     image: mongo:3.6.23-xenial
     hostname: nd-mongo-local
     ports:
