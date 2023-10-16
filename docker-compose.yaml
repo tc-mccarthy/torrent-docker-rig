@@ -169,9 +169,6 @@ services:
       - 27017:27017
     volumes:
       - mongo_db:/data/db
-    networks:
-      - ace
-      - special-projects
     restart: always
 
   sonarr:
