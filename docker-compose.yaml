@@ -331,8 +331,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_db:/data
-    ports:
-      - 9443:9443
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
