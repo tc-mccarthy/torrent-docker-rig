@@ -398,6 +398,7 @@ function transcode(file, filelist) {
           const video = await File.findOne({ path: file });
 
           if (video) {
+            console.log(">> VIDEO FOUND -- REMOVING ERROR >>", video);
             delete video.error;
             await video.save();
           }
