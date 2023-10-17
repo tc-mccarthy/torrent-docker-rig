@@ -372,7 +372,6 @@ function transcode(file, filelist) {
         `-maxrate ${conversion_profile.bitrate}M`,
         `-bufsize ${conversion_profile.bitrate * 3}M`,
         `-max_muxing_queue_size 9999`,
-        `-threads 4`,
       ]);
 
       if (!transcode_audio) {
