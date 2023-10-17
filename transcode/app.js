@@ -248,7 +248,7 @@ function transcode(file, filelist) {
         .filter(
           (s) =>
             s.codec_type === "audio" &&
-            (!s.tags?.language || s.tags.language === "eng")
+            (!s.tags?.language || /und|eng/i.test(s.tags.language))
         )
         .sort((a, b) => (a.channels > b.channels ? -1 : 1))[0];
       const subtitle_stream = ffprobe_data.streams.find(
