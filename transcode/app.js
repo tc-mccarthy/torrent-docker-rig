@@ -395,10 +395,12 @@ function transcode(file, filelist) {
             "/usr/app/output/filelist.json",
             JSON.stringify(filelist.slice(list_idx || list_idx + 1))
           );
-          await upsert_video({
-            path: file,
-            error: undefined,
-          });
+          const video = await File.findOne({ path: file });
+
+          if (video) {
+            delete video.error;
+            await video.save();
+          }
         })
         .on("progress", function (progress) {
           const elapsed = moment().diff(start_time, "seconds");
