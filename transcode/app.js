@@ -5,6 +5,7 @@ import * as fs from "fs";
 import moment from "moment";
 import File from "./models/files.js";
 import mongo_connect from "./lib/mongo_connection.js";
+import cron from "node-cron";
 
 const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(
   (path) => "/" + path
@@ -571,9 +572,25 @@ async function run() {
   }
 }
 
+async function db_cleanup() {
+  const files = await File.find({}).sort({ path: 1 });
+
+  await async.eachLimit(files, 10, async (file) => {
+    if (!fs.existsSync(file.path)) {
+      await file.remove();
+    }
+
+    return true;
+  });
+}
+
 mongo_connect()
   .then(() => {
     run();
+
+    cron.schedule("0 0 * * *", () => {
+      db_cleanup();
+    });
   })
   .catch((e) => {
     console.error(">> COULD NOT CONNECT TO MONGO >>", e);
