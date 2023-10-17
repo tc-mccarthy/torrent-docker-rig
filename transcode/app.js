@@ -399,7 +399,7 @@ function transcode(file, filelist) {
 
           if (video) {
             console.log(">> VIDEO FOUND -- REMOVING ERROR >>", video);
-            delete video.error;
+            video.error = undefined;
             await video.save();
           }
         })
