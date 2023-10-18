@@ -569,8 +569,8 @@ async function get_utilization() {
     ),
   };
 
-  data.memory = parseFloat(data.memory);
-  data.cpu = parseFloat(data.cpu);
+  data.memory = Math.round(parseFloat(data.memory));
+  data.cpu = Math.round(parseFloat(data.cpu));
 
   fs.writeFileSync("/usr/app/output/utilization.json", JSON.stringify(data));
 
