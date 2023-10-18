@@ -564,13 +564,14 @@ function get_disk_space() {
 async function get_utilization() {
   const data = {
     memory: await exec_promise("free | grep Mem | awk '{print $3/$2 * 100.0}'"),
-    cpu: await exec_promise(
-      "echo $[100-$(vmstat 1 2|tail -1|awk '{print $15}')]"
-    ),
+    cpu: await exec_promise("echo $(vmstat 1 2|tail -1|awk '{print $15}')"),
+    last_updated: new Date(),
   };
 
   data.memory = Math.round(parseFloat(data.memory.stdout));
-  data.cpu = Math.round(parseFloat(data.cpu.stdout));
+  data.cpu = Math.round(
+    100 - parseFloat(data.cpu.stdout.replace(/[^0-9]+/g, ""))
+  );
 
   fs.writeFileSync("/usr/app/output/utilization.json", JSON.stringify(data));
 
