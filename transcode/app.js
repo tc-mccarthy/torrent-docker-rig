@@ -580,7 +580,7 @@ async function db_cleanup() {
 
   await async.eachLimit(files, 10, async (file) => {
     if (!fs.existsSync(file.path)) {
-      await file.remove();
+      await File.deleteOne({ path: file.path });
     }
 
     return true;
