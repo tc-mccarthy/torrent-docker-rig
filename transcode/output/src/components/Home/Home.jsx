@@ -5,7 +5,7 @@ import Box from '@mui/material/Box';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
 import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 
-async function getData (setData, setFileList, setDisks) {
+async function getData (setData, setFileList, setDisks, setUtilization) {
   try {
     const d = await fetch('active.json').then((r) => r.json());
 
@@ -19,8 +19,12 @@ async function getData (setData, setFileList, setDisks) {
 
     setDisks(disks);
 
+    const utilization = await fetch('utilization.json').then((r) => r.json());
+
+    setUtilization(utilization);
+
     setTimeout(() => {
-      getData(setData, setFileList, setDisks);
+      getData(setData, setFileList, setDisks, setUtilization);
     }, 1 * 1000);
   } catch (e) {
     setTimeout(() => {
@@ -41,9 +45,10 @@ function Home () {
   const [data, setData] = useState(false);
   const [filelist, setFileList] = useState(false);
   const [disks, setDisks] = useState(false);
+  const [utilization, setUtilization] = useState(false);
 
   if (!data) {
-    getData(setData, setFileList, setDisks);
+    getData(setData, setFileList, setDisks, setUtilization);
     return (
       <Box sx={{ display: 'flex' }}>
         <CircularProgress />
@@ -66,7 +71,17 @@ function Home () {
         {data.audio_stream.codec_name}
         )
       </div>
-
+      <div className="flex">
+        <div className="widget">
+          <strong>CPU</strong>
+          <LinearProgressWithLabel value={utilization.cpu} />
+        </div>
+        <div className="widget">
+          <strong>Memory</strong>
+          <LinearProgressWithLabel value={utilization.memory} />
+        </div>
+        ;
+      </div>
       <div className="flex">
         <div className="widget">
           <strong>Elapsed</strong>

@@ -561,12 +561,31 @@ function get_disk_space() {
   });
 }
 
+async function get_utilization() {
+  const data = {
+    memory: await exec_promise("free | grep Mem | awk '{print $3/$2 * 100.0}'"),
+    cpu: await exec_promise(
+      "echo $[100-$(vmstat 1 2|tail -1|awk '{print $15}')]"
+    ),
+  };
+
+  data.memory = parseFloat(data.memory);
+  data.cpu = parseFloat(data.cpu);
+
+  fs.writeFileSync("/usr/app/output/utilization.json", JSON.stringify(data));
+
+  setTimeout(() => {
+    get_utilization();
+  }, 10 * 1000);
+}
+
 async function run() {
   try {
     await pre_sanitize();
     const filelist = await generate_filelist();
     console.log(">> FILELIST >>", filelist);
     await get_disk_space();
+    await get_utilization();
     await async.eachSeries(filelist, async (file) => {
       await transcode(file, filelist);
       return true;
