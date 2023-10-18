@@ -510,6 +510,7 @@ function transcode(file, filelist) {
             error: { error: err.message, stdout, stderr, ffmpeg_cmd },
           });
 
+          // If this video is corrupted, trash it
           if (/Invalid\s+NAL\s+unit\s+size/gi.test(stderr)) {
             console.log(">> INVALID NAL UNIT SIZE >>");
             await trash(file);
@@ -587,7 +588,7 @@ async function db_cleanup() {
   const files = await File.find({}).sort({ path: 1 });
   const to_remove = files.map((f) => f.path).filter((p) => !fs.existsSync(p));
 
-  // delete any files whose paths don't exist
+  // delete any file whose path doesn't exist
   await File.deleteMany({
     path: { $in: to_remove },
   });
