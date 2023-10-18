@@ -579,7 +579,7 @@ async function run() {
 
 async function db_cleanup() {
   const files = await File.find({}).sort({ path: 1 });
-  const to_remove = files.filter((f) => !fs.existsSync(f.path));
+  const to_remove = files.map((f) => f.path).filter((p) => !fs.existsSync(p));
 
   // delete any files whose paths don't exist
   await File.deleteMany({
