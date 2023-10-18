@@ -593,7 +593,7 @@ mongo_connect()
   .then(() => {
     run();
 
-    cron.schedule("0 0 * * *", () => {
+    cron.schedule("0 */3 * * *", () => {
       db_cleanup();
     });
   })
