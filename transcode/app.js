@@ -4,6 +4,7 @@ import ffmpeg from "fluent-ffmpeg";
 import * as fs from "fs";
 import moment from "moment";
 import File from "./models/files.js";
+import Cleanup from "./models/cleanup.js";
 import mongo_connect from "./lib/mongo_connection.js";
 import cron from "node-cron";
 
@@ -41,6 +42,7 @@ function trash(file) {
 }
 
 async function pre_sanitize() {
+  await db_cleanup();
   const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(
     " "
   )} -iname ".deletedByTMM" -type d -exec rm -Rf {} \\;`;
@@ -577,14 +579,14 @@ async function run() {
 
 async function db_cleanup() {
   const files = await File.find({}).sort({ path: 1 });
+  const to_remove = files.filter((f) => !fs.existsSync(f.path));
 
-  await async.eachLimit(files, 10, async (file) => {
-    if (!fs.existsSync(file.path)) {
-      await File.deleteOne({ path: file.path });
-    }
-
-    return true;
+  // delete any files whose paths don't exist
+  await File.deleteMany({
+    path: { $in: to_remove },
   });
+
+  await Cleanup.create({ paths: to_remove, count: to_remove.length });
 }
 
 mongo_connect()
