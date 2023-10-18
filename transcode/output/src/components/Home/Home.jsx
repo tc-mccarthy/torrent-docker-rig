@@ -80,7 +80,6 @@ function Home () {
           <strong>Memory</strong>
           <LinearProgressWithLabel value={utilization.memory} />
         </div>
-        ;
       </div>
       <div className="flex">
         <div className="widget">
