@@ -141,12 +141,7 @@ function Home () {
           disks?.map((disk) => (
             <div className="widget">
               <strong>{disk.mounted}</strong>
-              <em>
-                {disk.used}
-                {' '}
-                of
-                {disk.size}
-              </em>
+              <em>{[disk.used, 'of', disk.size].join(' ')}</em>
               <LinearProgressWithLabel value={parseFloat(disk.use.replace('%', ''))} />
             </div>
           ))}
