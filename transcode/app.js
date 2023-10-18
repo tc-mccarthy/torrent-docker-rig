@@ -280,7 +280,10 @@ function transcode(file, filelist) {
       // if the codec doesn't match the profile
       if (!conversion_profile.audio_codec.test(audio_stream.codec_name)) {
         transcode_audio = true;
-        audio_filters.push("-c:a:0 libopus");
+        audio_filters.push(
+          "-c:a:0 libopus",
+          `-b:a:0 ${audio_stream.channels * 56}k`
+        );
       }
 
       if (
@@ -380,7 +383,10 @@ function transcode(file, filelist) {
       if (!transcode_audio) {
         cmd = cmd.outputOptions("-c:a copy");
       } else {
-        cmd = cmd.outputOptions(audio_filters);
+        // add unique audio filters to output options
+        cmd = cmd.outputOptions(
+          audio_filters.filter((prop, idx, self) => self.indexOf(prop) === idx)
+        );
       }
 
       cmd = cmd.outputOptions(`-metadata encode_version=${encode_version}`);
