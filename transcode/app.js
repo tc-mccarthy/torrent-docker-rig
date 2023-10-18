@@ -582,8 +582,8 @@ async function get_utilization() {
 
 async function run() {
   try {
-    await get_disk_space();
     await get_utilization();
+    await get_disk_space();
     await pre_sanitize();
     const filelist = await generate_filelist();
     console.log(">> FILELIST >>", filelist);
