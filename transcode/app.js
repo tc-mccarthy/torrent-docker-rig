@@ -538,6 +538,16 @@ function transcode(file, filelist) {
               message: "Unknown codec",
               obj: stderr,
             },
+            {
+              test: /too\s+many\s+packets\s+buffered\s+for\s+output\s+stream/gi,
+              message: "Too many packets buffered for output stream",
+              obj: stderr,
+            },
+            {
+              test: /invalid\s+data\s+found\s+when\s+processing\s+input/gi,
+              message: "Invalid data found when processing input",
+              obj: stderr,
+            },
           ];
 
           const is_corrupt = corrupt_video_tests.find((t) =>
