@@ -533,6 +533,11 @@ function transcode(file, filelist) {
               message: "Unspecified pixel format",
               obj: stderr,
             },
+            {
+              test: /unknown\s+codec/gi,
+              message: "Unknown codec",
+              obj: stderr,
+            },
           ];
 
           const is_corrupt = corrupt_video_tests.find((t) =>
