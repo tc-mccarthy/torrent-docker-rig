@@ -7,10 +7,9 @@ import File from "./models/files.js";
 import Cleanup from "./models/cleanup.js";
 import mongo_connect from "./lib/mongo_connection.js";
 import cron from "node-cron";
+import config from "./config.js";
 
-const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(
-  (path) => "/" + path
-);
+const PATHS = config.sources.map((p) => p.path);
 
 const encode_version = "20230608a";
 const concurrent_file_checks = 30;
@@ -238,7 +237,22 @@ function transcode(file, filelist) {
         (s) => s.codec_type === "video"
       );
 
-      const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".tc.mkv");
+      // get the scratch path
+      const scratch_path = config.sources.find((p) =>
+        file.startsWith(p.path)
+      ).scratch;
+
+      // get the filename
+      const filename = file.match(/([^\/]+)$/)[1];
+
+      // set the scratch file path and name
+      const scratch_file = `${scratch_path}/${filename}`.replace(
+        /\.[A-Za-z0-9]+$/,
+        ".tc.mkv"
+      );
+
+      // set the destination file path and name
+      const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".mkv");
 
       // if this file has already been encoded, short circuit
       if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
@@ -484,11 +498,9 @@ function transcode(file, filelist) {
           console.log("Transcoding succeeded!");
 
           await trash(file);
-          await exec_promise(
-            `mv "${dest_file}" "${dest_file.replace(/\.tc/i, "")}"`
-          );
+          await exec_promise(`mv "${scratch_file}" "${dest_file}"`);
           await upsert_video({
-            path: dest_file.replace(/\.tc/i, ""),
+            path: dest_file,
             error: undefined,
             encode_version,
           });
@@ -504,20 +516,37 @@ function transcode(file, filelist) {
               4
             )
           );
-          await trash(dest_file);
+          await trash(scratch_file);
           await upsert_video({
             path: file,
             error: { error: err.message, stdout, stderr, ffmpeg_cmd },
           });
 
+          const corrupt_video_tests = [
+            {
+              test: /Invalid\s+NAL\s+unit\s+size/gi,
+              message: "Invalid NAL unit size",
+              obj: stderr,
+            },
+            {
+              test: /unspecified\s+pixel\s+format/gi,
+              message: "Unspecified pixel format",
+              obj: stderr,
+            },
+          ];
+
+          const is_corrupt = corrupt_video_tests.find((t) =>
+            t.test.test(t.obj)
+          );
+
           // If this video is corrupted, trash it
-          if (/Invalid\s+NAL\s+unit\s+size/gi.test(stderr)) {
-            console.log(">> INVALID NAL UNIT SIZE >>");
+          if (is_corrupt) {
+            console.log(">>", is_corrupt.message, ">>");
             await trash(file);
           }
           resolve();
         });
-      cmd.save(dest_file);
+      cmd.save(scratch_file);
     } catch (e) {
       console.log(">> TRANSCODE ERROR >>", e);
       resolve();
@@ -582,6 +611,7 @@ async function get_utilization() {
 
 async function run() {
   try {
+    await create_scratch_disks();
     await get_utilization();
     await get_disk_space();
     await pre_sanitize();
@@ -614,6 +644,12 @@ async function db_cleanup() {
   });
 
   await Cleanup.create({ paths: to_remove, count: to_remove.length });
+}
+
+async function create_scratch_disks() {
+  await exec_promise(
+    `mkdir -p ${config.sources.map((p) => `"${p.scratch}"`).join(" ")}`
+  );
 }
 
 mongo_connect()
