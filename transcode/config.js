@@ -9,6 +9,10 @@ const transcode_config = {
       scratch: "/source_media/Drax/transcode_scratch",
     },
     {
+      path: "/source_media/Danvers/TV Shows",
+      scratch: "/source_media/Danvers/transcode_scratch",
+    },
+    {
       path: "/source_media/Wanda/TV Shows",
       scratch: "/source_media/Wanda/transcode_scratch",
     },
