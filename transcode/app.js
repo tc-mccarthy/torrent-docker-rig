@@ -267,11 +267,11 @@ function transcode(file, filelist) {
             (!s.tags?.language || /und|eng/i.test(s.tags.language))
         )
         .sort((a, b) => (a.channels > b.channels ? -1 : 1))[0];
-      const subtitle_stream = ffprobe_data.streams.find(
+      const subtitle_streams = ffprobe_data.streams.filter(
         (s) =>
           s.codec_type === "subtitle" &&
           s.tags?.language === "eng" &&
-          /srt|pgs/i.test(s.codec_name)
+          /subrip/i.test(s.codec_name)
       );
       let transcode_video = false;
       let transcode_audio = false;
@@ -346,8 +346,12 @@ function transcode(file, filelist) {
         input_maps.push(`-map 0:${audio_stream.index}`);
       }
 
-      if (subtitle_stream) {
-        input_maps.push(`-map 0:${subtitle_stream.index}`, "-c:s copy");
+      if (subtitle_streams.length > 0) {
+        subtitle_streams.forEach((s) => {
+          input_maps.push(`-map 0:${s.index}`);
+        });
+
+        input_maps.push("-c:s copy");
       }
 
       if (ffprobe_data.chapters.length > 0) {
