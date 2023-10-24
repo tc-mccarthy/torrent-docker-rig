@@ -69,17 +69,20 @@ const config = {
       },
     },
   },
+  build_profiles: () => {
+    this.profiles = this.profiles
+      .map((x) => ({
+        ...x,
+        output: this.dest_formats[x.output] || this.dest_formats.av1, // merge in the defaults for the output profile specified
+        aspect: aspect_round(x.aspect),
+      }))
+      .map((x) => {
+        x.output.video.bitrate = x.bitrate;
+        return x;
+      });
+  },
 };
 
-config.profiles = config.profiles
-  .map((x) => ({
-    ...x,
-    output: config.dest_formats[x.output] || config.dest_formats.av1, // merge in the defaults for the output profile specified
-    aspect: aspect_round(x.aspect),
-  }))
-  .map((x) => {
-    x.output.video.bitrate = x.bitrate;
-    return x;
-  });
+config.build_profiles();
 
 export default config;
