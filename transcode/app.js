@@ -166,7 +166,12 @@ async function ffprobe(file) {
 
   const video = data.streams.find((s) => s.codec_type === "video");
 
-  video.aspect = aspect_round(video.width / video.height);
+  if (video.display_aspect_ratio) {
+    const [width, height] = video.display_aspect_ratio.split(":");
+    video.aspect = aspect_round(width / height);
+  } else {
+    video.aspect = aspect_round(video.width / video.height);
+  }
 
   return data;
 }
@@ -229,6 +234,11 @@ function transcode(file, filelist) {
           video_stream.width + 10 >= x.width && video_stream.aspect >= x.aspect
       );
 
+      console.log(">> VIDEO STREAM WIDTH >>", video_stream.width);
+      console.log(">> VIDEO STREAM ASPECT >>", video_stream.aspect);
+      console.log(">> CONVERSION PROFILE >>", conversion_profile);
+      console.log(">> CONVERSION PROFILES >>", profiles);
+
       conversion_profile.width =
         conversion_profile.dest_width || conversion_profile.width;
 
@@ -246,7 +256,7 @@ function transcode(file, filelist) {
       ) {
         transcode_audio = true;
         audio_filters.push(
-          "-c:a:0" + conversion_profile.output.audio.codec,
+          `-c:a:0 ${conversion_profile.output.audio.codec}`,
           `-b:a:0 ${audio_stream.channels * 56}k`
         );
       }
@@ -277,12 +287,12 @@ function transcode(file, filelist) {
         console.log("more than two audio channels");
         transcode_audio = true;
         audio_filters = audio_filters.concat([
-          "-c:a:0 " + conversion_profile.output.audio.codec,
+          `-c:a:0 ${conversion_profile.output.audio.codec}`,
           `-b:a:0 ${
             audio_stream.channels *
             conversion_profile.output.audio.per_channel_bitrate
           }k`,
-          "-c:a:1 " + conversion_profile.output.audio.codec,
+          `-c:a:1 ${conversion_profile.output.audio.codec}`,
           `-b:a:1 ${2 * conversion_profile.output.audio.per_channel_bitrate}k`,
           "-ac:a:1 2",
           "-metadata:s:a:1 title=Stereo",
