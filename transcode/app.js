@@ -127,7 +127,7 @@ async function generate_filelist() {
 
       return true;
     } catch (e) {
-      logger.error(e, { label: "FFPROBE ERROR" });
+      logger.error(e, { label: "FFPROBE ERROR", file });
 
       // if the file itself wasn't readable by ffprobe, remove it from the list
       if (/command\s+failed/i.test(e.message)) {
