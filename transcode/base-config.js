@@ -11,12 +11,14 @@ const config = {
       width: 3840,
       aspect: 16 / 9,
       bitrate: 25,
+      output: "av1",
     },
     {
       name: "1080p",
       width: 1920,
       aspect: 16 / 9,
       bitrate: 7,
+      output: "av1",
     },
     {
       name: "720p",
@@ -24,24 +26,28 @@ const config = {
       dest_width: 1920,
       aspect: 16 / 9,
       bitrate: 7,
+      output: "av1",
     },
     {
       name: "hdv (1440p)",
       width: 1440,
       aspect: 4 / 3,
       bitrate: 7,
+      output: "av1",
     },
     {
       name: "sd",
       width: 480,
       aspect: 4 / 3,
       bitrate: 3.5,
+      output: "av1",
     },
     {
       name: "vertical",
       width: 1080,
       aspect: 9 / 16,
       bitrate: 12,
+      output: "av1",
     },
   ],
 
@@ -68,7 +74,7 @@ const config = {
 config.profiles = config.profiles
   .map((x) => ({
     ...x,
-    output: config.dest_formats.av1, // merge in the av1 defaults
+    output: config.dest_formats[x.output] || config.dest_formats.av1, // merge in the defaults for the output profile specified
     aspect: aspect_round(x.aspect),
   }))
   .map((x) => {
