@@ -9,6 +9,7 @@ import mongo_connect from "./lib/mongo_connection.js";
 import cron from "node-cron";
 import config from "./config.js";
 import { aspect_round } from "./base-config.js";
+import logger from "./lib/logger.js";
 
 const PATHS = config.sources.map((p) => p.path);
 
@@ -16,7 +17,7 @@ const { encode_version, concurrent_file_checks } = config;
 
 function exec_promise(cmd) {
   return new Promise((resolve, reject) => {
-    console.log("Running", cmd);
+    logger.debug(cmd, { label: "Shell command" });
     exec(cmd, { maxBuffer: 1024 * 1024 * 500 }, (error, stdout, stderr) => {
       if (error) {
         console.error(`exec error: ${error}`);
@@ -45,8 +46,7 @@ async function pre_sanitize() {
   const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(
     " "
   )} -iname ".deletedByTMM" -type d -exec rm -Rf {} \\;`;
-  const { stdout, stderr } = await exec_promise(findCMD);
-  console.log(stdout);
+  await exec_promise(findCMD);
 }
 
 async function upsert_video(video) {
@@ -54,7 +54,7 @@ async function upsert_video(video) {
     const { path } = video;
     await File.findOneAndUpdate({ path }, video, { upsert: true });
   } catch (e) {
-    console.log(">> COULD NOT CONFIGURE SQL >>", e);
+    logger.error(e, { label: "COULD NOT CONFIGURE SQL" });
   }
 }
 
@@ -70,7 +70,7 @@ async function get_encoded_videos() {
 
     return videos || [];
   } catch (e) {
-    console.log(">> COULD NOT CONFIGURE SQL >>", e);
+    logger.error(e, { label: "COULD NOT GET ENCODED VIDEOS" });
   }
 }
 
@@ -127,14 +127,16 @@ async function generate_filelist() {
 
       return true;
     } catch (e) {
-      console.log(">> FFPROBE ERROR >>", e);
+      logger.error(e, { label: "FFPROBE ERROR" });
 
       // if the file itself wasn't readable by ffprobe, remove it from the list
       if (/command\s+failed/i.test(e.message)) {
         // if this is an unreadble file, trash it.
         const ext_expression = new RegExp("." + file_ext.join("|"), "i");
         if (ext_expression.test(e.message)) {
-          console.log(">> UNREADABLE VIDEO FILE. REMOVING FROM LIST >>");
+          logger.info(file, {
+            label: "UNREADABLE VIDEO FILE. REMOVING FROM LIST",
+          });
           trash(file);
         }
 
@@ -183,7 +185,7 @@ function transcode(file, filelist) {
       const { profiles } = config;
 
       const ffprobe_data = await ffprobe(file);
-      console.log(">> FFPROBE DATA >>", ffprobe_data);
+      logger.debug(ffprobe_data, { label: "FFPROBE DATA >>" });
       const video_stream = ffprobe_data.streams.find(
         (s) => s.codec_type === "video"
       );
@@ -234,10 +236,15 @@ function transcode(file, filelist) {
           video_stream.width + 10 >= x.width && video_stream.aspect >= x.aspect
       );
 
-      console.log(">> VIDEO STREAM WIDTH >>", video_stream.width);
-      console.log(">> VIDEO STREAM ASPECT >>", video_stream.aspect);
-      console.log(">> CONVERSION PROFILE >>", conversion_profile);
-      console.log(">> CONVERSION PROFILES >>", profiles);
+      logger.debug(
+        {
+          video_stream_width: video_stream.width,
+          video_stream_aspect: video_stream.aspect,
+          conversion_profile,
+          profiles,
+        },
+        { label: "Profile debug info" }
+      );
 
       conversion_profile.width =
         conversion_profile.dest_width || conversion_profile.width;
@@ -267,7 +274,9 @@ function transcode(file, filelist) {
           conversion_profile.bitrate * 1024 * 1024 &&
         !transcode_video
       ) {
-        console.log("Video stream bitrate higher than conversion profile");
+        logger.debug(
+          "Video stream bitrate higher than conversion profile. Transcoding"
+        );
         transcode_video = true;
       }
 
@@ -284,7 +293,7 @@ function transcode(file, filelist) {
         conversion_profile.output.audio.downmix &&
         audio_stream.channels > 2
       ) {
-        console.log("more than two audio channels");
+        logger.debug("more than two audio channels, downmixing");
         transcode_audio = true;
         audio_filters = audio_filters.concat([
           `-c:a:0 ${conversion_profile.output.audio.codec}`,
@@ -383,7 +392,7 @@ function transcode(file, filelist) {
       let start_time;
       cmd = cmd
         .on("start", async function (commandLine) {
-          console.log("Spawned Ffmpeg with command: " + commandLine);
+          logger.debug("Spawned Ffmpeg with command: " + commandLine);
           start_time = moment();
           ffmpeg_cmd = commandLine;
           fs.writeFileSync(
@@ -393,7 +402,7 @@ function transcode(file, filelist) {
           const video = await File.findOne({ path: file });
 
           if (video) {
-            console.log(">> VIDEO FOUND -- REMOVING ERROR >>", video);
+            logger.debug(">> VIDEO FOUND -- REMOVING ERROR >>", video);
             video.error = undefined;
             await video.save();
           }
@@ -445,14 +454,17 @@ function transcode(file, filelist) {
             4
           );
           console.clear();
-          console.log(">> JOB >>", {
-            ...conversion_profile,
-            ffmpeg_cmd,
-            file,
-            overall_progress: `(${list_idx}/${filelist.length})`,
-          });
+          logger.debug(
+            {
+              ...conversion_profile,
+              ffmpeg_cmd,
+              file,
+              overall_progress: `(${list_idx}/${filelist.length})`,
+            },
+            { label: "Job" }
+          );
 
-          console.log(">> PROGRESS >>", output);
+          logger.info(output);
 
           fs.writeFileSync(
             "/usr/app/output/active.json",
@@ -468,7 +480,7 @@ function transcode(file, filelist) {
           );
         })
         .on("end", async function (stdout, stderr) {
-          console.log("Transcoding succeeded!");
+          logger.info("Transcoding succeeded!");
 
           await trash(file);
           await exec_promise(`mv "${scratch_file}" "${dest_file}"`);
@@ -480,7 +492,7 @@ function transcode(file, filelist) {
           resolve();
         })
         .on("error", async function (err, stdout, stderr) {
-          console.log("Cannot process video: ", err.message, stdout, stderr);
+          logger.error(e, { label: "Cannot process video", stdout, stderr });
           fs.appendFileSync(
             "/usr/app/logs/ffmpeg.log",
             JSON.stringify(
@@ -529,14 +541,16 @@ function transcode(file, filelist) {
 
           // If this video is corrupted, trash it
           if (is_corrupt) {
-            console.log(">>", is_corrupt.message, ">>");
+            logger.info(is_corrupt, {
+              label: "Source video is corrupt. Trashing",
+            });
             await trash(file);
           }
           resolve();
         });
       cmd.save(scratch_file);
     } catch (e) {
-      console.log(">> TRANSCODE ERROR >>", e);
+      logger.error(e, { label: "TRANSCODE ERROR" });
       resolve();
     }
   });
@@ -604,18 +618,18 @@ async function run() {
     await get_disk_space();
     await pre_sanitize();
     const filelist = await generate_filelist();
-    console.log(">> FILELIST >>", filelist);
+    logger.debug(filelist, { label: "File list" });
     await async.eachSeries(filelist, async (file) => {
       await transcode(file, filelist);
       return true;
     });
-    console.log("Requeuing in 30 seconds...");
+    logger.info("Requeuing in 30 seconds...");
     setTimeout(() => {
       run();
     }, 30 * 1000);
   } catch (e) {
-    console.log(">> ERROR >>", e);
-    console.log("Requeuing in 30 seconds...");
+    logger.error(e, { label: "ERROR" });
+    logger.info("Requeuing in 30 seconds...");
     setTimeout(() => {
       run();
     }, 30 * 1000);
