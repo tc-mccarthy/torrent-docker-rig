@@ -69,7 +69,7 @@ const config = {
       },
     },
   },
-  build_profiles: () => {
+  build_profiles: function () {
     this.profiles = this.profiles
       .map((x) => ({
         ...x,
