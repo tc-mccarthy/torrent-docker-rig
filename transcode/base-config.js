@@ -69,11 +69,11 @@ const config = {
       },
     },
   },
-  build_profiles: function () {
-    this.profiles = this.profiles
+  build_profiles: function (config) {
+    config.profiles = config.profiles
       .map((x) => ({
         ...x,
-        output: this.dest_formats[x.output] || this.dest_formats.av1, // merge in the defaults for the output profile specified
+        output: config.dest_formats[x.output] || config.dest_formats.av1, // merge in the defaults for the output profile specified
         aspect: aspect_round(x.aspect),
       }))
       .map((x) => {
@@ -83,6 +83,6 @@ const config = {
   },
 };
 
-config.build_profiles();
+config.build_profiles(config);
 
 export default config;
