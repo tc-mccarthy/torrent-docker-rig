@@ -1,4 +1,4 @@
-function aspect_round(val) {
+export function aspect_round(val) {
   return Math.round(val * 10) / 10;
 }
 
