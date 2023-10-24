@@ -11,8 +11,7 @@ import config from "./config.js";
 
 const PATHS = config.sources.map((p) => p.path);
 
-const encode_version = "20230608a";
-const concurrent_file_checks = 30;
+const { encode_version, concurrent_file_checks } = config;
 
 function exec_promise(cmd) {
   return new Promise((resolve, reject) => {
@@ -179,57 +178,7 @@ function transcode(file, filelist) {
   return new Promise(async (resolve, reject) => {
     try {
       const list_idx = filelist.findIndex((f) => f === file) + 1;
-      const profiles = [
-        {
-          name: "uhd",
-          width: 3840,
-          aspect: 16 / 9,
-          bitrate: 25,
-          codec: /libsvtav1/,
-          audio_codec: /libopus/,
-        },
-        {
-          name: "1080p",
-          width: 1920,
-          aspect: 16 / 9,
-          bitrate: 7,
-          codec: /libsvtav1/,
-          audio_codec: /libopus/,
-        },
-        {
-          name: "720p",
-          width: 720,
-          dest_width: 1920,
-          aspect: 16 / 9,
-          bitrate: 7,
-          codec: /libsvtav1/,
-          audio_codec: /libopus/,
-        },
-        {
-          name: "hdv (1440p)",
-          width: 1440,
-          aspect: 4 / 3,
-          bitrate: 7,
-          codec: /libsvtav1/,
-          audio_codec: /libopus/,
-        },
-        {
-          name: "sd",
-          width: 480,
-          aspect: 4 / 3,
-          bitrate: 3.5,
-          codec: /libsvtav1/,
-          audio_codec: /libopus/,
-        },
-        {
-          name: "vertical",
-          width: 1080,
-          aspect: 9 / 16,
-          bitrate: 12,
-          codec: /libsvtav1/,
-          audio_codec: /libopus/,
-        },
-      ].map((x) => ({ ...x, aspect: aspect_round(x.aspect) }));
+      const { profiles } = config;
 
       const ffprobe_data = await ffprobe(file);
       console.log(">> FFPROBE DATA >>", ffprobe_data);
@@ -286,29 +235,36 @@ function transcode(file, filelist) {
       conversion_profile.width =
         conversion_profile.dest_width || conversion_profile.width;
 
-      // if the codec doesn't match the profile
-      if (!conversion_profile.codec.test(video_stream.codec_name)) {
+      // if the video codec doesn't match the profile
+
+      if (
+        conversion_profile.output.video.codec_name !== video_stream.codec_name
+      ) {
         transcode_video = true;
       }
 
-      // if the codec doesn't match the profile
-      if (!conversion_profile.audio_codec.test(audio_stream.codec_name)) {
+      // if the audio codec doesn't match the profile
+      if (
+        conversion_profile.output.audio.codec_name !== audio_stream.codec_name
+      ) {
         transcode_audio = true;
         audio_filters.push(
-          "-c:a:0 libopus",
+          "-c:a:0" + conversion_profile.output.audio.codec,
           `-b:a:0 ${audio_stream.channels * 56}k`
         );
       }
 
+      // if the video codec matches the profile, but the bitrate is higher than the profile
       if (
         ffprobe_data.format.bit_rate >
-          conversion_profile.bitrate * 1024 * 1024 ||
-        ffprobe_data.format.codec_name !== "av1"
+          conversion_profile.bitrate * 1024 * 1024 &&
+        !transcode_video
       ) {
         console.log("Video stream bitrate higher than conversion profile");
         transcode_video = true;
       }
 
+      // if the input stream width doesn't equal the conversion profile width
       if (video_stream.width !== conversion_profile.width) {
         transcode_video = true;
         video_filters.push(
@@ -316,16 +272,21 @@ function transcode(file, filelist) {
         );
       }
 
-      console.log(audio_stream);
-
-      if (audio_stream.channels > 2) {
+      // if the audio stream has more than two channels, and the profile is set to downmix, create a stereo version
+      if (
+        conversion_profile.output.audio.downmix &&
+        audio_stream.channels > 2
+      ) {
         console.log("more than two audio channels");
         transcode_audio = true;
         audio_filters = audio_filters.concat([
-          "-c:a:0 libopus",
-          `-b:a:0 ${audio_stream.channels * 56}k`,
-          "-c:a:1 libopus",
-          "-b:a:1 112k",
+          "-c:a:0 " + conversion_profile.output.audio.codec,
+          `-b:a:0 ${
+            audio_stream.channels *
+            conversion_profile.output.audio.per_channel_bitrate
+          }k`,
+          "-c:a:1 " + conversion_profile.output.audio.codec,
+          `-b:a:1 ${2 * conversion_profile.output.audio.per_channel_bitrate}k`,
           "-ac:a:1 2",
           "-metadata:s:a:1 title=Stereo",
           "-metadata:s:a:1 language=eng",
@@ -367,9 +328,10 @@ function transcode(file, filelist) {
           video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
 
         cmd = cmd.outputOptions([
-          "-c:v libsvtav1",
-          "-preset 8",
-          "-crf 35",
+          `-c:v ${conversion_profile.output.video.codec}`,
+          ...Object.keys(conversion_profile.output.video.flags || {}).map(
+            (k) => `-${k} ${conversion_profile.output.video.flags[k]}`
+          ),
           `-pix_fmt ${pix_fmt}`,
         ]);
 
@@ -393,8 +355,8 @@ function transcode(file, filelist) {
       }
 
       cmd = cmd.outputOptions([
-        `-maxrate ${conversion_profile.bitrate}M`,
-        `-bufsize ${conversion_profile.bitrate * 3}M`,
+        `-maxrate ${conversion_profile.output.video.bitrate}M`,
+        `-bufsize ${conversion_profile.output.video.bitrate * 3}M`,
         `-max_muxing_queue_size 9999`,
       ]);
 

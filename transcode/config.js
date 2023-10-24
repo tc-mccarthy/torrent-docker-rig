@@ -1,4 +1,7 @@
+import base_config from "./base-config.js";
+
 const transcode_config = {
+  ...base_config,
   sources: [
     {
       path: "/source_media/Drax/Movies",
