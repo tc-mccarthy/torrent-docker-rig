@@ -190,6 +190,10 @@ function transcode(file, filelist) {
         (s) => s.codec_type === "video"
       );
 
+      if (!video_stream) {
+        throw new Error("No video stream found");
+      }
+
       // get the scratch path
       const scratch_path = config.sources.find((p) =>
         file.startsWith(p.path)
@@ -551,6 +555,9 @@ function transcode(file, filelist) {
       cmd.save(scratch_file);
     } catch (e) {
       logger.error(e, { label: "TRANSCODE ERROR" });
+      if (/no\s+video\s+stream\s+found/gi.test(e.message)) {
+        await trash(file);
+      }
       resolve();
     }
   });
