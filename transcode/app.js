@@ -152,10 +152,6 @@ async function generate_filelist() {
   return filelist;
 }
 
-function aspect_round(val) {
-  return Math.round(val * 10) / 10;
-}
-
 async function ffprobe(file) {
   const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams "${file}"`;
   const { stdout, stderr } = await exec_promise(ffprobeCMD);

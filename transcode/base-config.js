@@ -1,3 +1,7 @@
+function aspect_round(val) {
+  return Math.round(val * 10) / 10;
+}
+
 const config = {
   encode_version: "20230608a",
   concurrent_file_checks: 30,
