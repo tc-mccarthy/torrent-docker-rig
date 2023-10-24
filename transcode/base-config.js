@@ -64,7 +64,7 @@ const config = {
 config.profiles = config.profiles
   .map((x) => ({
     ...x,
-    output: config.profiles.dest_formats.av1, // merge in the av1 defaults
+    output: config.dest_formats.av1, // merge in the av1 defaults
     aspect: aspect_round(x.aspect),
   }))
   .map((x) => {
