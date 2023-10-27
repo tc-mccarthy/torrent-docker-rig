@@ -235,10 +235,7 @@ function transcode(file, filelist) {
       let video_filters = [];
       let audio_filters = [];
 
-      const conversion_profile = profiles.find(
-        (x) =>
-          video_stream.width + 10 >= x.width && video_stream.aspect >= x.aspect
-      );
+      const conversion_profile = config.get_profile(video_stream);
 
       logger.debug(
         {
@@ -347,25 +344,31 @@ function transcode(file, filelist) {
         const pix_fmt =
           video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
 
+        conversion_profile.addFlags({
+          maxrate: `${conversion_profile.output.video.bitrate}M`,
+          bufsize: `${conversion_profile.output.video.bitrate * 3}M`,
+          max_muxing_queue_size: 9999,
+          pix_fmt: pix_fmt,
+        });
+
+        // handle HDR
+        if (/arib[-]std[-]b67|smpte2084/i.test(video_stream.color_transfer)) {
+          conversion_profile.addFlags({
+            color_primaries: "bt2020",
+            color_trc: "smpte2084",
+            color_range: "tv",
+            colorspace: "bt2020nc",
+          });
+
+          conversion_profile.name += ` (hdr)`;
+        }
+
         cmd = cmd.outputOptions([
           `-c:v ${conversion_profile.output.video.codec}`,
           ...Object.keys(conversion_profile.output.video.flags || {}).map(
             (k) => `-${k} ${conversion_profile.output.video.flags[k]}`
           ),
-          `-pix_fmt ${pix_fmt}`,
         ]);
-
-        // handle HDR
-        if (/arib[-]std[-]b67|smpte2084/i.test(video_stream.color_transfer)) {
-          cmd = cmd.outputOptions([
-            "-color_range tv",
-            "-colorspace bt2020nc",
-            "-color_primaries bt2020",
-            "-color_trc smpte2084",
-          ]);
-
-          conversion_profile.name += ` HDR`;
-        }
       } else {
         cmd = cmd.outputOptions("-c:v copy");
       }
@@ -373,12 +376,6 @@ function transcode(file, filelist) {
       if (video_filters.length > 0) {
         cmd = cmd.outputOptions(["-vf", ...video_filters]);
       }
-
-      cmd = cmd.outputOptions([
-        `-maxrate ${conversion_profile.output.video.bitrate}M`,
-        `-bufsize ${conversion_profile.output.video.bitrate * 3}M`,
-        `-max_muxing_queue_size 9999`,
-      ]);
 
       if (!transcode_audio) {
         cmd = cmd.outputOptions("-c:a copy");

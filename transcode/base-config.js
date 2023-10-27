@@ -1,3 +1,5 @@
+import copy from "fast-copy";
+
 export function aspect_round(val) {
   return Math.round(val * 10) / 10;
 }
@@ -80,6 +82,31 @@ const config = {
         x.output.video.bitrate = x.bitrate;
         return x;
       });
+  },
+  get_profile: function (video_stream) {
+    // locate the conversion profile that's best suited for this source media and duplicate it so changes don't propagate to the next use of the profile
+    let conversion_profile = profiles.find(
+      (x) =>
+        video_stream.width + 10 >= x.width && video_stream.aspect >= x.aspect
+    );
+
+    if (conversion_profile) {
+      conversion_profile = copy(conversion_profile);
+      Object.assign(conversion_profile, {
+        flags: {},
+        addFlag: function (flag, value) {
+          this.flags[flag] = value;
+        },
+        addFlags: function (flags) {
+          Object.assign(this.flags, flags);
+        },
+      });
+      return conversion_profile;
+    }
+
+    throw new Error(
+      "No suitable conversion profile could be found for this video stream"
+    );
   },
 };
 
