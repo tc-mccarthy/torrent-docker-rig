@@ -131,7 +131,7 @@ async function generate_filelist() {
 
       await upsert_video({
         path: file,
-        error: { error: e.message, stdout, stderr },
+        error: { error: e.message, stdout, stderr, trace: e.stack },
       });
 
       // if the file itself wasn't readable by ffprobe, remove it from the list
@@ -510,7 +510,13 @@ function transcode(file, filelist) {
           fs.appendFileSync(
             "/usr/app/logs/ffmpeg.log",
             JSON.stringify(
-              { error: err.message, stdout, stderr, ffmpeg_cmd },
+              {
+                error: err.message,
+                stdout,
+                stderr,
+                ffmpeg_cmd,
+                trace: err.stack,
+              },
               true,
               4
             )
@@ -518,7 +524,13 @@ function transcode(file, filelist) {
           await trash(scratch_file);
           await upsert_video({
             path: file,
-            error: { error: err.message, stdout, stderr, ffmpeg_cmd },
+            error: {
+              error: err.message,
+              stdout,
+              stderr,
+              ffmpeg_cmd,
+              trace: err.stack,
+            },
           });
 
           const corrupt_video_tests = [
@@ -567,7 +579,7 @@ function transcode(file, filelist) {
       logger.error(e, { label: "TRANSCODE ERROR" });
       await upsert_video({
         path: file,
-        error: { error: e.message },
+        error: { error: e.message, trace: e.stack },
       });
       if (/no\s+video\s+stream\s+found/gi.test(e.message)) {
         await trash(file);
