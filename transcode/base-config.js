@@ -95,10 +95,10 @@ const config = {
       Object.assign(conversion_profile, {
         flags: {},
         addFlag: function (flag, value) {
-          this.flags[flag] = value;
+          conversion_profile.flags[flag] = value;
         },
         addFlags: function (flags) {
-          Object.assign(this.flags, flags);
+          Object.assign(conversion_profile.flags, flags);
         },
       });
       return conversion_profile;
