@@ -353,14 +353,14 @@ function transcode(file, filelist) {
 
         // handle HDR
         if (/arib[-]std[-]b67|smpte2084/i.test(video_stream.color_transfer)) {
-          conversion_profile.addFlags({
-            color_primaries: "bt2020",
-            color_trc: "smpte2084",
-            color_range: "tv",
-            colorspace: "bt2020nc",
-          });
-
-          conversion_profile.name += ` (hdr)`;
+          conversion_profile.name += ` (hdr)`; // add HDR to the profile name
+          // temporarily disable in an effort to accommodate dolby vision
+          // conversion_profile.addFlags({
+          //   color_primaries: "bt2020",
+          //   color_trc: "smpte2084",
+          //   color_range: "tv",
+          //   colorspace: "bt2020nc",
+          // });
         }
 
         cmd = cmd.outputOptions([
