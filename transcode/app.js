@@ -130,7 +130,7 @@ async function generate_filelist() {
       logger.error(e, { label: "FFPROBE ERROR", file });
 
       // if the file itself wasn't readable by ffprobe, remove it from the list
-      if (/command\s+failed|display_aspect_ratio/gi.test(e.message)) {
+      if (/command\s+failed/gi.test(e.message)) {
         // if this is an unreadble file, trash it.
         const ext_expression = new RegExp("." + file_ext.join("|"), "i");
         if (ext_expression.test(e.message)) {
@@ -139,10 +139,18 @@ async function generate_filelist() {
           });
           trash(file);
         }
-
-        // any ffprobe command failure, this should be removed from the list
-        filelist[file_idx] = null;
       }
+
+      // if the video stream is corrupt, delete it
+      if (/display_aspect_ratio/gi.test(e.message)) {
+        logger.info(file, {
+          label: "UNREADABLE VIDEO STREAM. REMOVING FROM LIST",
+        });
+        trash(file);
+      }
+
+      // any ffprobe command failure, this should be removed from the list
+      filelist[file_idx] = null;
 
       return true;
     }
