@@ -21,6 +21,7 @@
   "homepage": "https://github.com/tc-mccarthy/plex-transcoder#readme",
   "dependencies": {
     "async": "^3.2.4",
+    "fast-copy": "^3.0.1",
     "fluent-ffmpeg": "^2.1.2",
     "moment": "^2.29.4",
     "mongoose": "^7.6.2",
