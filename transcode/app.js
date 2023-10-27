@@ -129,6 +129,11 @@ async function generate_filelist() {
     } catch (e) {
       logger.error(e, { label: "FFPROBE ERROR", file });
 
+      await upsert_video({
+        path: file,
+        error: { error: e.message, stdout, stderr },
+      });
+
       // if the file itself wasn't readable by ffprobe, remove it from the list
       if (/command\s+failed/gi.test(e.message)) {
         // if this is an unreadble file, trash it.
