@@ -493,7 +493,7 @@ function transcode(file, filelist) {
           resolve();
         })
         .on("error", async function (err, stdout, stderr) {
-          logger.error(e, { label: "Cannot process video", stdout, stderr });
+          logger.error(err, { label: "Cannot process video", stdout, stderr });
           fs.appendFileSync(
             "/usr/app/logs/ffmpeg.log",
             JSON.stringify(
