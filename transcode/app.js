@@ -565,6 +565,10 @@ function transcode(file, filelist) {
       cmd.save(scratch_file);
     } catch (e) {
       logger.error(e, { label: "TRANSCODE ERROR" });
+      await upsert_video({
+        path: file,
+        error: { error: e.message, stdout, stderr },
+      });
       if (/no\s+video\s+stream\s+found/gi.test(e.message)) {
         await trash(file);
       }
