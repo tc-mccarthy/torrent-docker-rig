@@ -567,7 +567,7 @@ function transcode(file, filelist) {
       logger.error(e, { label: "TRANSCODE ERROR" });
       await upsert_video({
         path: file,
-        error: { error: e.message, stdout, stderr },
+        error: { error: e.message },
       });
       if (/no\s+video\s+stream\s+found/gi.test(e.message)) {
         await trash(file);
