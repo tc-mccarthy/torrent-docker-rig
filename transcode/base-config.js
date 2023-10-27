@@ -102,6 +102,8 @@ const config = {
             Object.assign(conversion_profile.flags, flags);
           },
         });
+
+        return conversion_profile;
       })(conversion_profile);
     }
 
