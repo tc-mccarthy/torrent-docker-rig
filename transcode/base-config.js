@@ -92,16 +92,17 @@ const config = {
 
     if (conversion_profile) {
       conversion_profile = copy(conversion_profile);
-      Object.assign(conversion_profile, {
-        flags: {},
-        addFlag: function (flag, value) {
-          conversion_profile.flags[flag] = value;
-        },
-        addFlags: function (flags) {
-          Object.assign(conversion_profile.flags, flags);
-        },
-      });
-      return conversion_profile;
+      return (function (conversion_profile) {
+        Object.assign(conversion_profile, {
+          flags: {},
+          addFlag: function (flag, value) {
+            conversion_profile.flags[flag] = value;
+          },
+          addFlags: function (flags) {
+            Object.assign(conversion_profile.flags, flags);
+          },
+        });
+      })(conversion_profile);
     }
 
     throw new Error(
