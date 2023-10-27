@@ -352,7 +352,7 @@ function transcode(file, filelist) {
         const pix_fmt =
           video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
 
-        conversion_profile.addFlags({
+        conversion_profile.output.video.addFlags({
           maxrate: `${conversion_profile.output.video.bitrate}M`,
           bufsize: `${conversion_profile.output.video.bitrate * 3}M`,
           max_muxing_queue_size: 9999,
