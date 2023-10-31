@@ -278,7 +278,10 @@ function transcode(file, filelist) {
         transcode_audio = true;
         audio_filters.push(
           `-c:a:0 ${conversion_profile.output.audio.codec}`,
-          `-b:a:0 ${audio_stream.channels * audio.per_channel_bitrate}k`
+          `-b:a:0 ${
+            audio_stream.channels *
+            conversion_profile.output.audio.per_channel_bitrate
+          }k`
         );
       }
 
