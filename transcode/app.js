@@ -241,7 +241,7 @@ function transcode(file, filelist) {
         (s) =>
           s.codec_type === "subtitle" &&
           s.tags?.language === "eng" &&
-          /subrip/i.test(s.codec_name)
+          /subrip|hdmv_pgs_subtitle/i.test(s.codec_name)
       );
       let transcode_video = false;
       let transcode_audio = false;

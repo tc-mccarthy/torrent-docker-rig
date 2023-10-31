@@ -60,13 +60,13 @@ const config = {
         codec_name: "av1",
         flags: {
           crf: 35,
-          preset: 8,
+          preset: 7,
         },
       },
       audio: {
         codec: "libopus",
         codes_name: "opus",
-        per_channel_bitrate: 56,
+        per_channel_bitrate: 64,
         downmix: true, // downmix to stereo in a duplicate channel
       },
     },
