@@ -59,7 +59,7 @@ const config = {
         codec: "libsvtav1",
         codec_name: "av1",
         flags: {
-          crf: 38,
+          crf: 32,
           preset: 7
         },
       },
