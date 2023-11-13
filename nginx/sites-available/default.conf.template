@@ -4,6 +4,8 @@ server {
   resolver_timeout 5s;
   listen ${NGINX_PORT} ssl;
 
+  client_max_body_size 10M;
+
   # RSA certificate
   ssl_certificate /ssl/live/${SSL_HOST}/fullchain.pem; 
   ssl_certificate_key /ssl/live/${SSL_HOST}/privkey.pem; 

@@ -141,11 +141,18 @@ services:
     environment:
       - TZ
       - TRANSCODE_PATHS
+      - LOG_PRETTY=on
+      - LOG_LEVEL=info # make debug when debugging
     volumes:
-      - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE} # path to my volumes for download storage
+      - ${TRANSCODE_STORAGE}:/source_media # path to my volumes for download storage
       - ./transcode:/usr/app
       - /usr/app/node_modules
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "12" # 12 cores
+          memory: 28G # 28GB
 
   plex:
     container_name: plex
@@ -160,6 +167,16 @@ services:
       - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE} # path to my volumes for download storage
       - ./plex:/config
     restart: unless-stopped
+
+  mongo:
+    container_name: torrent-mongo-local
+    image: mongo:3.6.23-xenial
+    hostname: torrent-mongo-local
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo_db:/data/db
+    restart: always
 
   sonarr:
     container_name: sonarr
@@ -315,11 +332,12 @@ services:
         condition: service_healthy
 
   portainer:
+    container_name: portainer
     image: portainer/portainer-ce:latest
     network_mode: service:vpn # all traffic goes through vpn
     volumes:
-      - ./portainer:/data
       - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_db:/data
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
@@ -350,6 +368,9 @@ services:
     #   retries: 0
     #   timeout: 5s
     #   start_period: 30s
+volumes:
+  mongo_db:
+  portainer_db:
 
 networks:
   default:

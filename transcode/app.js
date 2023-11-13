@@ -2,28 +2,22 @@ import { exec } from "child_process";
 import async from "async";
 import ffmpeg from "fluent-ffmpeg";
 import * as fs from "fs";
-import trash from "trash";
 import moment from "moment";
-import Knex from "knex";
+import File from "./models/files.js";
+import Cleanup from "./models/cleanup.js";
+import mongo_connect from "./lib/mongo_connection.js";
+import cron from "node-cron";
+import config from "./config.js";
+import { aspect_round } from "./base-config.js";
+import logger from "./lib/logger.js";
 
-const PATHS = process.env.TRANSCODE_PATHS.split(/[,]\s*\//).map(
-  (path) => "/" + path
-);
+const PATHS = config.sources.map((p) => p.path);
 
-const encode_version = "20230608a";
-const concurrent_file_checks = 30;
-
-const knex = Knex({
-  client: "sqlite3", // or 'better-sqlite3'
-  connection: {
-    filename: "/usr/app/data/transcoder.sqlite3",
-  },
-  useNullAsDefault: true,
-});
+const { encode_version, concurrent_file_checks } = config;
 
 function exec_promise(cmd) {
   return new Promise((resolve, reject) => {
-    console.log("Running", cmd);
+    logger.debug(cmd, { label: "Shell command" });
     exec(cmd, { maxBuffer: 1024 * 1024 * 500 }, (error, stdout, stderr) => {
       if (error) {
         console.error(`exec error: ${error}`);
@@ -34,43 +28,49 @@ function exec_promise(cmd) {
   });
 }
 
+function trash(file) {
+  return new Promise((resolve, reject) => {
+    file = file.replace(/\/$/g, "").trim();
+    exec(`rm "${file}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`exec error: ${error}`);
+        reject(error);
+      }
+      resolve();
+    });
+  });
+}
+
 async function pre_sanitize() {
+  await db_cleanup();
   const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(
     " "
   )} -iname ".deletedByTMM" -type d -exec rm -Rf {} \\;`;
-  const { stdout, stderr } = await exec_promise(findCMD);
-  console.log(stdout);
+  await exec_promise(findCMD);
 }
 
-async function add_encoded_video(path) {
+async function upsert_video(video) {
   try {
-    const timestamp = new Date();
-    await knex("encoded")
-      .insert({
-        path,
-        version: encode_version,
-        created_at: timestamp,
-        updated_at: timestamp,
-      })
-      .onConflict("path")
-      .merge(["path", "version", "updated_at"]);
+    const { path } = video;
+    await File.findOneAndUpdate({ path }, video, { upsert: true });
   } catch (e) {
-    console.log(">> COULD NOT CONFIGURE SQL >>", e);
+    logger.error(e, { label: "COULD NOT CONFIGURE SQL" });
   }
 }
 
 async function get_encoded_videos() {
   try {
     const timestamp = new Date(new Date().setDate(new Date().getDate() - 30));
-    let videos = await knex("encoded")
-      .where("updated_at", ">=", timestamp)
-      .andWhere("version", "=", encode_version);
+    let videos = await File.find({
+      updated_at: { $gte: timestamp },
+      encode_version,
+    });
 
     videos = videos.map((video) => video.path);
 
-    return videos;
+    return videos || [];
   } catch (e) {
-    console.log(">> COULD NOT CONFIGURE SQL >>", e);
+    logger.error(e, { label: "COULD NOT GET ENCODED VIDEOS" });
   }
 }
 
@@ -98,9 +98,9 @@ async function generate_filelist() {
   const { stdout, stderr } = await exec_promise(findCMD);
 
   let filelist = stdout
-    .split(/\s*\/media/)
+    .split(/\s*\/source_media/)
     .filter((j) => j)
-    .map((p) => `/media${p}`.replace("\x00", ""))
+    .map((p) => `/source_media${p}`.replace("\x00", ""))
     .slice(1);
 
   const encoded_videos = await get_encoded_videos();
@@ -117,25 +117,45 @@ async function generate_filelist() {
       // if the file is already encoded, remove it from the list
       if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
         filelist[file_idx] = null;
-        await add_encoded_video(file);
       }
+
+      await upsert_video({
+        path: file,
+        probe: ffprobe_data,
+        encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
+      });
 
       return true;
     } catch (e) {
-      console.log(">> FFPROBE ERROR >>", e);
+      logger.error(e, { label: "FFPROBE ERROR", file });
+
+      await upsert_video({
+        path: file,
+        error: { error: e.message, stdout, stderr, trace: e.stack },
+      });
 
       // if the file itself wasn't readable by ffprobe, remove it from the list
-      if (/command\s+failed/i.test(e.message)) {
+      if (/command\s+failed/gi.test(e.message)) {
         // if this is an unreadble file, trash it.
         const ext_expression = new RegExp("." + file_ext.join("|"), "i");
         if (ext_expression.test(e.message)) {
-          console.log(">> UNREADABLE VIDEO FILE. REMOVING FROM LIST >>");
+          logger.info(file, {
+            label: "UNREADABLE VIDEO FILE. REMOVING FROM LIST",
+          });
           trash(file);
         }
-
-        // any ffprobe command failure, this should be removed from the list
-        filelist[file_idx] = null;
       }
+
+      // if the video stream is corrupt, delete it
+      if (/display_aspect_ratio/gi.test(e.message)) {
+        logger.info(file, {
+          label: "UNREADABLE VIDEO STREAM. REMOVING FROM LIST",
+        });
+        trash(file);
+      }
+
+      // any ffprobe command failure, this should be removed from the list
+      filelist[file_idx] = null;
 
       return true;
     }
@@ -146,10 +166,6 @@ async function generate_filelist() {
 
   fs.writeFileSync("./filelist.txt", filelist.join("\n"));
   return filelist;
-}
-
-function aspect_round(val) {
-  return Math.round(val * 10) / 10;
 }
 
 async function ffprobe(file) {
@@ -165,7 +181,12 @@ async function ffprobe(file) {
 
   const video = data.streams.find((s) => s.codec_type === "video");
 
-  video.aspect = aspect_round(video.width / video.height);
+  if (video.display_aspect_ratio) {
+    const [width, height] = video.display_aspect_ratio.split(":");
+    video.aspect = aspect_round(width / height);
+  } else {
+    video.aspect = aspect_round(video.width / video.height);
+  }
 
   return data;
 }
@@ -174,65 +195,34 @@ function transcode(file, filelist) {
   return new Promise(async (resolve, reject) => {
     try {
       const list_idx = filelist.findIndex((f) => f === file) + 1;
-      const profiles = [
-        {
-          name: "uhd",
-          width: 3840,
-          aspect: 16 / 9,
-          bitrate: 18,
-          codec: /hevc/,
-          audio_codec: /aac|ac3/,
-        },
-        {
-          name: "1080p",
-          width: 1920,
-          aspect: 16 / 9,
-          bitrate: 5,
-          codec: /hevc/,
-          audio_codec: /aac|ac3/,
-        },
-        {
-          name: "720p",
-          width: 720,
-          dest_width: 1920,
-          aspect: 16 / 9,
-          bitrate: 5,
-          codec: /hevc/,
-          audio_codec: /aac|ac3/,
-        },
-        {
-          name: "hdv (1440p)",
-          width: 1440,
-          aspect: 4 / 3,
-          bitrate: 5,
-          codec: /hevc/,
-          audio_codec: /aac|ac3/,
-        },
-        {
-          name: "sd",
-          width: 480,
-          aspect: 4 / 3,
-          bitrate: 2.5,
-          codec: /hevc/,
-          audio_codec: /aac|ac3/,
-        },
-        {
-          name: "vertical",
-          width: 1080,
-          aspect: 9 / 16,
-          bitrate: 8,
-          codec: /hevc/,
-          audio_codec: /aac|ac3/,
-        },
-      ].map((x) => ({ ...x, aspect: aspect_round(x.aspect) }));
+      const { profiles } = config;
 
       const ffprobe_data = await ffprobe(file);
-      console.log(">> FFPROBE DATA >>", ffprobe_data);
+      logger.debug(ffprobe_data, { label: "FFPROBE DATA >>" });
       const video_stream = ffprobe_data.streams.find(
         (s) => s.codec_type === "video"
       );
 
-      const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".tc.mkv");
+      if (!video_stream) {
+        throw new Error("No video stream found");
+      }
+
+      // get the scratch path
+      const scratch_path = config.sources.find((p) =>
+        file.startsWith(p.path)
+      ).scratch;
+
+      // get the filename
+      const filename = file.match(/([^\/]+)$/)[1];
+
+      // set the scratch file path and name
+      const scratch_file = `${scratch_path}/${filename}`.replace(
+        /\.[A-Za-z0-9]+$/,
+        ".tc.mkv"
+      );
+
+      // set the destination file path and name
+      const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".mkv");
 
       // if this file has already been encoded, short circuit
       if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
@@ -244,44 +234,70 @@ function transcode(file, filelist) {
         .filter(
           (s) =>
             s.codec_type === "audio" &&
-            (!s.tags?.language || s.tags.language === "eng")
+            (!s.tags?.language || /und|eng/i.test(s.tags.language))
         )
         .sort((a, b) => (a.channels > b.channels ? -1 : 1))[0];
-      const subtitle_stream = ffprobe_data.streams.find(
-        (s) => s.codec_type === "subtitle" && s.tags?.language === "eng"
+      const subtitle_streams = ffprobe_data.streams.filter(
+        (s) =>
+          s.codec_type === "subtitle" &&
+          s.tags?.language === "eng" &&
+          /subrip|hdmv_pgs_subtitle/i.test(s.codec_name)
       );
       let transcode_video = false;
       let transcode_audio = false;
       let video_filters = [];
       let audio_filters = [];
 
-      const conversion_profile = profiles.find(
-        (x) =>
-          video_stream.width + 10 >= x.width && video_stream.aspect >= x.aspect
+      const conversion_profile = config.get_profile(video_stream);
+
+      logger.debug(
+        {
+          video_stream_width: video_stream.width,
+          video_stream_aspect: video_stream.aspect,
+          conversion_profile,
+          profiles,
+        },
+        { label: "Profile debug info" }
       );
 
       conversion_profile.width =
         conversion_profile.dest_width || conversion_profile.width;
 
-      // if the codec doesn't match the profile
-      if (!conversion_profile.codec.test(video_stream.codec_name)) {
-        transcode_video = true;
-      }
-
-      // if the codec doesn't match the profile
-      if (!conversion_profile.audio_codec.test(audio_stream.codec_name)) {
-        transcode_audio = true;
-        audio_filters.push("-c:a:0 aac");
-      }
+      // if the video codec doesn't match the profile
 
       if (
-        ffprobe_data.format.bit_rate >
-        conversion_profile.bitrate * 1024 * 1024
+        conversion_profile.output.video.codec_name !== video_stream.codec_name
       ) {
-        console.log("Video stream bitrate higher than conversion profile");
         transcode_video = true;
       }
 
+      // if the audio codec doesn't match the profile
+      if (
+        conversion_profile.output.audio.codec_name !== audio_stream.codec_name
+      ) {
+        transcode_audio = true;
+        audio_filters.push(
+          `-c:a:0 ${conversion_profile.output.audio.codec}`,
+          `-b:a:0 ${
+            audio_stream.channels *
+            conversion_profile.output.audio.per_channel_bitrate
+          }k`
+        );
+      }
+
+      // if the video codec matches the profile, but the bitrate is higher than the profile
+      if (
+        ffprobe_data.format.bit_rate >
+          conversion_profile.bitrate * 1024 * 1024 &&
+        !transcode_video
+      ) {
+        logger.debug(
+          "Video stream bitrate higher than conversion profile. Transcoding"
+        );
+        transcode_video = true;
+      }
+
+      // if the input stream width doesn't equal the conversion profile width
       if (video_stream.width !== conversion_profile.width) {
         transcode_video = true;
         video_filters.push(
@@ -289,22 +305,29 @@ function transcode(file, filelist) {
         );
       }
 
-      console.log(audio_stream);
-
-      if (audio_stream.channels > 2) {
-        console.log("more than two audio channels");
+      // if the audio stream has more than two channels, and the profile is set to downmix, create a stereo version
+      if (
+        conversion_profile.output.audio.downmix &&
+        audio_stream.channels > 2
+      ) {
+        logger.debug("more than two audio channels, downmixing");
         transcode_audio = true;
         audio_filters = audio_filters.concat([
-          "-c:a:0 aac",
-          "-b:a:0 192k",
-          "-ac:a:0 2",
-          "-filter:a:0 volume=2",
-          "-c:a:1 copy",
-          "-metadata:s:a:0 title=Stereo",
-          "-metadata:s:a:0 language=eng",
-          `-metadata:s:a:1 title=Original`,
-          `-metadata:s:a:1 language=eng`,
+          `-c:a:0 ${conversion_profile.output.audio.codec}`,
+          `-b:a:0 ${
+            audio_stream.channels *
+            conversion_profile.output.audio.per_channel_bitrate
+          }k`,
+          `-c:a:1 ${conversion_profile.output.audio.codec}`,
+          `-b:a:1 ${2 * conversion_profile.output.audio.per_channel_bitrate}k`,
+          "-ac:a:1 2",
+          "-metadata:s:a:1 title=Stereo",
+          "-metadata:s:a:1 language=eng",
         ]);
+
+        if (audio_stream.channels === 6) {
+          audio_filters.push("-af:0 channelmap=channel_layout=5.1");
+        }
       }
 
       const input_maps = [
@@ -312,12 +335,17 @@ function transcode(file, filelist) {
         `-map 0:${audio_stream.index}`,
       ];
 
-      if (audio_filters.length > 0) {
+      // only map audio a second time if we're going to be down mixing to stereo
+      if (audio_stream.channels > 2) {
         input_maps.push(`-map 0:${audio_stream.index}`);
       }
 
-      if (subtitle_stream) {
-        input_maps.push(`-map 0:${subtitle_stream.index}`, "-c:s copy");
+      if (subtitle_streams.length > 0) {
+        subtitle_streams.forEach((s) => {
+          input_maps.push(`-map 0:${s.index}`);
+        });
+
+        input_maps.push("-c:s copy");
       }
 
       if (ffprobe_data.chapters.length > 0) {
@@ -332,24 +360,31 @@ function transcode(file, filelist) {
         const pix_fmt =
           video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
 
-        cmd = cmd.outputOptions([
-          "-c:v libx265",
-          "-profile:v main10",
-          "-level:v 4.0",
-          `-pix_fmt ${pix_fmt}`,
-        ]);
+        conversion_profile.output.video.addFlags({
+          maxrate: `${conversion_profile.output.video.bitrate}M`,
+          bufsize: `${conversion_profile.output.video.bitrate * 3}M`,
+          max_muxing_queue_size: 9999,
+          pix_fmt: pix_fmt,
+        });
 
         // handle HDR
         if (/arib[-]std[-]b67|smpte2084/i.test(video_stream.color_transfer)) {
-          cmd = cmd.outputOptions([
-            "-color_range tv",
-            "-colorspace bt2020nc",
-            "-color_primaries bt2020",
-            "-color_trc smpte2084",
-          ]);
-
-          conversion_profile.name += ` HDR`;
+          conversion_profile.name += ` (hdr)`; // add HDR to the profile name
+          // temporarily disable in an effort to accommodate dolby vision
+          // conversion_profile.addFlags({
+          //   color_primaries: "bt2020",
+          //   color_trc: "smpte2084",
+          //   color_range: "tv",
+          //   colorspace: "bt2020nc",
+          // });
         }
+
+        cmd = cmd.outputOptions([
+          `-c:v ${conversion_profile.output.video.codec}`,
+          ...Object.keys(conversion_profile.output.video.flags || {}).map(
+            (k) => `-${k} ${conversion_profile.output.video.flags[k]}`
+          ),
+        ]);
       } else {
         cmd = cmd.outputOptions("-c:v copy");
       }
@@ -358,17 +393,13 @@ function transcode(file, filelist) {
         cmd = cmd.outputOptions(["-vf", ...video_filters]);
       }
 
-      cmd = cmd.outputOptions([
-        `-maxrate ${conversion_profile.bitrate}M`,
-        `-bufsize ${conversion_profile.bitrate * 3}M`,
-        `-max_muxing_queue_size 9999`,
-        `-threads 4`,
-      ]);
-
       if (!transcode_audio) {
         cmd = cmd.outputOptions("-c:a copy");
       } else {
-        cmd = cmd.outputOptions(audio_filters);
+        // add unique audio filters to output options
+        cmd = cmd.outputOptions(
+          audio_filters.filter((prop, idx, self) => self.indexOf(prop) === idx)
+        );
       }
 
       cmd = cmd.outputOptions(`-metadata encode_version=${encode_version}`);
@@ -377,14 +408,21 @@ function transcode(file, filelist) {
 
       let start_time;
       cmd = cmd
-        .on("start", function (commandLine) {
-          console.log("Spawned Ffmpeg with command: " + commandLine);
+        .on("start", async function (commandLine) {
+          logger.debug("Spawned Ffmpeg with command: " + commandLine);
           start_time = moment();
           ffmpeg_cmd = commandLine;
           fs.writeFileSync(
             "/usr/app/output/filelist.json",
             JSON.stringify(filelist.slice(list_idx || list_idx + 1))
           );
+          const video = await File.findOne({ path: file });
+
+          if (video) {
+            logger.debug(">> VIDEO FOUND -- REMOVING ERROR >>", video);
+            video.error = undefined;
+            await video.save();
+          }
         })
         .on("progress", function (progress) {
           const elapsed = moment().diff(start_time, "seconds");
@@ -400,6 +438,8 @@ function transcode(file, filelist) {
           const output = JSON.stringify(
             {
               ...progress,
+              video_stream,
+              audio_stream,
               run_time,
               pct_per_second,
               pct_remaining,
@@ -431,20 +471,25 @@ function transcode(file, filelist) {
             4
           );
           console.clear();
-          console.log(">> JOB >>", {
-            ...conversion_profile,
-            ffmpeg_cmd,
-            file,
-            overall_progress: `(${list_idx}/${filelist.length})`,
-          });
+          logger.debug(
+            {
+              ...conversion_profile,
+              ffmpeg_cmd,
+              file,
+              overall_progress: `(${list_idx}/${filelist.length})`,
+            },
+            { label: "Job" }
+          );
 
-          console.log(">> PROGRESS >>", output);
+          logger.info(output);
 
           fs.writeFileSync(
             "/usr/app/output/active.json",
             JSON.stringify({
               ...conversion_profile,
               ffmpeg_cmd,
+              audio_stream,
+              video_stream,
               file,
               overall_progress: `(${list_idx}/${filelist.length})`,
               output: JSON.parse(output),
@@ -452,22 +497,96 @@ function transcode(file, filelist) {
           );
         })
         .on("end", async function (stdout, stderr) {
-          console.log("Transcoding succeeded!");
+          logger.info("Transcoding succeeded!");
 
           await trash(file);
-          await exec_promise(
-            `mv "${dest_file}" "${dest_file.replace(/\.tc/i, "")}"`
-          );
+          await exec_promise(`mv "${scratch_file}" "${dest_file}"`);
+          await upsert_video({
+            path: dest_file,
+            error: undefined,
+            encode_version,
+          });
           resolve();
         })
         .on("error", async function (err, stdout, stderr) {
-          console.log("Cannot process video: ", err.message, stdout, stderr);
-          await trash(dest_file);
+          logger.error(err, { label: "Cannot process video", stdout, stderr });
+          fs.appendFileSync(
+            "/usr/app/logs/ffmpeg.log",
+            JSON.stringify(
+              {
+                error: err.message,
+                stdout,
+                stderr,
+                ffmpeg_cmd,
+                trace: err.stack,
+              },
+              true,
+              4
+            )
+          );
+          await trash(scratch_file);
+          await upsert_video({
+            path: file,
+            error: {
+              error: err.message,
+              stdout,
+              stderr,
+              ffmpeg_cmd,
+              trace: err.stack,
+            },
+          });
+
+          const corrupt_video_tests = [
+            {
+              test: /Invalid\s+NAL\s+unit\s+size/gi,
+              message: "Invalid NAL unit size",
+              obj: stderr,
+            },
+            {
+              test: /unspecified\s+pixel\s+format/gi,
+              message: "Unspecified pixel format",
+              obj: stderr,
+            },
+            {
+              test: /unknown\s+codec/gi,
+              message: "Unknown codec",
+              obj: stderr,
+            },
+            {
+              test: /too\s+many\s+packets\s+buffered\s+for\s+output\s+stream/gi,
+              message: "Too many packets buffered for output stream",
+              obj: stderr,
+            },
+            {
+              test: /invalid\s+data\s+found\s+when\s+processing\s+input/gi,
+              message: "Invalid data found when processing input",
+              obj: stderr,
+            },
+          ];
+
+          const is_corrupt = corrupt_video_tests.find((t) =>
+            t.test.test(t.obj)
+          );
+
+          // If this video is corrupted, trash it
+          if (is_corrupt) {
+            logger.info(is_corrupt, {
+              label: "Source video is corrupt. Trashing",
+            });
+            await trash(file);
+          }
           resolve();
         });
-      cmd.save(dest_file);
+      cmd.save(scratch_file);
     } catch (e) {
-      console.log(">> TRANSCODE ERROR >>", e);
+      logger.error(e, { label: "TRANSCODE ERROR" });
+      await upsert_video({
+        path: file,
+        error: { error: e.message, trace: e.stack },
+      });
+      if (/no\s+video\s+stream\s+found/gi.test(e.message)) {
+        await trash(file);
+      }
       resolve();
     }
   });
@@ -509,27 +628,76 @@ function get_disk_space() {
   });
 }
 
+async function get_utilization() {
+  const data = {
+    memory: await exec_promise("free | grep Mem | awk '{print $3/$2 * 100.0}'"),
+    cpu: await exec_promise("echo $(vmstat 1 2|tail -1|awk '{print $15}')"),
+    last_updated: new Date(),
+  };
+
+  data.memory = Math.round(parseFloat(data.memory.stdout));
+  data.cpu = Math.round(
+    100 - parseFloat(data.cpu.stdout.replace(/[^0-9]+/g, ""))
+  );
+
+  fs.writeFileSync("/usr/app/output/utilization.json", JSON.stringify(data));
+
+  setTimeout(() => {
+    get_utilization();
+  }, 10 * 1000);
+}
+
 async function run() {
   try {
+    await create_scratch_disks();
+    await get_utilization();
+    await get_disk_space();
     await pre_sanitize();
     const filelist = await generate_filelist();
-    console.log(">> FILELIST >>", filelist);
-    await get_disk_space();
+    logger.debug(filelist, { label: "File list" });
     await async.eachSeries(filelist, async (file) => {
       await transcode(file, filelist);
       return true;
     });
-    console.log("Requeuing in 30 seconds...");
+    logger.info("Requeuing in 30 seconds...");
     setTimeout(() => {
       run();
     }, 30 * 1000);
   } catch (e) {
-    console.log(">> ERROR >>", e);
-    console.log("Requeuing in 30 seconds...");
+    logger.error(e, { label: "ERROR" });
+    logger.info("Requeuing in 30 seconds...");
     setTimeout(() => {
       run();
     }, 30 * 1000);
   }
 }
 
-run();
+async function db_cleanup() {
+  const files = await File.find({}).sort({ path: 1 });
+  const to_remove = files.map((f) => f.path).filter((p) => !fs.existsSync(p));
+
+  // delete any file whose path doesn't exist
+  await File.deleteMany({
+    path: { $in: to_remove },
+  });
+
+  await Cleanup.create({ paths: to_remove, count: to_remove.length });
+}
+
+async function create_scratch_disks() {
+  await exec_promise(
+    `mkdir -p ${config.sources.map((p) => `"${p.scratch}"`).join(" ")}`
+  );
+}
+
+mongo_connect()
+  .then(() => {
+    run();
+
+    cron.schedule("0 */3 * * *", () => {
+      db_cleanup();
+    });
+  })
+  .catch((e) => {
+    console.error(">> COULD NOT CONNECT TO MONGO >>", e);
+  });
