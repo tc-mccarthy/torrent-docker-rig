@@ -5,7 +5,7 @@ export function aspect_round(val) {
 }
 
 const config = {
-  encode_version: "20230608a",
+  encode_version: "20231113a",
   concurrent_file_checks: 30,
   profiles: [
     {
@@ -60,7 +60,7 @@ const config = {
         codec_name: "av1",
         flags: {
           crf: 35,
-          preset: 7
+          preset: 7,
         },
       },
       audio: {
