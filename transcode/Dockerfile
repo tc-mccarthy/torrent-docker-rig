@@ -1,4 +1,4 @@
-FROM lscr.io/linuxserver/ffmpeg:version-6.0-cli
+FROM lscr.io/linuxserver/ffmpeg:latest
 
 # Install NodeJS Dependencies and set up DEB repo
 ENV NODE_MAJOR=20
