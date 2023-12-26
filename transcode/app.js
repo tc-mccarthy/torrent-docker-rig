@@ -218,12 +218,12 @@ function transcode(file, filelist) {
       // set the scratch file path and name
       const scratch_file = `${scratch_path}/${filename}`
         .replace(/\.[A-Za-z0-9]+$/, ".tc.mkv")
-        .replace(/\/!/g, "\\!");
+        .replace(/\/([$!]+)/g, "\\$1");
 
       // set the destination file path and name
       const dest_file = file
         .replace(/\.[A-Za-z0-9]+$/, ".mkv")
-        .replace(/\/!/g, "\\!");
+        .replace(/\/([$!]+)/g, "\\$1");
 
       // if this file has already been encoded, short circuit
       if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
