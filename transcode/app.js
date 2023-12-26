@@ -222,14 +222,13 @@ function transcode(file, filelist) {
       const filename = file.match(/([^\/]+)$/)[1];
 
       // set the scratch file path and name
-      const scratch_file = escape_file_path(
-        `${scratch_path}/${filename}`.replace(/\.[A-Za-z0-9]+$/, ".tc.mkv")
+      const scratch_file = `${scratch_path}/${filename}`.replace(
+        /\.[A-Za-z0-9]+$/,
+        ".tc.mkv"
       );
 
       // set the destination file path and name
-      const dest_file = escape_file_path(
-        file.replace(/\.[A-Za-z0-9]+$/, ".mkv")
-      );
+      const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".mkv");
 
       // if this file has already been encoded, short circuit
       if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
@@ -507,7 +506,9 @@ function transcode(file, filelist) {
           logger.info("Transcoding succeeded!");
 
           await trash(file);
-          await exec_promise(`mv '${scratch_file}' '${dest_file}'`);
+          await exec_promise(
+            `mv '${escape_file_path(scratch_file)}' '${dest_file}'`
+          );
           await upsert_video({
             path: dest_file,
             error: undefined,
@@ -531,7 +532,7 @@ function transcode(file, filelist) {
               4
             )
           );
-          await trash(scratch_file);
+          await trash(escape_file_path(scratch_file));
           await upsert_video({
             path: file,
             error: {
