@@ -30,7 +30,7 @@ function exec_promise(cmd) {
 
 function trash(file) {
   return new Promise((resolve, reject) => {
-    file = file.replace(/\/$/g, "").replace(/[&]/g, "\\&").trim();
+    file = file.replace(/\/$/g, "").trim();
     exec(`rm "${file}"`, (error, stdout, stderr) => {
       if (error) {
         console.error(`exec error: ${error}`);
@@ -100,7 +100,7 @@ async function generate_filelist() {
   let filelist = stdout
     .split(/\s*\/source_media/)
     .filter((j) => j)
-    .map((p) => `/source_media${p}`.replace("\x00", "").replace(/[&]/g, "\\&"))
+    .map((p) => `/source_media${p}`.replace("\x00", ""))
     .slice(1);
 
   const encoded_videos = await get_encoded_videos();
@@ -216,14 +216,13 @@ function transcode(file, filelist) {
       const filename = file.match(/([^\/]+)$/)[1];
 
       // set the scratch file path and name
-      const scratch_file = `${scratch_path}/${filename}`
-        .replace(/\.[A-Za-z0-9]+$/, ".tc.mkv")
-        .replace(/[&]/g, "\\&");
+      const scratch_file = `${scratch_path}/${filename}`.replace(
+        /\.[A-Za-z0-9]+$/,
+        ".tc.mkv"
+      );
 
       // set the destination file path and name
-      const dest_file = file
-        .replace(/\.[A-Za-z0-9]+$/, ".mkv")
-        .replace(/[&]/g, "\\&");
+      const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".mkv");
 
       // if this file has already been encoded, short circuit
       if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
@@ -605,12 +604,7 @@ function get_disk_space() {
           .map((row) => {
             const obj = {};
             rows[0].forEach((value, idx) => {
-              obj[
-                value
-                  .toLowerCase()
-                  .replace(/[^A-Za-z0-9]+/i, "")
-                  .replace(/[&]/g, "\\&")
-              ] = row[idx];
+              obj[value.toLowerCase().replace(/[^A-Za-z0-9]+/i, "")] = row[idx];
             });
             return obj;
           })
