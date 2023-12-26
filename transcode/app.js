@@ -30,7 +30,7 @@ function exec_promise(cmd) {
 
 function trash(file) {
   return new Promise((resolve, reject) => {
-    file = file.replace(/\/$/g, "").trim();
+    file = file.replace(/\/$/g, "").replace(/\/!/g, "\\!").trim();
     exec(`rm "${file}"`, (error, stdout, stderr) => {
       if (error) {
         console.error(`exec error: ${error}`);
@@ -216,13 +216,14 @@ function transcode(file, filelist) {
       const filename = file.match(/([^\/]+)$/)[1];
 
       // set the scratch file path and name
-      const scratch_file = `${scratch_path}/${filename}`.replace(
-        /\.[A-Za-z0-9]+$/,
-        ".tc.mkv"
-      );
+      const scratch_file = `${scratch_path}/${filename}`
+        .replace(/\.[A-Za-z0-9]+$/, ".tc.mkv")
+        .replace(/\/!/g, "\\!");
 
       // set the destination file path and name
-      const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".mkv");
+      const dest_file = file
+        .replace(/\.[A-Za-z0-9]+$/, ".mkv")
+        .replace(/\/!/g, "\\!");
 
       // if this file has already been encoded, short circuit
       if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
