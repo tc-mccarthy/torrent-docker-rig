@@ -232,7 +232,7 @@ function transcode(file, filelist) {
       );
 
       // if this file has already been encoded, short circuit
-      if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
+      if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
         return resolve();
       }
 
