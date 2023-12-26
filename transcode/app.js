@@ -29,13 +29,13 @@ function exec_promise(cmd) {
 }
 
 function escape_file_path(file) {
-  return file.replace(/([&!$])/g, "\\$1");
+  return file.replace(/(['])/g, "\\$1");
 }
 
 function trash(file) {
   return new Promise((resolve, reject) => {
     file = escape_file_path(file.replace(/\/$/g, "")).trim();
-    exec(`rm "${file}"`, (error, stdout, stderr) => {
+    exec(`rm '${file}'`, (error, stdout, stderr) => {
       if (error) {
         console.error(`exec error: ${error}`);
         reject(error);
@@ -173,7 +173,9 @@ async function generate_filelist() {
 }
 
 async function ffprobe(file) {
-  const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams "${file}"`;
+  const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams '${escape_file_path(
+    file
+  )}'`;
   const { stdout, stderr } = await exec_promise(ffprobeCMD);
 
   const data = JSON.parse(stdout);
@@ -505,7 +507,7 @@ function transcode(file, filelist) {
           logger.info("Transcoding succeeded!");
 
           await trash(file);
-          await exec_promise(`mv "${scratch_file}" "${dest_file}"`);
+          await exec_promise(`mv '${scratch_file}' '${dest_file}'`);
           await upsert_video({
             path: dest_file,
             error: undefined,
