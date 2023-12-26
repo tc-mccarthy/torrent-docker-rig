@@ -359,7 +359,7 @@ function transcode(file, filelist) {
         input_maps.push(`-map_chapters ${video_stream.index}`);
       }
 
-      let cmd = ffmpeg(escape_file_path(file));
+      let cmd = ffmpeg(file);
 
       cmd = cmd.outputOptions(input_maps);
 
