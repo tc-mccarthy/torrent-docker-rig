@@ -165,8 +165,12 @@ async function generate_filelist() {
     }
   });
 
-  // remove falsey values from the list
-  filelist = filelist.filter((file) => file);
+  // query for any files that have an encode version that doesn't match the current encode version
+  filelist = await File.find({ encode_version: { $ne: encode_version } })
+    .sort({ "probe.format.size": -1 })
+    .distinct("path");
+
+  filelist = filelist.map((f) => f.path).filter((f) => f);
 
   fs.writeFileSync("./filelist.txt", filelist.join("\n"));
   return filelist;
