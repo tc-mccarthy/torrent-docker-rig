@@ -166,9 +166,9 @@ async function generate_filelist() {
   });
 
   // query for any files that have an encode version that doesn't match the current encode version
-  filelist = await File.find({ encode_version: { $ne: encode_version } })
-    .sort({ "probe.format.size": -1 })
-    .distinct("path");
+  filelist = await File.find({ encode_version: { $ne: encode_version } }).sort({
+    "probe.format.size": -1,
+  });
 
   filelist = filelist.map((f) => f.path).filter((f) => f);
 
