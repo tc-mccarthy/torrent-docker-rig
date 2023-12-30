@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './Home.scss';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
+import moment from 'moment';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
 import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 
@@ -93,6 +94,10 @@ function Home () {
         <div className="widget">
           <strong>Profile</strong>
           {data.name}
+        </div>
+        <div className="widget">
+          <strong>Expected completed time</strong>
+          {moment().add(data.output.est_completed_seconds, 'seconds').toLocaleString()}
         </div>
         <div className="widget">
           <strong>ETA</strong>

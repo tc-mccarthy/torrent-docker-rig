@@ -440,8 +440,9 @@ function transcode(file, filelist) {
           const pct_per_second = progress.percent / elapsed;
           const seconds_pct = 1 / pct_per_second;
           const pct_remaining = 100 - progress.percent;
+          const est_completed_seconds = pct_remaining * seconds_pct;
           const time_remaining = moment
-            .utc(pct_remaining * seconds_pct * 1000)
+            .utc(est_completed_seconds * 1000)
             .format("HH:mm:ss");
           const estimated_final_kb =
             (progress.targetSize / progress.percent) * 100;
@@ -454,6 +455,7 @@ function transcode(file, filelist) {
               pct_per_second,
               pct_remaining,
               time_remaining,
+              est_completed_seconds,
               size: {
                 progress: {
                   kb: progress.targetSize,
