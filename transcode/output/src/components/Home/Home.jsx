@@ -105,6 +105,8 @@ function Home () {
           <strong>Profile</strong>
           {data.name}
         </div>
+      </div>
+      <div className="flex">
         <div className="widget">
           <strong>Expected completed time</strong>
           {estimated_local_time(data.output.est_completed_seconds)}
