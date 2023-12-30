@@ -34,6 +34,16 @@ async function getData (setData, setFileList, setDisks, setUtilization) {
   }
 }
 
+function estimated_local_time (seconds) {
+  const final_time = moment().add(seconds, 'seconds');
+  let fmt_string = 'MM-DD-YYYY HH:mm:ss';
+
+  if (final_time.isSame(moment(), 'day')) {
+    fmt_string = 'HH:mm:ss';
+  }
+  return final_time.format(fmt_string);
+}
+
 function human_size (size) {
   const order = ['gb', 'mb', 'kb'];
   const output_size = order.find((o) => size[o] >= 1);
@@ -97,7 +107,7 @@ function Home () {
         </div>
         <div className="widget">
           <strong>Expected completed time</strong>
-          {moment().add(data.output.est_completed_seconds, 'seconds').toLocaleString()}
+          {estimated_local_time(data.output.est_completed_seconds)}
         </div>
         <div className="widget">
           <strong>ETA</strong>
