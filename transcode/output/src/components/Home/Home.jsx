@@ -36,7 +36,7 @@ async function getData (setData, setFileList, setDisks, setUtilization) {
 
 function estimated_local_time (seconds) {
   const final_time = moment().add(seconds, 'seconds');
-  let fmt_string = 'MM-DD-YYYY HH:mm:ss';
+  let fmt_string = 'MM/DD/YYYY HH:mm:ss';
 
   if (final_time.isSame(moment(), 'day')) {
     fmt_string = 'HH:mm:ss';
