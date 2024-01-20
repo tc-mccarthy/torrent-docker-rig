@@ -28,10 +28,14 @@ function exec_promise(cmd) {
   });
 }
 
+function escape_file_path(file) {
+  return file.replace(/(['])/g, "'\\''");
+}
+
 function trash(file) {
   return new Promise((resolve, reject) => {
-    file = file.replace(/\/$/g, "").trim();
-    exec(`rm "${file}"`, (error, stdout, stderr) => {
+    file = escape_file_path(file.replace(/\/$/g, "")).trim();
+    exec(`rm '${file}'`, (error, stdout, stderr) => {
       if (error) {
         console.error(`exec error: ${error}`);
         reject(error);
@@ -161,15 +165,21 @@ async function generate_filelist() {
     }
   });
 
-  // remove falsey values from the list
-  filelist = filelist.filter((file) => file);
+  // query for any files that have an encode version that doesn't match the current encode version
+  filelist = await File.find({ encode_version: { $ne: encode_version } }).sort({
+    "probe.format.size": -1,
+  });
+
+  filelist = filelist.map((f) => f.path).filter((f) => f);
 
   fs.writeFileSync("./filelist.txt", filelist.join("\n"));
   return filelist;
 }
 
 async function ffprobe(file) {
-  const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams "${file}"`;
+  const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams '${escape_file_path(
+    file
+  )}'`;
   const { stdout, stderr } = await exec_promise(ffprobeCMD);
 
   const data = JSON.parse(stdout);
@@ -225,7 +235,7 @@ function transcode(file, filelist) {
       const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".mkv");
 
       // if this file has already been encoded, short circuit
-      if (ffprobe_data.format.tags.ENCODE_VERSION === encode_version) {
+      if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
         return resolve();
       }
 
@@ -430,8 +440,9 @@ function transcode(file, filelist) {
           const pct_per_second = progress.percent / elapsed;
           const seconds_pct = 1 / pct_per_second;
           const pct_remaining = 100 - progress.percent;
+          const est_completed_seconds = pct_remaining * seconds_pct;
           const time_remaining = moment
-            .utc(pct_remaining * seconds_pct * 1000)
+            .utc(est_completed_seconds * 1000)
             .format("HH:mm:ss");
           const estimated_final_kb =
             (progress.targetSize / progress.percent) * 100;
@@ -444,6 +455,7 @@ function transcode(file, filelist) {
               pct_per_second,
               pct_remaining,
               time_remaining,
+              est_completed_seconds,
               size: {
                 progress: {
                   kb: progress.targetSize,
@@ -500,7 +512,9 @@ function transcode(file, filelist) {
           logger.info("Transcoding succeeded!");
 
           await trash(file);
-          await exec_promise(`mv "${scratch_file}" "${dest_file}"`);
+          await exec_promise(
+            `mv '${escape_file_path(scratch_file)}' '${dest_file}'`
+          );
           await upsert_video({
             path: dest_file,
             error: undefined,
@@ -524,7 +538,7 @@ function transcode(file, filelist) {
               4
             )
           );
-          await trash(scratch_file);
+          await trash(escape_file_path(scratch_file));
           await upsert_video({
             path: file,
             error: {

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './Home.scss';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
+import moment from 'moment';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
 import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 
@@ -31,6 +32,16 @@ async function getData (setData, setFileList, setDisks, setUtilization) {
       getData(setData, setFileList);
     }, 1 * 1000);
   }
+}
+
+function estimated_local_time (seconds) {
+  const final_time = moment().add(seconds, 'seconds');
+  let fmt_string = 'MM/DD/YYYY HH:mm:ss';
+
+  if (final_time.isSame(moment(), 'day')) {
+    fmt_string = 'HH:mm:ss';
+  }
+  return final_time.format(fmt_string);
 }
 
 function human_size (size) {
@@ -93,6 +104,12 @@ function Home () {
         <div className="widget">
           <strong>Profile</strong>
           {data.name}
+        </div>
+      </div>
+      <div className="flex">
+        <div className="widget">
+          <strong>Expected completed time</strong>
+          {estimated_local_time(data.output.est_completed_seconds)}
         </div>
         <div className="widget">
           <strong>ETA</strong>
