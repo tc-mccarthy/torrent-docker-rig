@@ -140,7 +140,7 @@ async function generate_filelist() {
 
       // if the file itself wasn't readable by ffprobe, remove it from the list
       if (/command\s+failed/gi.test(e.message)) {
-        // if this is an unreadble file, trash it.
+        // if this is an unreadable file, trash it.
         const ext_expression = new RegExp("." + file_ext.join("|"), "i");
         if (ext_expression.test(e.message)) {
           logger.info(file, {
@@ -167,7 +167,7 @@ async function generate_filelist() {
 
   // query for any files that have an encode version that doesn't match the current encode version
   filelist = await File.find({ encode_version: { $ne: encode_version } }).sort({
-    "probe.format.size": -1,
+    "probe.format.size": 1,
   });
 
   filelist = filelist.map((f) => f.path).filter((f) => f);
@@ -538,7 +538,7 @@ function transcode(file, filelist) {
               4
             )
           );
-          await trash(escape_file_path(scratch_file));
+          await trash(scratch_file);
           await upsert_video({
             path: file,
             error: {
