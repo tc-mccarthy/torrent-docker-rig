@@ -101,7 +101,7 @@ server {
   }
 
   location /tmm {
-    return 301 $scheme://$http_host/tinymediamanager/vnc.html?path=tinymediamanager/vnc&autoconnect=true&resize=remote&reconnect=true&show_dot=true&bell=false&view_only=false;
+    return 301 $scheme://$http_host/tinymediamanager/vnc.html?path=tinymediamanager/websockify&autoconnect=true&resize=remote&reconnect=true&show_dot=true&bell=false&view_only=false;
   }
   
   location /tinymediamanager/ {
