@@ -79,6 +79,20 @@ async function get_encoded_videos() {
 }
 
 async function generate_filelist() {
+  // query for any files that have an encode version that doesn't match the current encode version
+  let filelist = await File.find({
+    encode_version: { $ne: encode_version },
+  }).sort({
+    "probe.format.size": 1,
+  });
+
+  filelist = filelist.map((f) => f.path).filter((f) => f);
+
+  fs.writeFileSync("./filelist.txt", filelist.join("\n"));
+  return filelist;
+}
+
+async function update_queue() {
   // Get the list of files to be converted
 
   const file_ext = [
@@ -164,16 +178,6 @@ async function generate_filelist() {
       return true;
     }
   });
-
-  // query for any files that have an encode version that doesn't match the current encode version
-  filelist = await File.find({ encode_version: { $ne: encode_version } }).sort({
-    "probe.format.size": 1,
-  });
-
-  filelist = filelist.map((f) => f.path).filter((f) => f);
-
-  fs.writeFileSync("./filelist.txt", filelist.join("\n"));
-  return filelist;
 }
 
 async function ffprobe(file) {
@@ -667,6 +671,8 @@ async function run() {
     await get_utilization();
     await get_disk_space();
     await pre_sanitize();
+    // parallelize the detection of new videos
+    update_queue();
     const filelist = await generate_filelist();
     logger.debug(filelist, { label: "File list" });
     await async.eachSeries(filelist, async (file) => {
