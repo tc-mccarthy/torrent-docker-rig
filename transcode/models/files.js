@@ -35,5 +35,7 @@ const schema = new Schema(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
 
+schema.index({ "probe.format.size": 1 });
+
 // create a model object that uses the above schema
 export default model(model_name, schema);
