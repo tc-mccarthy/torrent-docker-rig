@@ -151,8 +151,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "16" # 12 cores
-          memory: 56G # 28GB
+          cpus: 16 # 16 cores
+          memory: 56G # 56GB
 
   plex:
     container_name: plex
