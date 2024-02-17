@@ -4,7 +4,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import moment from 'moment';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
-import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
+// import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 
 async function getData (setData, setFileList, setDisks, setUtilization) {
   try {
@@ -68,7 +68,7 @@ function Home () {
   }
 
   const [numerator, denominator] = data.overall_progress.replace(/[()]/g, '').split('/');
-
+  const files_remaining = denominator - numerator;
   return (
     <div className="container image">
       <div className="overline" />
@@ -118,8 +118,9 @@ function Home () {
       </div>
       <div className="flex">
         <div className="widget">
-          <strong>Overall Progress</strong>
-          <CircularProgressWithLabel numerator={numerator} denominator={denominator} />
+          <strong>Files Remaining</strong>
+          {files_remaining.toLocaleString()}
+          {/* <CircularProgressWithLabel numerator={numerator} denominator={denominator} /> */}
         </div>
         <div className="widget">
           <strong>File Progress</strong>
