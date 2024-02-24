@@ -83,7 +83,8 @@ async function generate_filelist() {
   let filelist = await File.find({
     encode_version: { $ne: encode_version },
   }).sort({
-    "probe.format.size": 1,
+    "sortFields.width": -1,
+    "sortFields.size": 1,
   });
 
   filelist = filelist.map((f) => f.path).filter((f) => f);
@@ -141,6 +142,11 @@ async function update_queue() {
         path: file,
         probe: ffprobe_data,
         encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
+        sortFields: {
+          width: ffprobe_data.streams.find((s) => s.codec_type === "video")
+            ?.width,
+          size: ffprobe_data.format.size,
+        },
       });
 
       return true;
