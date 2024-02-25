@@ -12,7 +12,7 @@ const config = {
       name: "uhd",
       width: 3840,
       aspect: 16 / 9,
-      bitrate: 25,
+      bitrate: 12,
       crf: 35,
       output: "av1",
     },
