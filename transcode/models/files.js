@@ -41,6 +41,7 @@ const schema = new Schema(
 
 schema.index({ "probe.format.size": 1 });
 schema.index({ "sortFields.width": -1, "sortFields.size": 1 });
+schema.index({ "updated_at": -1 });
 
 // create a model object that uses the above schema
 export default model(model_name, schema);
