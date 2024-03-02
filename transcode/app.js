@@ -140,7 +140,7 @@ async function update_queue() {
   const encoded_videos = await get_encoded_videos();
 
   // filter out any paths in the filelist that are in the list of encoded videos as they've already been encoded
-  filelist = filelist.filter((file) => encoded_videos.indexOf(file) === -1);
+  filelist = filelist.filter((file) => encoded_videos.indexOf(file) === -1).map((f) => f.replace('\n', '').trim());
 
   // remove any videos that already have the current encode version in the metadata
   await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
@@ -160,6 +160,7 @@ async function update_queue() {
       await upsert_video({
         path: file,
         error: { error: e.message, stdout, stderr, trace: e.stack },
+        hasError: true
       });
 
       // if the file itself wasn't readable by ffprobe, remove it from the list
@@ -558,6 +559,7 @@ function transcode(file, filelist) {
               ffmpeg_cmd,
               trace: err.stack,
             },
+            hasError: true
           });
 
           const corrupt_video_tests = [
@@ -607,6 +609,7 @@ function transcode(file, filelist) {
       await upsert_video({
         path: file,
         error: { error: e.message, trace: e.stack },
+        hasError: true
       });
       if (/no\s+video\s+stream\s+found/gi.test(e.message)) {
         await trash(file);
