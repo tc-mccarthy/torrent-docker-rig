@@ -78,6 +78,21 @@ async function get_encoded_videos() {
   }
 }
 
+async function probe_and_upsert(file) {
+  const ffprobe_data = await ffprobe(file);
+  await upsert_video({
+    path: file,
+    probe: ffprobe_data,
+    encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
+    sortFields: {
+      width: ffprobe_data.streams.find((s) => s.codec_type === "video")?.width,
+      size: ffprobe_data.format.size,
+    },
+  });
+
+  return ffprobe_data;
+}
+
 async function generate_filelist() {
   // query for any files that have an encode version that doesn't match the current encode version
   let filelist = await File.find({
@@ -131,23 +146,12 @@ async function update_queue() {
   await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
     const file_idx = filelist.indexOf(file);
     try {
-      const ffprobe_data = await ffprobe(file);
+      const ffprobe_data = await probe_and_upsert(file);
 
       // if the file is already encoded, remove it from the list
       if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
         filelist[file_idx] = null;
       }
-
-      await upsert_video({
-        path: file,
-        probe: ffprobe_data,
-        encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
-        sortFields: {
-          width: ffprobe_data.streams.find((s) => s.codec_type === "video")
-            ?.width,
-          size: ffprobe_data.format.size,
-        },
-      });
 
       return true;
     } catch (e) {
@@ -525,11 +529,7 @@ function transcode(file, filelist) {
           await exec_promise(
             `mv '${escape_file_path(scratch_file)}' '${dest_file}'`
           );
-          await upsert_video({
-            path: dest_file,
-            error: undefined,
-            encode_version,
-          });
+          await probe_and_upsert(dest_file);
           resolve();
         })
         .on("error", async function (err, stdout, stderr) {
