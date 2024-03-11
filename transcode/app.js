@@ -189,6 +189,11 @@ async function update_queue() {
       return true;
     }
   });
+
+  // run every 3 hours
+  setTimeout(() => { 
+    update_queue();
+  }, 3 * 60 * 1000);
 }
 
 async function ffprobe(file) {

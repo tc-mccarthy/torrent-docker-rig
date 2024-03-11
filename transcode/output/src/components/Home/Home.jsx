@@ -127,6 +127,12 @@ function Home () {
           <LinearProgressWithLabel value={data.output.percent} />
         </div>
       </div>
+      <div className="flex">
+        <div className="widget">
+          <strong>Library Coverage</strong>
+          <LinearProgressWithLabel value={Math.round(utilization.library_coverage)} />
+        </div>
+      </div>
 
       <div className="flex">
         <div className="widget">
