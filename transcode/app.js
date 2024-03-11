@@ -395,13 +395,6 @@ function transcode(file, filelist) {
         // handle HDR
         if (/arib[-]std[-]b67|smpte2084/i.test(video_stream.color_transfer)) {
           conversion_profile.name += ` (hdr)`; // add HDR to the profile name
-          // temporarily disable in an effort to accommodate dolby vision
-          // conversion_profile.addFlags({
-          //   color_primaries: "bt2020",
-          //   color_trc: "smpte2084",
-          //   color_range: "tv",
-          //   colorspace: "bt2020nc",
-          // });
         }
 
         cmd = cmd.outputOptions([
@@ -660,6 +653,10 @@ async function get_utilization() {
     memory: await exec_promise("free | grep Mem | awk '{print $3/$2 * 100.0}'"),
     cpu: await exec_promise("echo $(vmstat 1 2|tail -1|awk '{print $15}')"),
     last_updated: new Date(),
+    processed_files: await File.countDocuments({ encode_version }),
+    total_files: await File.countDocuments(),
+    unprocessed_files: await File.countDocuments({encode_version: {$ne: encode_version}}),
+    library_coverage: await File.countDocuments({ encode_version }) / await File.countDocuments() * 100,
   };
 
   data.memory = Math.round(parseFloat(data.memory.stdout));
