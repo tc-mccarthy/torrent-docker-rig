@@ -58,12 +58,15 @@ function human_size (size) {
 
 function Home () {
   const [data, setData] = useState(false);
-  const [filelist, setFileList] = useState(false);
+  const [filelist, setFileList] = useState([]);
   const [disks, setDisks] = useState(false);
   const [utilization, setUtilization] = useState(false);
   const [status, setStatus] = useState(false);
 
-  if (!data) {
+  const mvp = [data, filelist, disks, utilization, status].filter((d) => !d);
+
+  // interface waits for all data to be loaded
+  if (mvp.length > 0) {
     getData(setData, setFileList, setDisks, setUtilization, setStatus);
     return (
       <Box sx={{ display: 'flex' }}>
