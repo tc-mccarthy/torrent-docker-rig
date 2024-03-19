@@ -8,6 +8,7 @@ import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWi
 
 async function getData (setData, setFileList, setDisks, setUtilization, setStatus) {
   try {
+    clearTimeout(window.dataTimeout);
     const d = await fetch('active.json').then((r) => r.json());
 
     setData(d);
@@ -28,11 +29,11 @@ async function getData (setData, setFileList, setDisks, setUtilization, setStatu
 
     setStatus(status);
 
-    setTimeout(() => {
+    window.dataTimeout = setTimeout(() => {
       getData(...arguments);
     }, 1 * 1000);
   } catch (e) {
-    setTimeout(() => {
+    window.dataTimeout = setTimeout(() => {
       getData(...arguments);
     }, 1 * 1000);
   }
