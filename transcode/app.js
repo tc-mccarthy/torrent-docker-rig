@@ -686,17 +686,18 @@ async function update_status(){
 function transcode_loop(){
   return new Promise(async (resolve, reject) => {
 
-  const filelist = await generate_filelist();
-  await update_status();
-  const file = filelist[0];
-  await transcode(file, filelist);
+    const filelist = await generate_filelist();
+    await update_status();
+    const file = filelist[0];
+    await transcode(file, filelist);
 
-  // if there are more files, run the loop again
-  if(filelist.length > 1){
-    return transcode_loop();
-  }
+    // if there are more files, run the loop again
+    if(filelist.length > 1){
+      return transcode_loop();
+    }
 
-  resolve();
+    resolve();
+  });
 }
 
 async function run() {
@@ -723,7 +724,7 @@ async function run() {
       run();
     }, 30 * 1000);
   }
-}}
+}
 
 async function db_cleanup() {
   const files = await File.find({}).sort({ path: 1 });
