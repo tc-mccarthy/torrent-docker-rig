@@ -6,7 +6,7 @@ import moment from 'moment';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
 // import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 
-async function getData (setData, setFileList, setDisks, setUtilization) {
+async function getData (setData, setFileList, setDisks, setUtilization, setStatus) {
   try {
     const d = await fetch('active.json').then((r) => r.json());
 
@@ -24,12 +24,16 @@ async function getData (setData, setFileList, setDisks, setUtilization) {
 
     setUtilization(utilization);
 
+    const status = await fetch('status.json').then((r) => r.json());
+
+    setStatus(status);
+
     setTimeout(() => {
-      getData(setData, setFileList, setDisks, setUtilization);
+      getData(...arguments);
     }, 1 * 1000);
   } catch (e) {
     setTimeout(() => {
-      getData(setData, setFileList);
+      getData(...arguments);
     }, 1 * 1000);
   }
 }
@@ -57,9 +61,10 @@ function Home () {
   const [filelist, setFileList] = useState(false);
   const [disks, setDisks] = useState(false);
   const [utilization, setUtilization] = useState(false);
+  const [status, setStatus] = useState(false);
 
   if (!data) {
-    getData(setData, setFileList, setDisks, setUtilization);
+    getData(setData, setFileList, setDisks, setUtilization, setStatus);
     return (
       <Box sx={{ display: 'flex' }}>
         <CircularProgress />
@@ -67,8 +72,6 @@ function Home () {
     );
   }
 
-  const [numerator, denominator] = data.overall_progress.replace(/[()]/g, '').split('/');
-  const files_remaining = denominator - numerator;
   return (
     <div className="container image">
       <div className="overline" />
@@ -119,7 +122,7 @@ function Home () {
       <div className="flex">
         <div className="widget">
           <strong>Files Remaining</strong>
-          {files_remaining.toLocaleString()}
+          {status.unprocessed_files.toLocaleString()}
           {/* <CircularProgressWithLabel numerator={numerator} denominator={denominator} /> */}
         </div>
         <div className="widget">
@@ -130,7 +133,7 @@ function Home () {
       <div className="flex">
         <div className="widget">
           <strong>Library Coverage</strong>
-          <LinearProgressWithLabel value={Math.round(utilization.library_coverage)} />
+          <LinearProgressWithLabel value={Math.round(status.library_coverage)} />
         </div>
       </div>
 

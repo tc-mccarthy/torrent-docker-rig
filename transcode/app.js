@@ -10,6 +10,7 @@ import cron from "node-cron";
 import config from "./config.js";
 import { aspect_round } from "./base-config.js";
 import logger from "./lib/logger.js";
+import { clear } from "console";
 
 const PATHS = config.sources.map((p) => p.path);
 
@@ -104,7 +105,10 @@ async function generate_filelist() {
 
   filelist = filelist.map((f) => f.path).filter((f) => f);
 
-  fs.writeFileSync("./filelist.txt", filelist.join("\n"));
+  // remove first item from the list and write the rest to a file
+  fs.writeFileSync("./filelist.txt", filelist.slice(1).join("\n"));
+
+  // send back full list
   return filelist;
 }
 
@@ -224,7 +228,6 @@ async function ffprobe(file) {
 function transcode(file, filelist) {
   return new Promise(async (resolve, reject) => {
     try {
-      const list_idx = filelist.findIndex((f) => f === file) + 1;
       const { profiles } = config;
 
       const ffprobe_data = await ffprobe(file);
@@ -435,10 +438,6 @@ function transcode(file, filelist) {
           logger.debug("Spawned Ffmpeg with command: " + commandLine);
           start_time = moment();
           ffmpeg_cmd = commandLine;
-          fs.writeFileSync(
-            "/usr/app/output/filelist.json",
-            JSON.stringify(filelist.slice(list_idx || list_idx + 1))
-          );
           const video = await File.findOne({ path: file });
 
           if (video) {
@@ -500,8 +499,7 @@ function transcode(file, filelist) {
             {
               ...conversion_profile,
               ffmpeg_cmd,
-              file,
-              overall_progress: `(${list_idx}/${filelist.length})`,
+              file              
             },
             { label: "Job" }
           );
@@ -516,7 +514,6 @@ function transcode(file, filelist) {
               audio_stream,
               video_stream,
               file,
-              overall_progress: `(${list_idx}/${filelist.length})`,
               output: JSON.parse(output),
             })
           );
@@ -618,6 +615,7 @@ function transcode(file, filelist) {
 }
 
 function get_disk_space() {
+  clearTimeout(global.disk_space_timeout);
   return new Promise((resolve, reject) => {
     exec("df -h", (err, stdout, stderr) => {
       if (err) {
@@ -644,7 +642,7 @@ function get_disk_space() {
               }) > -1
           );
         fs.writeFileSync("/usr/app/output/disk.json", JSON.stringify(rows));
-        setTimeout(() => {
+        global.disk_space_timeout = setTimeout(() => {
           get_disk_space();
         }, 10 * 1000);
         resolve(rows);
@@ -654,14 +652,12 @@ function get_disk_space() {
 }
 
 async function get_utilization() {
+  clearTimeout(global.utilization_timeout);
+
   const data = {
     memory: await exec_promise("free | grep Mem | awk '{print $3/$2 * 100.0}'"),
     cpu: await exec_promise("echo $(vmstat 1 2|tail -1|awk '{print $15}')"),
-    last_updated: new Date(),
-    processed_files: await File.countDocuments({ encode_version }),
-    total_files: await File.countDocuments(),
-    unprocessed_files: await File.countDocuments({encode_version: {$ne: encode_version}}),
-    library_coverage: await File.countDocuments({ encode_version }) / await File.countDocuments() * 100,
+    last_updated: new Date()
   };
 
   data.memory = Math.round(parseFloat(data.memory.stdout));
@@ -671,9 +667,36 @@ async function get_utilization() {
 
   fs.writeFileSync("/usr/app/output/utilization.json", JSON.stringify(data));
 
-  setTimeout(() => {
+  global.utilization_timeout = setTimeout(() => {
     get_utilization();
   }, 10 * 1000);
+}
+
+async function update_status(){
+  const data = {
+    processed_files: await File.countDocuments({ encode_version }),
+    total_files: await File.countDocuments(),
+    unprocessed_files: await File.countDocuments({encode_version: {$ne: encode_version}}),
+    library_coverage: await File.countDocuments({ encode_version }) / await File.countDocuments() * 100
+  };
+
+  fs.writeFileSync("/usr/app/output/status.json", JSON.stringify(data));
+}
+
+function transcode_loop(){
+  return new Promise(async (resolve, reject) => {
+
+  const filelist = await generate_filelist();
+  await update_status();
+  const file = filelist[0];
+  await transcode(file, filelist);
+
+  // if there are more files, run the loop again
+  if(filelist.length > 1){
+    return transcode_loop();
+  }
+
+  resolve();
 }
 
 async function run() {
@@ -682,26 +705,25 @@ async function run() {
     await get_utilization();
     await get_disk_space();
     await pre_sanitize();
+
     // parallelize the detection of new videos
     update_queue();
-    const filelist = await generate_filelist();
-    logger.debug(filelist, { label: "File list" });
-    await async.eachSeries(filelist, async (file) => {
-      await transcode(file, filelist);
-      return true;
-    });
+    await transcode_loop();
+    
+    
+    
     logger.info("Requeuing in 30 seconds...");
-    setTimeout(() => {
+    global.runTimeout = setTimeout(() => {
       run();
     }, 30 * 1000);
   } catch (e) {
     logger.error(e, { label: "ERROR" });
     logger.info("Requeuing in 30 seconds...");
-    setTimeout(() => {
+    global.runTimeout = setTimeout(() => {
       run();
     }, 30 * 1000);
   }
-}
+}}
 
 async function db_cleanup() {
   const files = await File.find({}).sort({ path: 1 });
