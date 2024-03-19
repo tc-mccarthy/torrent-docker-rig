@@ -107,6 +107,7 @@ async function generate_filelist() {
 
   // remove first item from the list and write the rest to a file
   fs.writeFileSync("./filelist.txt", filelist.slice(1).join("\n"));
+  fs.writeFileSync("./output/filelist.json", JSON.stringify(filelist.slice(1)));
 
   // send back full list
   return filelist;
