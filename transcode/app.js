@@ -86,6 +86,7 @@ async function probe_and_upsert(file) {
     probe: ffprobe_data,
     encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
     sortFields: {
+      priority: 10,
       width: ffprobe_data.streams.find((s) => s.codec_type === "video")?.width,
       size: ffprobe_data.format.size,
     },
@@ -95,10 +96,16 @@ async function probe_and_upsert(file) {
 }
 
 async function generate_filelist() {
+  // create a default priority for all records that need it
+  await File.updateMany(
+    { "sortFields.priority": { $exists: false } },
+    { $set: { "sortFields.priority": 10 } }
+  );
   // query for any files that have an encode version that doesn't match the current encode version
   let filelist = await File.find({
     encode_version: { $ne: encode_version },
   }).sort({
+    "sortFields.priority": 1,
     "sortFields.width": -1,
     "sortFields.size": 1,
   });
