@@ -72,6 +72,8 @@ async function upsert_video(video) {
     // merge the file object with the video object and override with sortFields
     file = Object.assign(file, video, {sortFields});
 
+    console.log(file, { label: "UPSERT" });
+
     await file.save();
 
   } catch (e) {
