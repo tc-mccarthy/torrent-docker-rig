@@ -113,11 +113,6 @@ async function probe_and_upsert(file) {
 }
 
 async function generate_filelist() {
-  // create a default priority for all records that need it
-  await File.updateMany(
-    { "sortFields.priority": { $exists: false } },
-    { $set: { "sortFields.priority": 100 } }
-  );
   // query for any files that have an encode version that doesn't match the current encode version
   let filelist = await File.find({
     encode_version: { $ne: encode_version },
