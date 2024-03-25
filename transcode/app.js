@@ -63,14 +63,19 @@ async function upsert_video(video) {
       file = new File(video);
     }
 
+    // get priority from the video object, or default to 100
     const priority = video.sortFields?.priority || 100;
 
-    file.sortFields = {...file.sortFields, priority};
+    // merge the sortFields object with the priority
+    const sortFields = {...file.sortFields, priority};
+
+    // merge the file object with the video object and override with sortFields
+    file = Object.assign(file, video, {sortFields});
 
     await file.save();
 
   } catch (e) {
-    logger.error(e, { label: "COULD NOT CONFIGURE SQL" });
+    logger.error(e, { label: "UPSERT FAILURE" });
   }
 }
 
