@@ -57,7 +57,15 @@ async function pre_sanitize() {
 async function upsert_video(video) {
   try {
     const { path } = video;
-    await File.findOneAndUpdate({ path }, video, { upsert: true });
+    const file = File.findOneAndUpdate({ path }, video, { upsert: true });
+
+    // set the default priority if one isn't already set
+    if(!file.sortFields.priority){
+      file.sortFields.priority = 100;
+    }
+
+    await file.save();
+
   } catch (e) {
     logger.error(e, { label: "COULD NOT CONFIGURE SQL" });
   }
@@ -86,7 +94,6 @@ async function probe_and_upsert(file) {
     probe: ffprobe_data,
     encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
     sortFields: {
-      priority: 100,
       width: ffprobe_data.streams.find((s) => s.codec_type === "video")?.width,
       size: ffprobe_data.format.size,
     },
