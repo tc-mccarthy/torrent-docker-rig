@@ -12,7 +12,8 @@ const config = {
       name: "uhd",
       width: 3840,
       aspect: 16 / 9,
-      bitrate: 25,
+      bitrate: 10,
+      crf: 35,
       output: "av1",
     },
     {
@@ -20,6 +21,7 @@ const config = {
       width: 1920,
       aspect: 16 / 9,
       bitrate: 7,
+      crf: 35,
       output: "av1",
     },
     {
@@ -28,6 +30,7 @@ const config = {
       dest_width: 1920,
       aspect: 16 / 9,
       bitrate: 7,
+      crf: 35,
       output: "av1",
     },
     {
@@ -35,6 +38,7 @@ const config = {
       width: 1440,
       aspect: 4 / 3,
       bitrate: 7,
+      crf: 35,
       output: "av1",
     },
     {
@@ -42,6 +46,7 @@ const config = {
       width: 480,
       aspect: 4 / 3,
       bitrate: 3.5,
+      crf: 50,
       output: "av1",
     },
     {
@@ -49,6 +54,7 @@ const config = {
       width: 1080,
       aspect: 9 / 16,
       bitrate: 12,
+      crf: 35,
       output: "av1",
     },
   ],
@@ -60,7 +66,7 @@ const config = {
         codec_name: "av1",
         flags: {
           crf: 35,
-          preset: 5,
+          preset: 6,
         },
       },
       audio: {
@@ -92,6 +98,8 @@ const config = {
 
     if (conversion_profile) {
       conversion_profile = copy(conversion_profile);
+      conversion_profile.output.video.bitrate = conversion_profile.bitrate;
+      conversion_profile.output.video.flags.crf = conversion_profile.crf;
       conversion_profile.output.video.addFlags = function (flags) {
         Object.assign(conversion_profile.output.video.flags, flags);
       };

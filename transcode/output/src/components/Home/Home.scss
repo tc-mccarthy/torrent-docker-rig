@@ -141,9 +141,6 @@ figcaption {
   }
 
   &.list {
-    max-height: 100vh;
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
     ol,
     ul {
       text-align: left;

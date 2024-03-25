@@ -27,8 +27,16 @@ const schema = new Schema(
       type: Object,
       required: false, // making this false so that we can easily add registration to the site without needing a subscription
     },
+    sortFields: {
+      type: Object,
+      required: true,
+    },
     error: {
       type: Object,
+      required: false,
+    },
+    hasError: {
+      type: Boolean,
       required: false,
     },
   },
@@ -36,6 +44,13 @@ const schema = new Schema(
 );
 
 schema.index({ "probe.format.size": 1 });
+schema.index({ "sortFields.width": -1, "sortFields.size": 1 });
+schema.index({ "sortFields.priority": 1, "sortFields.width": -1, "sortFields.size": 1 });
+schema.index({ "sortFields.priority": 1 });
+schema.index({ "probe.streams[0].codec_name": 1 });
+schema.index({ "probe.streams.codec_name": 1 });
+schema.index({ "updated_at": -1 });
+schema.index({ "hasError": 1 });
 
 // create a model object that uses the above schema
 export default model(model_name, schema);

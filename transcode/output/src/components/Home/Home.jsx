@@ -4,10 +4,11 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import moment from 'moment';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
-import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
+// import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 
-async function getData (setData, setFileList, setDisks, setUtilization) {
+async function getData (setData, setFileList, setDisks, setUtilization, setStatus) {
   try {
+    clearTimeout(window.dataTimeout);
     const d = await fetch('active.json').then((r) => r.json());
 
     setData(d);
@@ -24,12 +25,16 @@ async function getData (setData, setFileList, setDisks, setUtilization) {
 
     setUtilization(utilization);
 
-    setTimeout(() => {
-      getData(setData, setFileList, setDisks, setUtilization);
+    const status = await fetch('status.json').then((r) => r.json());
+
+    setStatus(status);
+
+    window.dataTimeout = setTimeout(() => {
+      getData(...arguments);
     }, 1 * 1000);
   } catch (e) {
-    setTimeout(() => {
-      getData(setData, setFileList);
+    window.dataTimeout = setTimeout(() => {
+      getData(...arguments);
     }, 1 * 1000);
   }
 }
@@ -54,20 +59,22 @@ function human_size (size) {
 
 function Home () {
   const [data, setData] = useState(false);
-  const [filelist, setFileList] = useState(false);
+  const [filelist, setFileList] = useState([]);
   const [disks, setDisks] = useState(false);
   const [utilization, setUtilization] = useState(false);
+  const [status, setStatus] = useState(false);
 
-  if (!data) {
-    getData(setData, setFileList, setDisks, setUtilization);
+  const mvp = [data, filelist, disks, utilization, status].filter((d) => !d);
+
+  // interface waits for all data to be loaded
+  if (mvp.length > 0) {
+    getData(setData, setFileList, setDisks, setUtilization, setStatus);
     return (
       <Box sx={{ display: 'flex' }}>
         <CircularProgress />
       </Box>
     );
   }
-
-  const [numerator, denominator] = data.overall_progress.replace(/[()]/g, '').split('/');
 
   return (
     <div className="container image">
@@ -118,12 +125,19 @@ function Home () {
       </div>
       <div className="flex">
         <div className="widget">
-          <strong>Overall Progress</strong>
-          <CircularProgressWithLabel numerator={numerator} denominator={denominator} />
+          <strong>Files Remaining</strong>
+          {status.unprocessed_files.toLocaleString()}
+          {/* <CircularProgressWithLabel numerator={numerator} denominator={denominator} /> */}
         </div>
         <div className="widget">
           <strong>File Progress</strong>
           <LinearProgressWithLabel value={data.output.percent} />
+        </div>
+      </div>
+      <div className="flex">
+        <div className="widget">
+          <strong>Library Coverage</strong>
+          <LinearProgressWithLabel value={Math.round(status.library_coverage)} />
         </div>
       </div>
 

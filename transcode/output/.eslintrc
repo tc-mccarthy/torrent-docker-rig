@@ -351,6 +351,7 @@
       }
     ],
     "prefer-promise-reject-errors": "error",
+    "prefer-rest-params": 0,
     "quote-props": ["error", "as-needed"],
     "quotes": [
       "error",
