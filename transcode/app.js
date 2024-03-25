@@ -57,7 +57,7 @@ async function pre_sanitize() {
 async function upsert_video(video) {
   try {
     const { path } = video;
-    const file = File.findOneAndUpdate({ path }, video, { upsert: true });
+    const file = await File.findOneAndUpdate({ path }, video, { upsert: true });
 
     // set the default priority if one isn't already set
     if(!file.sortFields.priority){
