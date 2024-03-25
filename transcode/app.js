@@ -57,14 +57,7 @@ async function pre_sanitize() {
 async function upsert_video(video) {
   try {
     const { path } = video;
-    const file = await File.findOneAndUpdate({ path }, video, { upsert: true });
-
-    // set the default priority if one isn't already set
-    if(!file.sortFields.priority){
-      file.sortFields.priority = 100;
-    }
-
-    await file.save();
+    return File.findOneAndUpdate({ path }, video, { upsert: true });
 
   } catch (e) {
     logger.error(e, { label: "COULD NOT CONFIGURE SQL" });
