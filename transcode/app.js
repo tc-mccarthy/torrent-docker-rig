@@ -63,7 +63,7 @@ async function upsert_video(video) {
       file = new File(video);
     }
 
-    // get priority from the video object, or default to 100
+    // get priority from the video object, existing document or default to 100
     const priority = video.sortFields?.priority || file?.sortFields?.priority || 100;
 
     // merge the sortFields object with the priority
