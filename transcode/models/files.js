@@ -47,7 +47,7 @@ schema.index({ "probe.format.size": 1 });
 schema.index({ "sortFields.width": -1, "sortFields.size": 1 });
 schema.index({ "sortFields.priority": 1, "sortFields.width": -1, "sortFields.size": 1 });
 schema.index({ "sortFields.priority": 1 });
-schema.index({ "probe.streams[0].code_name": 1 });
+schema.index({ "probe.streams[0].codec_name": 1 });
 schema.index({ "updated_at": -1 });
 schema.index({ "hasError": 1 });
 
