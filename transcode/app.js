@@ -5,6 +5,7 @@ import * as fs from "fs";
 import moment from "moment";
 import File from "./models/files.js";
 import Cleanup from "./models/cleanup.js";
+import ErrorLog from "./models/error.js";
 import mongo_connect from "./lib/mongo_connection.js";
 import cron from "node-cron";
 import config from "./config.js";
@@ -186,6 +187,8 @@ async function update_queue() {
         error: { error: e.message, stdout, stderr, trace: e.stack },
         hasError: true
       });
+
+      await ErrorLog.create({path, error: { error: e.message, stdout, stderr, trace: e.stack }});
 
       // if the file itself wasn't readable by ffprobe, remove it from the list
       if (/command\s+failed/gi.test(e.message)) {
@@ -577,6 +580,14 @@ function transcode(file, filelist) {
             hasError: true
           });
 
+          await ErrorLog.create({path: file, error: {
+            error: err.message,
+            stdout,
+            stderr,
+            ffmpeg_cmd,
+            trace: err.stack,
+          }});
+
           const corrupt_video_tests = [
             {
               test: /Invalid\s+NAL\s+unit\s+size/gi,
@@ -626,6 +637,9 @@ function transcode(file, filelist) {
         error: { error: e.message, trace: e.stack },
         hasError: true
       });
+
+      await ErrorLog.create({path: file, error: { error: e.message, trace: e.stack }});
+      
       if (/no\s+video\s+stream\s+found/gi.test(e.message)) {
         await trash(file);
       }
