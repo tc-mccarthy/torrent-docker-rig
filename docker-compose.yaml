@@ -158,6 +158,8 @@ services:
     container_name: plex
     image: lscr.io/linuxserver/plex:latest
     network_mode: host
+    devices:
+      - "/dev/dri:/dev/dri"
     environment:
       - TZ
       - PUID=1000
