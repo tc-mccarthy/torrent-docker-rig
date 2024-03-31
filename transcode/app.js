@@ -11,7 +11,10 @@ import cron from "node-cron";
 import config from "./config.js";
 import { aspect_round } from "./base-config.js";
 import logger from "./lib/logger.js";
-import { clear } from "console";
+import { createClient } from "redis";
+
+const redisClient = createClient({url: "redis://torrent-redis-local"});
+
 
 const PATHS = config.sources.map((p) => p.path);
 
@@ -82,21 +85,21 @@ async function upsert_video(video) {
   }
 }
 
-async function get_encoded_videos() {
-  try {
-    const timestamp = new Date(new Date().setDate(new Date().getDate() - 30));
-    let videos = await File.find({
-      updated_at: { $gte: timestamp },
-      encode_version,
-    });
+// async function get_encoded_videos() {
+//   try {
+//     const timestamp = new Date(new Date().setDate(new Date().getDate() - 30));
+//     let videos = await File.find({
+//       updated_at: { $gte: timestamp },
+//       encode_version,
+//     });
 
-    videos = videos.map((video) => video.path);
+//     videos = videos.map((video) => video.path);
 
-    return videos || [];
-  } catch (e) {
-    logger.error(e, { label: "COULD NOT GET ENCODED VIDEOS" });
-  }
-}
+//     return videos || [];
+//   } catch (e) {
+//     logger.error(e, { label: "COULD NOT GET ENCODED VIDEOS" });
+//   }
+// }
 
 async function probe_and_upsert(file) {
   const ffprobe_data = await ffprobe(file);
@@ -136,6 +139,10 @@ async function generate_filelist() {
 async function update_queue() {
   // Get the list of files to be converted
 
+  // get the last probe time from redis
+  const last_probe = await redisClient.get("last_probe") || "1969-12-31 23:59:59";
+  const current_time = moment();
+
   const file_ext = [
     "avi",
     "mkv",
@@ -152,7 +159,7 @@ async function update_queue() {
     .map((ext) => `-iname "*.${ext}"`)
     .join(
       " -o "
-    )} \\) -not \\( -iname "*.tc.mkv" \\) -print0 | sort -z | xargs -0`;
+    )} \\) -not \\( -iname "*.tc.mkv" \\) -newermt ${last_probe} -print0 | sort -z | xargs -0`;
 
   const { stdout, stderr } = await exec_promise(findCMD);
 
@@ -162,12 +169,6 @@ async function update_queue() {
     .map((p) => `/source_media${p}`.replace("\x00", ""))
     .slice(1);
 
-  const encoded_videos = await get_encoded_videos();
-
-  // filter out any paths in the filelist that are in the list of encoded videos as they've already been encoded
-  filelist = filelist.filter((file) => encoded_videos.indexOf(file) === -1).map((f) => f.replace('\n', '').trim());
-
-  // remove any videos that already have the current encode version in the metadata
   await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
     const file_idx = filelist.indexOf(file);
     try {
@@ -217,10 +218,12 @@ async function update_queue() {
     }
   });
 
-  // run every 3 hours
+  await redisClient.set("last_probe", current_time.format("MM/DD/YYYY H:i:s"));
+  
+  // run every 10 minutes
   setTimeout(() => { 
     update_queue();
-  }, 3 * 60 * 1000);
+  }, 10 * 60 * 1000);
 }
 
 async function ffprobe(file) {
@@ -639,7 +642,7 @@ function transcode(file, filelist) {
       });
 
       await ErrorLog.create({path: file, error: { error: e.message, trace: e.stack }});
-      
+
       if (/no\s+video\s+stream\s+found/gi.test(e.message)) {
         await trash(file);
       }
@@ -779,6 +782,7 @@ async function create_scratch_disks() {
 }
 
 mongo_connect()
+  .then(() => redisClient.connect())
   .then(() => {
     run();
 

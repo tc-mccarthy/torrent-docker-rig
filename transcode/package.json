@@ -24,9 +24,11 @@
     "fast-copy": "^3.0.1",
     "fluent-ffmpeg": "^2.1.2",
     "moment": "^2.29.4",
+    "moment-timezone": "^0.5.45",
     "mongoose": "^7.6.2",
     "node-cron": "^3.0.2",
     "nodemon": "^2.0.20",
+    "redis": "^4.6.13",
     "trash-cli": "^5.0.0",
     "winston": "^3.11.0"
   }
