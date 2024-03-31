@@ -191,7 +191,7 @@ async function update_queue() {
         hasError: true
       });
 
-      await ErrorLog.create({path, error: { error: e.message, stdout, stderr, trace: e.stack }});
+      await ErrorLog.create({path: file, error: { error: e.message, stdout, stderr, trace: e.stack }});
 
       // if the file itself wasn't readable by ffprobe, remove it from the list
       if (/command\s+failed/gi.test(e.message)) {
