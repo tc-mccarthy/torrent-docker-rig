@@ -229,9 +229,9 @@ async function update_queue() {
 }
 
 async function ffprobe(file) {
-  const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams "${escape_file_path(
+  const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams '${escape_file_path(
     file
-  )}"`;
+  )}'`;
   const { stdout, stderr } = await exec_promise(ffprobeCMD);
 
   const data = JSON.parse(stdout);
