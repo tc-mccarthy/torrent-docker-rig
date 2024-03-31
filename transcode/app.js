@@ -159,7 +159,7 @@ async function update_queue() {
     .map((ext) => `-iname "*.${ext}"`)
     .join(
       " -o "
-    )} \\) -not \\( -iname "*.tc.mkv" \\) -newermt ${last_probe} -print0 | sort -z | xargs -0`;
+    )} \\) -not \\( -iname "*.tc.mkv" \\) -newermt "${last_probe}" -print0 | sort -z | xargs -0`;
 
   logger.info(findCMD, {label: "FIND COMMAND"});
 
@@ -220,7 +220,7 @@ async function update_queue() {
     }
   });
 
-  await redisClient.set("last_probe", current_time.format("MM/DD/YYYY H:i:s"));
+  await redisClient.set("last_probe", current_time.format("MM/DD/YYYY H:m:s"));
 
   // run every 10 minutes
   setTimeout(() => { 
