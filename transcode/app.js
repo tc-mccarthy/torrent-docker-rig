@@ -161,6 +161,8 @@ async function update_queue() {
       " -o "
     )} \\) -not \\( -iname "*.tc.mkv" \\) -newermt ${last_probe} -print0 | sort -z | xargs -0`;
 
+  console.log("Executing find command", findCMD);
+
   const { stdout, stderr } = await exec_promise(findCMD);
 
   let filelist = stdout
@@ -219,7 +221,7 @@ async function update_queue() {
   });
 
   await redisClient.set("last_probe", current_time.format("MM/DD/YYYY H:i:s"));
-  
+
   // run every 10 minutes
   setTimeout(() => { 
     update_queue();
