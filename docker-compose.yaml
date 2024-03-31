@@ -150,6 +150,9 @@ services:
       - ./transcode:/usr/app
       - /usr/app/node_modules
     restart: unless-stopped
+    depends_on:
+      - redis
+      - mongo
     deploy:
       resources:
         limits:
