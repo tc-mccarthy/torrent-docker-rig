@@ -161,7 +161,7 @@ async function update_queue() {
       " -o "
     )} \\) -not \\( -iname "*.tc.mkv" \\) -newermt ${last_probe} -print0 | sort -z | xargs -0`;
 
-  console.log("Executing find command", findCMD);
+  logger.info(findCMD, {label: "FIND COMMAND"});
 
   const { stdout, stderr } = await exec_promise(findCMD);
 
