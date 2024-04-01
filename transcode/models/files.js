@@ -27,6 +27,10 @@ const schema = new Schema(
       type: Object,
       required: false, // making this false so that we can easily add registration to the site without needing a subscription
     },
+    last_probe: {
+      type: Date,
+      required: false,
+    },
     sortFields: {
       type: Object,
       required: true,

@@ -102,11 +102,13 @@ async function upsert_video(video) {
 // }
 
 async function probe_and_upsert(file) {
+  const current_time = moment();
   const ffprobe_data = await ffprobe(file);
   await upsert_video({
     path: file,
     probe: ffprobe_data,
     encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
+    last_probe: current_time,
     sortFields: {
       width: ffprobe_data.streams.find((s) => s.codec_type === "video")?.width,
       size: ffprobe_data.format.size,
@@ -220,7 +222,7 @@ async function update_queue() {
     }
   });
 
-  await redisClient.set("last_probe", current_time.format("MM/DD/YYYY H:m:s"));
+  await redisClient.set(`last_probe_${encode_version}`, current_time.format("MM/DD/YYYY H:m:s"));
 
   // run every 10 minutes
   setTimeout(() => { 
