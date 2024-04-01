@@ -54,6 +54,7 @@ schema.index({ "sortFields.priority": 1 });
 schema.index({ "probe.streams[0].codec_name": 1 });
 schema.index({ "probe.streams.codec_name": 1 });
 schema.index({ "updated_at": -1 });
+schema.index({ "last_probe": -1 });
 schema.index({ "hasError": 1 });
 
 // create a model object that uses the above schema
