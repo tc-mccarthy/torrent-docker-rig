@@ -23,6 +23,10 @@ const transcode_config = {
       path: "/source_media/Drax/Random",
       scratch: "/source_media/Drax/transcode_scratch",
     },
+    {
+      path: "/source_media/Stark/TV Shows",
+      scratch: "/source_media/Stark/transcode_scratch",
+    },
   ],
 };
 
