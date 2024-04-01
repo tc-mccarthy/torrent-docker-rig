@@ -141,7 +141,7 @@ async function generate_filelist() {
 
 async function update_queue() {
   // Get the list of files to be converted
-  const last_probe_cache_key = `last_probe_${encode_version}`;
+  const last_probe_cache_key = `last_probe_${encode_version}_a`;
 
   // get the last probe time from redis
   const last_probe = await redisClient.get(last_probe_cache_key) || "1969-12-31 23:59:59";
@@ -224,7 +224,7 @@ async function update_queue() {
     }
   });
 
-  await redisClient.set(last_probe_cache_key, current_time.format("MM/DD/YYYY H:m:s"));
+  await redisClient.set(last_probe_cache_key, current_time.format("MM/DD/YYYY HH:mm:ss"));
 
   // run every 10 minutes
   setTimeout(() => { 
