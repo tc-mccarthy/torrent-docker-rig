@@ -60,7 +60,8 @@ async function pre_sanitize() {
 
 async function upsert_video(video) {
   try {
-    const { path } = video;
+    let { path } = video;
+    path = path.replace(/\n+$/, "");
     let file = await File.findOne({ path });
 
     if (!file) {
@@ -140,9 +141,10 @@ async function generate_filelist() {
 
 async function update_queue() {
   // Get the list of files to be converted
+  const last_probe_cache_key = `last_probe_${encode_version}`;
 
   // get the last probe time from redis
-  const last_probe = await redisClient.get("last_probe") || "1969-12-31 23:59:59";
+  const last_probe = await redisClient.get(last_probe_cache_key) || "1969-12-31 23:59:59";
   const current_time = moment();
 
   const file_ext = [
@@ -222,7 +224,7 @@ async function update_queue() {
     }
   });
 
-  await redisClient.set(`last_probe_${encode_version}`, current_time.format("MM/DD/YYYY H:m:s"));
+  await redisClient.set(last_probe_cache_key, current_time.format("MM/DD/YYYY H:m:s"));
 
   // run every 10 minutes
   setTimeout(() => { 
