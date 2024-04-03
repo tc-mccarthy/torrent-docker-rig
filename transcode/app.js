@@ -654,7 +654,7 @@ function transcode(file, filelist) {
 
       await ErrorLog.create({path: file, error: { error: e.message, trace: e.stack }});
 
-      if (/no\s+video\s+stream\s+found/gi.test(e.message)) {
+      if (/no\s+(video|audio)\s+stream\s+found/gi.test(e.message)) {
         await trash(file);
       }
       resolve();
