@@ -560,7 +560,7 @@ function transcode(file, filelist) {
 
           await trash(file);
           await exec_promise(
-            `mv '${escape_file_path(scratch_file)}' '${dest_file}'`
+            `mv '${escape_file_path(scratch_file)}' '${escape_file_path(dest_file)}'`
           );
           await probe_and_upsert(dest_file);
           resolve();
