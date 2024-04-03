@@ -302,6 +302,11 @@ function transcode(file, filelist) {
             (!s.tags?.language || /und|eng/i.test(s.tags.language))
         )
         .sort((a, b) => (a.channels > b.channels ? -1 : 1))[0];
+
+      if (!audio_stream) {
+        throw new Error("No audio stream found");
+      }
+
       const subtitle_streams = ffprobe_data.streams.filter(
         (s) =>
           s.codec_type === "subtitle" &&
