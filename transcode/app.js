@@ -34,7 +34,7 @@ function exec_promise(cmd) {
 }
 
 function escape_file_path(file) {
-  return file.replace(/(['])/g, "'\\''");
+  return file.replace(/(['])/g, "'\\''").replace(/\n+$/, "");
 }
 
 function trash(file) {
