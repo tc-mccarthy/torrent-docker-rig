@@ -103,6 +103,7 @@ async function upsert_video(video) {
 // }
 
 async function probe_and_upsert(file) {
+  file = escape_file_path(file);
   const current_time = moment();
   const ffprobe_data = await ffprobe(file);
   await upsert_video({
