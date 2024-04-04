@@ -14,7 +14,7 @@ const model_name = "ErrorLog";
 const schema = new Schema(
   {
     path: {
-        type: Objects,
+        type: Object,
         required: false,
       },
     error: {
