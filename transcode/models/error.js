@@ -13,12 +13,10 @@ const model_name = "ErrorLog";
 //establish types and defaults for keys
 const schema = new Schema(
   {
-    paths: [
-      {
-        type: String,
+    path: {
+        type: Objects,
         required: false,
       },
-    ],
     error: {
       type: Object,
       required: false,
@@ -26,6 +24,10 @@ const schema = new Schema(
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
+
+
+schema.index({ "updated_at": -1 });
+schema.index({path: 1})
 
 // create a model object that uses the above schema
 export default model(model_name, schema);
