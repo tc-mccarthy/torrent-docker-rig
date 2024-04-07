@@ -122,7 +122,7 @@ async function generate_filelist() {
     path: f.path, 
     size: f.sortFields.size, 
     resolution: f.probe.streams.find((v) => v.codec_type === 'video').height,
-    codec: `${f.probe.streams.find((v) => v.codec_type === 'video').codec_name}/${f.probe.streams.find((v) => v.codec_type === 'audio').codec_name}`,
+    codec: `${f.probe.streams.find((v) => v.codec_type === 'video')?.codec_name}/${f.probe.streams.find((v) => v.codec_type === 'audio')?.codec_name}`,
     encode_version: f.encode_version,
   }))));
 
