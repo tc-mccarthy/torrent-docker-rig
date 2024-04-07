@@ -160,7 +160,7 @@ async function update_queue() {
     .map((p) => `/source_media${p}`.replace("\x00", ""))
     .slice(1);
 
-  await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
+  await async.eachLimit(filelist.map(f => f.path), concurrent_file_checks, async (file) => {
     const file_idx = filelist.indexOf(file);
     try {
       const ffprobe_data = await probe_and_upsert(file);
