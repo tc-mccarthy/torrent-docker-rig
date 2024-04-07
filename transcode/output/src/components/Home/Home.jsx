@@ -57,6 +57,19 @@ function human_size (size) {
   return rounded_size + output_size;
 }
 
+function make_human_readable (size) {
+  let calc_size = +size;
+  const units = ['kb', 'mb', 'gb'];
+  let unit = 0;
+
+  while (calc_size > 1024) {
+    calc_size /= 1024;
+    unit += 1;
+  }
+
+  return `${Math.round(calc_size * 100) / 100}${units[unit]}`;
+}
+
 function Home () {
   const [data, setData] = useState(false);
   const [filelist, setFileList] = useState([]);
@@ -178,29 +191,33 @@ function Home () {
           ))}
       </div>
 
-      <div className="widget list overflow">
+      <div className="widget list">
         <strong>Remaining files</strong>
         {!filelist?.map && <em>Loading...</em>}
-        {filelist?.map && (
-          <table>
-            <tr>
-              <th>Path</th>
-              <th>Size</th>
-              <th>Resolution</th>
-              <th>Codec</th>
-              <th>Encode version</th>
-            </tr>
-            {filelist.map((f) => (
+        <div className="overflow">
+          {filelist?.map && (
+            <table>
               <tr>
-                <td>{f.path}</td>
-                <td>{human_size(f.size)}</td>
-                <td>{f.resolution}</td>
-                <td>{f.codec}</td>
-                <td>{f.encode_version}</td>
+                <th>Priority</th>
+                <th>Path</th>
+                <th>Size</th>
+                <th>Resolution</th>
+                <th>Codec</th>
+                <th>Encode version</th>
               </tr>
-            ))}
-          </table>
-        )}
+              {filelist.map((f) => (
+                <tr>
+                  <td>{f.priority}</td>
+                  <td>{f.path}</td>
+                  <td>{make_human_readable(f.size)}</td>
+                  <td>{f.resolution}</td>
+                  <td>{f.codec}</td>
+                  <td>{f.encode_version}</td>
+                </tr>
+              ))}
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );

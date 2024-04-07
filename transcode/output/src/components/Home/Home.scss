@@ -136,7 +136,7 @@ figcaption {
   margin-bottom: 10px;
   text-align: center;
 
-  &.overflow {
+  .overflow {
     overflow-x: auto;
   }
 
@@ -161,6 +161,12 @@ figcaption {
 
   em {
     font-size: 0.9rem;
+  }
+
+  table {
+    tr:even {
+      background-color: #f9f9f9;
+    }
   }
 }
 /*********************************************************************

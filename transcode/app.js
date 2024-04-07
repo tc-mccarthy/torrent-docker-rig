@@ -119,9 +119,10 @@ async function generate_filelist() {
   // remove first item from the list and write the rest to a file
   fs.writeFileSync("./filelist.txt", filelist.slice(1).map(f => f.path).join("\n"));
   fs.writeFileSync("./output/filelist.json", JSON.stringify(filelist.slice(1).map(f => ({
-    path: f.path, 
-    size: f.sortFields.size, 
-    resolution: f.probe.streams.find((v) => v.codec_type === 'video').height,
+    path: f.path.split(/\//).pop(), 
+    size: f.sortFields.size,
+    priority: f.sortFields.priority, 
+    resolution: f.probe.streams.find((v) => v.codec_type === 'video').width * .5625, // use width at 56.25% to calculate resolution
     codec: `${f.probe.streams.find((v) => v.codec_type === 'video')?.codec_name}/${f.probe.streams.find((v) => v.codec_type === 'audio')?.codec_name}`,
     encode_version: f.encode_version,
   }))));
