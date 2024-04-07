@@ -121,8 +121,8 @@ async function generate_filelist() {
   fs.writeFileSync("./output/filelist.json", JSON.stringify(filelist.slice(1).map(f => ({
     path: f.path, 
     size: f.sortFields.size, 
-    resolution: probe.streams.find((v) => v.codec_type === 'video').height,
-    codec: `${probe.streams.find((v) => v.codec_type === 'video').codec_name}/${probe.streams.find((v) => v.codec_type === 'audio').codec_name}`,
+    resolution: f.probe.streams.find((v) => v.codec_type === 'video').height,
+    codec: `${f.probe.streams.find((v) => v.codec_type === 'video').codec_name}/${f.probe.streams.find((v) => v.codec_type === 'audio').codec_name}`,
     encode_version: f.encode_version,
   }))));
 
