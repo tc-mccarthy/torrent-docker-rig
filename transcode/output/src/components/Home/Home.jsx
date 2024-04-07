@@ -194,12 +194,8 @@ function Home () {
               <tr>
                 <td>{f.path}</td>
                 <td>{human_size(f.sortFields.size)}</td>
-                <td>{f.probe.streams.find((v) => v.codec_type === 'video').height}</td>
-                <td>
-                  {f.probe.streams.find((v) => v.codec_type === 'video').codec_name}
-                  /
-                  {f.probe.streams.find((v) => v.codec_type === 'audio').codec_name}
-                </td>
+                <td>{f.resolution}</td>
+                <td>{f.codec}</td>
                 <td>{f.encode_version}</td>
               </tr>
             ))}

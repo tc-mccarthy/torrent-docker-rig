@@ -118,7 +118,13 @@ async function generate_filelist() {
 
   // remove first item from the list and write the rest to a file
   fs.writeFileSync("./filelist.txt", filelist.slice(1).map(f => f.path).join("\n"));
-  fs.writeFileSync("./output/filelist.json", JSON.stringify(filelist.slice(1)));
+  fs.writeFileSync("./output/filelist.json", JSON.stringify(filelist.slice(1).map(f => ({
+    path: f.path, 
+    size: f.sortFields.size, 
+    resolution: probe.streams.find((v) => v.codec_type === 'video').height,
+    codec: `${probe.streams.find((v) => v.codec_type === 'video').codec_name}/${probe.streams.find((v) => v.codec_type === 'audio').codec_name}`,
+    encode_version: f.encode_version,
+  }))));
 
   // send back full list
   return filelist;
