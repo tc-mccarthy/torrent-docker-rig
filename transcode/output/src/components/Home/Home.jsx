@@ -193,7 +193,7 @@ function Home () {
             {filelist.map((f) => (
               <tr>
                 <td>{f.path}</td>
-                <td>{human_size(f.sortFields.size)}</td>
+                <td>{human_size(f.size)}</td>
                 <td>{f.resolution}</td>
                 <td>{f.codec}</td>
                 <td>{f.encode_version}</td>
