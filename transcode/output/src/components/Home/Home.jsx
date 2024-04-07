@@ -178,15 +178,32 @@ function Home () {
           ))}
       </div>
 
-      <div className="widget list">
+      <div className="widget list overflow">
         <strong>Remaining files</strong>
         {!filelist?.map && <em>Loading...</em>}
         {filelist?.map && (
-          <ol>
+          <table>
+            <tr>
+              <th>Path</th>
+              <th>Size</th>
+              <th>Resolution</th>
+              <th>Codec</th>
+              <th>Encode version</th>
+            </tr>
             {filelist.map((f) => (
-              <li>{f}</li>
+              <tr>
+                <td>{f.path}</td>
+                <td>{human_size(f.sortFields.size)}</td>
+                <td>{f.probe.streams.find((v) => v.codec_type === 'video').height}</td>
+                <td>
+                  {f.probe.streams.find((v) => v.codec_type === 'video').codec_name}
+                  /
+                  {f.probe.streams.find((v) => v.codec_type === 'audio').codec_name}
+                </td>
+                <td>{f.encode_version}</td>
+              </tr>
             ))}
-          </ol>
+          </table>
         )}
       </div>
     </div>

@@ -86,22 +86,6 @@ async function upsert_video(video) {
   }
 }
 
-// async function get_encoded_videos() {
-//   try {
-//     const timestamp = new Date(new Date().setDate(new Date().getDate() - 30));
-//     let videos = await File.find({
-//       updated_at: { $gte: timestamp },
-//       encode_version,
-//     });
-
-//     videos = videos.map((video) => video.path);
-
-//     return videos || [];
-//   } catch (e) {
-//     logger.error(e, { label: "COULD NOT GET ENCODED VIDEOS" });
-//   }
-// }
-
 async function probe_and_upsert(file) {
   file = file.replace(/\n+$/, "");
   const current_time = moment();
@@ -130,10 +114,10 @@ async function generate_filelist() {
     "sortFields.size": 1,
   });
 
-  filelist = filelist.map((f) => f.path).filter((f) => f);
+  filelist = filelist.filter((f) => f.path);
 
   // remove first item from the list and write the rest to a file
-  fs.writeFileSync("./filelist.txt", filelist.slice(1).join("\n"));
+  fs.writeFileSync("./filelist.txt", filelist.slice(1).map(f => f.path).join("\n"));
   fs.writeFileSync("./output/filelist.json", JSON.stringify(filelist.slice(1)));
 
   // send back full list

@@ -136,6 +136,10 @@ figcaption {
   margin-bottom: 10px;
   text-align: center;
 
+  &.overflow {
+    overflow-x: auto;
+  }
+
   &.center {
     margin: 0 auto 10px;
   }
