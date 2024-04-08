@@ -197,7 +197,7 @@ function Home () {
           Next
           {filelist.length.toLocaleString()}
           {' '}
-          queued files files
+          queued files
         </strong>
         <div className="overflow">
           {filelist?.map && (
