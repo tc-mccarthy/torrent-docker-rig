@@ -247,6 +247,8 @@ async function ffprobe(file) {
   logger.info(ffprobeCMD, { label: "FFPROBE COMMAND" });
   const { stdout, stderr } = await exec_promise(ffprobeCMD);
 
+  logger.info({stdout, stderr}, { label: "FFPROBE OUTPUT" });
+
   const data = JSON.parse(stdout);
 
   data.format.duration = +data.format.duration;
