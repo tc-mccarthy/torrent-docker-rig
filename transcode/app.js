@@ -178,6 +178,8 @@ async function update_queue() {
     .map((p) => `/source_media${p}`.replace("\x00", ""))
     .slice(1);
 
+  logger.info("", {label: "NEW FILES IDENTIFIED. PROBING..."});
+
   await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
     const file_idx = filelist.indexOf(file);
     try {
@@ -227,7 +229,10 @@ async function update_queue() {
     }
   });
 
+  logger.info("", {label: "PROBE COMPLETE. UPDATING REDIS..."});
   await redisClient.set(last_probe_cache_key, current_time.format("MM/DD/YYYY HH:mm:ss"));
+
+  logger.info("", {label: "REDIS UPDATED"});
 
   // run every 10 minutes
   setTimeout(() => { 
@@ -576,9 +581,10 @@ function transcode(file) {
           await exec_promise(
             `mv '${escape_file_path(scratch_file)}' '${escape_file_path(dest_file)}'`
           );
+
           await probe_and_upsert(dest_file, video_record._id, {
             transcode_details: {
-              start_time: video_record.transcode_details.start_time, 
+              ...video_record.transcode_details,
               end_time: moment().toDate(),
               duration: moment().diff(start_time, "seconds"),
             }
@@ -753,10 +759,12 @@ async function update_status(){
 
 function transcode_loop(){
   return new Promise(async (resolve, reject) => {
-
+    logger.info("STARTING TRANSCODE LOOP");
     const filelist = await generate_filelist();
+    logger.info("FILE LIST ACQUIRED");
     await update_status();
     const file = filelist[0];
+    logger.info("BEGINNING TRANSCODE");
     await transcode(file);
 
     // if there are more files, run the loop again
