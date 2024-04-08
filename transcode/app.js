@@ -61,12 +61,12 @@ async function pre_sanitize() {
 
 async function upsert_video(video) {
   try {
-    let { path, _id } = video;
+    let { path, record_id } = video;
     path = path.replace(/\n+$/, "");
     let file;
 
-    if(_id){
-      file = await File.findOne({ _id });
+    if(record_id){
+      file = await File.findOne({ _id: record_id });
     }
 
     if(!file){
@@ -100,7 +100,7 @@ async function probe_and_upsert(file, record_id, opts = {}) {
   const current_time = moment();
   const ffprobe_data = await ffprobe(file);
   await upsert_video({
-    _id: record_id,
+    record_id,
     path: file,
     probe: ffprobe_data,
     encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
