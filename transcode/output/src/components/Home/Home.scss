@@ -164,8 +164,14 @@ figcaption {
   }
 
   table {
-    tr:nth-child(even) {
-      background-color: #f9f9f9;
+    border-collapse: collapse;
+    tr {
+      td {
+        padding: 5px;
+      }
+      &:nth-child(even) {
+        background-color: #f9f9f9;
+      }
     }
   }
 }
