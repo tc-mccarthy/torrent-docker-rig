@@ -11,6 +11,7 @@ const config = {
     {
       name: "uhd",
       width: 3840,
+      height: 2160,
       aspect: 16 / 9,
       bitrate: 10,
       crf: 35,
@@ -19,6 +20,7 @@ const config = {
     {
       name: "1080p",
       width: 1920,
+      height: 1080,
       aspect: 16 / 9,
       bitrate: 7,
       crf: 35,
@@ -26,7 +28,8 @@ const config = {
     },
     {
       name: "720p",
-      width: 720,
+      width: 1280,
+      height: 720,
       dest_width: 1920,
       aspect: 16 / 9,
       bitrate: 7,
@@ -36,6 +39,7 @@ const config = {
     {
       name: "hdv (1440p)",
       width: 1440,
+      height: 1080,
       aspect: 4 / 3,
       bitrate: 7,
       crf: 35,
@@ -43,7 +47,8 @@ const config = {
     },
     {
       name: "sd",
-      width: 480,
+      width: 720,
+      height: 480,
       aspect: 4 / 3,
       bitrate: 3.5,
       crf: 50,
@@ -52,6 +57,7 @@ const config = {
     {
       name: "vertical",
       width: 1080,
+      height: 1920,
       aspect: 9 / 16,
       bitrate: 12,
       crf: 35,
@@ -93,7 +99,7 @@ const config = {
     // locate the conversion profile that's best suited for this source media and duplicate it so changes don't propagate to the next use of the profile
     let conversion_profile = config.profiles.find(
       (x) =>
-        video_stream.width + 10 >= x.width && Math.abs(video_stream.aspect) >= x.aspect
+        (video_stream.width + 50 >= x.width || video_stream.height + 50 >= x.height) && Math.abs(video_stream.aspect) >= x.aspect
     );
 
     if (conversion_profile) {
