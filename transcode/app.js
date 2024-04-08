@@ -111,7 +111,7 @@ async function generate_filelist() {
   }).sort({
     "sortFields.priority": 1,
     "sortFields.width": -1,
-    "sortFields.size": 1,
+    "sortFields.size": -1,
   });
 
   filelist = filelist.filter((f) => f.path);
