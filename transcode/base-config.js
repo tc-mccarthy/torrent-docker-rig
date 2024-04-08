@@ -93,7 +93,7 @@ const config = {
     // locate the conversion profile that's best suited for this source media and duplicate it so changes don't propagate to the next use of the profile
     let conversion_profile = config.profiles.find(
       (x) =>
-        video_stream.width + 10 >= x.width && video_stream.aspect >= x.aspect
+        video_stream.width + 10 >= x.width && Math.abs(video_stream.aspect) >= x.aspect
     );
 
     if (conversion_profile) {
