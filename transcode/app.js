@@ -505,7 +505,7 @@ function transcode(file) {
             video_record.error = undefined;
             video_record.transcode_details = {
               start_time: start_time.toDate(),
-              source_codec: `${video_record.probe.streams.find(f => f.codec_type === "video")?.codec_name}_${video_record.probe.streams.find(f => f.codec_type === "video")?.codec_name}`,
+              source_codec: `${video_record.probe.streams.find(f => f.codec_type === "video")?.codec_name}_${video_record.probe.streams.find(f => f.codec_type === "audio")?.codec_name}`,
             }
             await video_record.save();
           }
