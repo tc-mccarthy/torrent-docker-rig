@@ -128,7 +128,7 @@ async function generate_filelist() {
   }))));
 
   // send back full list
-  return filelist;
+  return filelist.map(f => f.path);
 }
 
 async function update_queue() {
@@ -167,8 +167,8 @@ async function update_queue() {
     .map((p) => `/source_media${p}`.replace("\x00", ""))
     .slice(1);
 
-  await async.eachLimit(filelist.map(f => f.path), concurrent_file_checks, async (file) => {
-    const file_idx = filelist.findIndex(f => f.path === file);
+  await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
+    const file_idx = filelist.indexOf(file);
     try {
       const ffprobe_data = await probe_and_upsert(file);
 
@@ -729,7 +729,7 @@ function transcode_loop(){
     const filelist = await generate_filelist();
     await update_status();
     const file = filelist[0];
-    await transcode(file.path);
+    await transcode(file);
 
     // if there are more files, run the loop again
     if(filelist.length > 1){
