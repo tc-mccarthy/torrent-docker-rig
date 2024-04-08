@@ -234,10 +234,10 @@ async function update_queue() {
 
   logger.info("", {label: "REDIS UPDATED"});
 
-  // run every 10 minutes
+  // run every 2 minutes
   setTimeout(() => { 
     update_queue();
-  }, 10 * 60 * 1000);
+  }, 2 * 60 * 1000);
 }
 
 async function ffprobe(file) {
