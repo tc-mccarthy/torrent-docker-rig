@@ -198,6 +198,7 @@ function Home () {
           {filelist?.map && (
             <table>
               <tr>
+                <th>#</th>
                 <th>Priority</th>
                 <th>Path</th>
                 <th>Size</th>
@@ -205,8 +206,9 @@ function Home () {
                 <th>Codec</th>
                 <th>Encode version</th>
               </tr>
-              {filelist.map((f) => (
+              {filelist.map((f, idx) => (
                 <tr>
+                  <td>{idx + 1}</td>
                   <td>{f.priority}</td>
                   <td>{f.path}</td>
                   <td>{make_human_readable(f.size)}</td>
