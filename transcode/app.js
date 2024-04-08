@@ -244,6 +244,7 @@ async function ffprobe(file) {
   const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams '${escape_file_path(
     file
   )}'`;
+  logger.info(ffprobeCMD, { label: "FFPROBE COMMAND" });
   const { stdout, stderr } = await exec_promise(ffprobeCMD);
 
   const data = JSON.parse(stdout);
@@ -269,7 +270,7 @@ function transcode(file) {
   return new Promise(async (resolve, reject) => {
     try {
       const { profiles } = config;
-
+      
       const ffprobe_data = await ffprobe(file);
       logger.debug(ffprobe_data, { label: "FFPROBE DATA >>" });
       const video_stream = ffprobe_data.streams.find(
@@ -761,7 +762,7 @@ function transcode_loop(){
   return new Promise(async (resolve, reject) => {
     logger.info("STARTING TRANSCODE LOOP");
     const filelist = await generate_filelist();
-    logger.info("FILE LIST ACQUIRED");
+    logger.info("FILE LIST ACQUIRED. THERE ARE " + filelist.length + " FILES TO TRANSCODE.");
     await update_status();
     const file = filelist[0];
     logger.info("BEGINNING TRANSCODE");
