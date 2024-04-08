@@ -796,7 +796,7 @@ async function run() {
 
     // parallelize the detection of new videos
     update_queue();
-    await transcode_loop();
+    // await transcode_loop();
     
     
     
