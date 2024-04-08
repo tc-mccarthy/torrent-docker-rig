@@ -485,13 +485,13 @@ function transcode(file) {
           
 
           if (video_record) {
-            logger.debug(">> VIDEO FOUND -- REMOVING ERROR >>", video);
+            logger.debug(">> VIDEO FOUND -- REMOVING ERROR >>", video_record);
             video_record.error = undefined;
             video_record.transcode_details = {
               start_time,
               source_codec: `${video_record.probe.streams.find(f => f.code_type === "video")?.codec_name}_${video_record.probe.streams.find(f => f.code_type === "video")?.codec_name}`,
             }
-            await video.save();
+            await video_record.save();
           }
         })
         .on("progress", function (progress) {
