@@ -31,6 +31,10 @@ const schema = new Schema(
       type: Date,
       required: false,
     },
+    transcode_details: {
+      type: Object,
+      required: false
+    },
     sortFields: {
       type: Object,
       required: true,

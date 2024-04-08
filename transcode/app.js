@@ -12,6 +12,7 @@ import config from "./config.js";
 import { aspect_round } from "./base-config.js";
 import logger from "./lib/logger.js";
 import { createClient } from "redis";
+import { start } from "repl";
 
 const redisClient = createClient({url: "redis://torrent-redis-local"});
 
@@ -60,9 +61,17 @@ async function pre_sanitize() {
 
 async function upsert_video(video) {
   try {
-    let { path } = video;
+    let { path, _id } = video;
     path = path.replace(/\n+$/, "");
-    let file = await File.findOne({ path });
+    let file;
+
+    if(_id){
+      file = await File.findOne({ _id });
+    }
+
+    if(!file){
+      file = await File.findOne({ path });
+    }
 
     if (!file) {
       file = new File(video);
@@ -86,11 +95,12 @@ async function upsert_video(video) {
   }
 }
 
-async function probe_and_upsert(file) {
+async function probe_and_upsert(file, record_id, opts = {}) {
   file = file.replace(/\n+$/, "");
   const current_time = moment();
   const ffprobe_data = await ffprobe(file);
   await upsert_video({
+    _id: record_id,
     path: file,
     probe: ffprobe_data,
     encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
@@ -99,6 +109,7 @@ async function probe_and_upsert(file) {
       width: ffprobe_data.streams.find((s) => s.codec_type === "video")?.width,
       size: ffprobe_data.format.size,
     },
+    ...opts
   });
 
   return ffprobe_data;
@@ -462,16 +473,24 @@ function transcode(file) {
       let ffmpeg_cmd;
 
       let start_time;
+
+      // mongo record of the video
+      const video_record = await File.findOne({ path: file });
+
       cmd = cmd
         .on("start", async function (commandLine) {
           logger.debug("Spawned Ffmpeg with command: " + commandLine);
           start_time = moment();
           ffmpeg_cmd = commandLine;
-          const video = await File.findOne({ path: file });
+          
 
-          if (video) {
+          if (video_record) {
             logger.debug(">> VIDEO FOUND -- REMOVING ERROR >>", video);
-            video.error = undefined;
+            video_record.error = undefined;
+            video_record.transcode_details = {
+              start_time,
+              source_codec: `${video_record.probe.streams.find(f => f.code_type === "video")?.codec_name}_${video_record.probe.streams.find(f => f.code_type === "video")?.codec_name}`,
+            }
             await video.save();
           }
         })
@@ -550,11 +569,20 @@ function transcode(file) {
         .on("end", async function (stdout, stderr) {
           logger.info("Transcoding succeeded!");
 
+          // delete the original file
           await trash(file);
+
+          // move the transcoded file to the destination
           await exec_promise(
             `mv '${escape_file_path(scratch_file)}' '${escape_file_path(dest_file)}'`
           );
-          await probe_and_upsert(dest_file);
+          await probe_and_upsert(dest_file, video_record._id, {
+            transcode_details: {
+              start_time: video_record.transcode_details.start_time, 
+              end_time: moment(),
+              duration: moment().diff(video_record.transcode_details.start_time, "seconds"),
+            }
+          });
           resolve();
         })
         .on("error", async function (err, stdout, stderr) {
