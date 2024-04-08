@@ -488,7 +488,7 @@ function transcode(file) {
             logger.debug(">> VIDEO FOUND -- REMOVING ERROR >>", video_record);
             video_record.error = undefined;
             video_record.transcode_details = {
-              start_time,
+              start_time: start_time.toDate(),
               source_codec: `${video_record.probe.streams.find(f => f.code_type === "video")?.codec_name}_${video_record.probe.streams.find(f => f.code_type === "video")?.codec_name}`,
             }
             await video_record.save();
@@ -579,8 +579,8 @@ function transcode(file) {
           await probe_and_upsert(dest_file, video_record._id, {
             transcode_details: {
               start_time: video_record.transcode_details.start_time, 
-              end_time: moment(),
-              duration: moment().diff(video_record.transcode_details.start_time, "seconds"),
+              end_time: moment().toDate(),
+              duration: moment().diff(start_time, "seconds"),
             }
           });
           resolve();
