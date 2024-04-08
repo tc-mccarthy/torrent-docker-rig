@@ -118,7 +118,7 @@ async function generate_filelist() {
 
   // remove first item from the list and write the rest to a file
   fs.writeFileSync("./filelist.txt", filelist.slice(1).map(f => f.path).join("\n"));
-  fs.writeFileSync("./output/filelist.json", JSON.stringify(filelist.slice(1).map(f => ({
+  fs.writeFileSync("./output/filelist.json", JSON.stringify(filelist.slice(1, 1001).map(f => ({
     path: f.path.split(/\//).pop(), 
     size: f.sortFields.size,
     priority: f.sortFields.priority, 

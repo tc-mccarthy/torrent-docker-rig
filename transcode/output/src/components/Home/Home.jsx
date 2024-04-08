@@ -192,8 +192,13 @@ function Home () {
       </div>
 
       <div className="widget list">
-        <strong>Remaining files</strong>
         {!filelist?.map && <em>Loading...</em>}
+        <strong>
+          Next
+          {filelist.length.toLocaleString()}
+          {' '}
+          queued files files
+        </strong>
         <div className="overflow">
           {filelist?.map && (
             <table>
