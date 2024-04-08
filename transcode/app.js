@@ -272,6 +272,8 @@ function transcode(file) {
   return new Promise(async (resolve, reject) => {
     try {
       const { profiles } = config;
+      // mongo record of the video
+      const video_record = await File.findOne({ path: file });
       
       const ffprobe_data = await ffprobe(file);
       logger.debug(ffprobe_data, { label: "FFPROBE DATA >>" });
@@ -302,6 +304,15 @@ function transcode(file) {
 
       // if this file has already been encoded, short circuit
       if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
+        logger.info(
+          {
+            file,
+            encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
+          },
+          { label: "File already encoded" }
+        );
+        video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
+        await video_record.save();
         return resolve();
       }
 
@@ -481,9 +492,6 @@ function transcode(file) {
       let ffmpeg_cmd;
 
       let start_time;
-
-      // mongo record of the video
-      const video_record = await File.findOne({ path: file });
 
       cmd = cmd
         .on("start", async function (commandLine) {
