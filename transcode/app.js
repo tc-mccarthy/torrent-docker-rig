@@ -444,7 +444,7 @@ function transcode(file) {
         input_maps.push(`-map_chapters ${video_stream.index}`);
       }
 
-      let cmd = ffmpeg(file);
+      let cmd = ffmpeg(file).inputOptions('-hwaccel qsv');;
 
       cmd = cmd.outputOptions(input_maps);
 
@@ -663,6 +663,11 @@ function transcode(file) {
             {
               test: /invalid\s+data\s+found\s+when\s+processing\s+input/gi,
               message: "Invalid data found when processing input",
+              obj: stderr,
+            },
+            {
+              test: /could\s+not\s+open\s+encoder\s+before\s+eof/gi,
+              message: "Could not open encoder before End of File",
               obj: stderr,
             },
           ];
