@@ -683,6 +683,7 @@ function transcode(file) {
               label: "Source video is corrupt. Trashing",
             });
             await trash(file);
+            await File.deleteOne({ path: file });
           }
           resolve();
         });
