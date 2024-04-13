@@ -444,7 +444,8 @@ function transcode(file) {
         input_maps.push(`-map_chapters ${video_stream.index}`);
       }
 
-      let cmd = ffmpeg(file).inputOptions('-hwaccel qsv');;
+      let cmd = ffmpeg(file);
+      
 
       cmd = cmd.outputOptions(input_maps);
 
