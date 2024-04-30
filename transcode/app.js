@@ -441,7 +441,7 @@ function transcode(file) {
       }
 
       if (ffprobe_data.chapters.length > 0) {
-        input_maps.push(`-map_chapters ${video_stream.index}`);
+        input_maps.push(`-map_chapters 0`);
       }
 
       let cmd = ffmpeg(file);
@@ -496,7 +496,7 @@ function transcode(file) {
 
       cmd = cmd
         .on("start", async function (commandLine) {
-          logger.debug("Spawned Ffmpeg with command: " + commandLine);
+          logger.info("Spawned Ffmpeg with command: " + commandLine);
           start_time = moment();
           ffmpeg_cmd = commandLine;
           
