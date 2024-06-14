@@ -55,6 +55,7 @@ schema.index({ "probe.format.size": 1 });
 schema.index({ "sortFields.width": -1, "sortFields.size": 1 });
 schema.index({ "sortFields.priority": 1, "sortFields.width": -1, "sortFields.size": 1 });
 schema.index({ "sortFields.priority": 1, "sortFields.width": -1, "sortFields.size": -1 });
+schema.index({ "sortFields.priority": 1, "sortFields.size": -1, "sortFields.width": -1 });
 schema.index({ "sortFields.priority": 1 });
 schema.index({ "sortFields.size": 1 });
 schema.index({ "sortFields.width": -1 });

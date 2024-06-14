@@ -121,8 +121,8 @@ async function generate_filelist() {
     encode_version: { $ne: encode_version },
   }).sort({
     "sortFields.priority": 1,
-    "sortFields.width": -1,
     "sortFields.size": -1,
+    "sortFields.width": -1,
   });
 
   filelist = filelist.filter((f) => f.path);
