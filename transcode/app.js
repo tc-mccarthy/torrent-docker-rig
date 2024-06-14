@@ -274,12 +274,16 @@ function transcode(file) {
       const { profiles } = config;
       // mongo record of the video
       const video_record = await File.findOne({ path: file });
-      
+      const exists = fs.existsSync(file);
       const ffprobe_data = await ffprobe(file);
       logger.debug(ffprobe_data, { label: "FFPROBE DATA >>" });
       const video_stream = ffprobe_data.streams.find(
         (s) => s.codec_type === "video"
       );
+
+      if(!exists){
+        throw new Error("File not found");
+      }
 
       if (!video_stream) {
         throw new Error("No video stream found");
