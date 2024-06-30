@@ -144,7 +144,7 @@ async function generate_filelist() {
 
 async function update_queue() {
   // Get the list of files to be converted
-  const last_probe_cache_key = `last_probe_${encode_version}_a`;
+  const last_probe_cache_key = `last_probe_${encode_version}_b`;
 
   // get the last probe time from redis
   const last_probe = await redisClient.get(last_probe_cache_key) || "1969-12-31 23:59:59";
@@ -161,6 +161,7 @@ async function update_queue() {
     "gif",
     "mpg",
     "mp4",
+    "m2ts"
   ];
   const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(" ")} \\( ${file_ext
     .map((ext) => `-iname "*.${ext}"`)
