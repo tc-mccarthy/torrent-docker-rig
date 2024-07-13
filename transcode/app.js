@@ -676,6 +676,11 @@ function transcode(file) {
               message: "Could not open encoder before End of File",
               obj: stderr,
             },
+            {
+              test: /command\s+failed/gi,
+              message: "FFProbe command failed, video likely corrupt",
+              obj: stderr,
+            },
           ];
 
           const is_corrupt = corrupt_video_tests.find((t) =>
