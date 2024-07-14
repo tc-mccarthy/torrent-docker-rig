@@ -681,6 +681,11 @@ function transcode(file) {
               message: "FFProbe command failed, video likely corrupt",
               obj: stderr,
             },
+            {
+              test: /ffmpeg\s+was\s+killed\s+with\s+signal\s+SIGFPE/i,
+              message: "FFMpeg processing failed, video likely corrupt",
+              obj: stderr,
+            }
           ];
 
           const is_corrupt = corrupt_video_tests.find((t) =>
