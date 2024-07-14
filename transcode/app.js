@@ -697,7 +697,8 @@ function transcode(file) {
             logger.info(is_corrupt, {
               label: "Source video is corrupt. Trashing",
             });
-            await trash(file);
+            // don't await the delete in case the problem is a missing file
+            trash(file);
             await File.deleteOne({ path: file });
           }
           resolve();
