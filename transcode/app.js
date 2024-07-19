@@ -685,6 +685,11 @@ function transcode(file) {
               test: /ffmpeg\s+was\s+killed\s+with\s+signal\s+SIGFPE/i,
               message: "FFMpeg processing failed, video likely corrupt",
               obj: stderr,
+            },
+            {
+              test: /no\s+suitable/i,
+              message: "Video is an unsupported size",
+              obj: stderr
             }
           ];
 
