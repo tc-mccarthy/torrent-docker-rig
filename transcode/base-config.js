@@ -56,6 +56,16 @@ const config = {
     },
     {
       name: "sd",
+      width: 586,
+      height: 480,
+      aspect: 4 / 3,
+      bitrate: 3.5,
+      dest_width: 720,
+      crf: 50,
+      output: "av1",
+    },
+    {
+      name: "sd",
       width: 540,
       height: 360,
       aspect: 4 / 3,
