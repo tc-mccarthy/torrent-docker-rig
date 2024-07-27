@@ -98,7 +98,7 @@ const config = {
       name: "sd",
       width: 480,
       height: 320,
-      aspect: 4 / 3,
+      aspect: 480/320,
       bitrate: 3.5,
       dest_width: 720,
       crf: 50,
