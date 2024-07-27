@@ -43,7 +43,7 @@ const config = {
       aspect: 16 / 9,
       bitrate: 7,
       crf: 35,
-      output: "av1",
+      output: "av1"
     },
     {
       name: "sd",
@@ -53,56 +53,7 @@ const config = {
       bitrate: 3.5,
       crf: 50,
       output: "av1",
-    },
-    {
-      name: "sd",
-      width: 586,
-      height: 480,
-      aspect: 586 / 480,
-      bitrate: 3.5,
-      dest_width: 720,
-      crf: 50,
-      output: "av1",
-    },
-    {
-      name: "sd",
-      width: 540,
-      height: 360,
-      aspect: 4 / 3,
-      bitrate: 3.5,
-      dest_width: 720,
-      crf: 50,
-      output: "av1",
-    },
-    {
-      name: "sd",
-      width: 405,
-      height: 270,
-      aspect: 4 / 3,
-      bitrate: 3.5,
-      dest_width: 720,
-      crf: 50,
-      output: "av1",
-    },
-    {
-      name: "sd",
-      width: 352,
-      height: 264,
-      aspect: 4 / 3,
-      bitrate: 3.5,
-      dest_width: 720,
-      crf: 50,
-      output: "av1",
-    },
-    {
-      name: "sd",
-      width: 480,
-      height: 318,
-      aspect: 480 / 318,
-      bitrate: 3.5,
-      dest_width: 720,
-      crf: 50,
-      output: "av1",
+      default: true
     },
     {
       name: "vertical",
@@ -152,20 +103,18 @@ const config = {
         (video_stream.width + 50 >= x.width) && Math.abs(video_stream.aspect) >= x.aspect
     );
 
-    if (conversion_profile) {
-      conversion_profile = copy(conversion_profile);
-      conversion_profile.output.video.bitrate = conversion_profile.bitrate;
-      conversion_profile.output.video.flags.crf = conversion_profile.crf;
-      conversion_profile.output.video.addFlags = function (flags) {
-        Object.assign(conversion_profile.output.video.flags, flags);
-      };
-      return conversion_profile;
+    if(!conversion_profile) {
+      conversion_profile = config.profiles.find(p => p.default);
     }
 
-    throw new Error(
-      "No suitable conversion profile could be found for this video stream"
-    );
-  },
+    conversion_profile = copy(conversion_profile);
+    conversion_profile.output.video.bitrate = conversion_profile.bitrate;
+    conversion_profile.output.video.flags.crf = conversion_profile.crf;
+    conversion_profile.output.video.addFlags = function (flags) {
+      Object.assign(conversion_profile.output.video.flags, flags);
+    };
+    return conversion_profile;    
+  }
 };
 
 config.build_profiles(config);
