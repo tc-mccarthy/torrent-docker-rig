@@ -165,8 +165,11 @@ async function update_queue() {
     
     const current_time = dayjs();
 
-    // calculate the number of seconds until midnight
-    const seconds_until_midnight = dayjs().diff(dayjs().endOf("day"), "seconds");
+    // get seconds until midnight
+    const seconds_until_midnight =
+      86400 - current_time.diff(current_time.endOf("day"), "seconds");
+
+    console.log("Seconds until midnight", seconds_until_midnight);
 
     const file_ext = [
       "avi",
@@ -559,7 +562,7 @@ function transcode(file) {
         })
         .on("progress", function (progress) {
           const elapsed = dayjs().diff(start_time, "seconds");
-          const run_time = moment.utc(elapsed * 1000).format("HH:mm:ss");
+          const run_time = dayjs.utc(elapsed * 1000).format("HH:mm:ss");
           const pct_per_second = progress.percent / elapsed;
           const seconds_pct = 1 / pct_per_second;
           const pct_remaining = 100 - progress.percent;
