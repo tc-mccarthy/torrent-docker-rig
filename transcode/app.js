@@ -321,12 +321,13 @@ function transcode(file) {
         return resolve();
       }
 
-      //get the audio stream, in english, with the highest channel count
+      //get the audio stream, in english unless otherwise specified, with the highest channel count
+      const audio_stream_test = new RegExp(video_record.audio_language || "und|eng", "i"); // if the record has an audio language specified on it, honor that
       const audio_stream = ffprobe_data.streams
         .filter(
           (s) =>
             s.codec_type === "audio" &&
-            (!s.tags?.language || /und|eng/i.test(s.tags.language))
+            (!s.tags?.language || audio_stream_test.test(s.tags.language))
         )
         .sort((a, b) => (a.channels > b.channels ? -1 : 1))[0];
 
