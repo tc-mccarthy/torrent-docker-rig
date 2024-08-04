@@ -420,7 +420,7 @@ function transcode(file) {
           `-b:a:1 ${2 * conversion_profile.output.audio.per_channel_bitrate}k`,
           "-ac:a:1 2",
           "-metadata:s:a:1 title=Stereo",
-          "-metadata:s:a:1 language=eng",
+          `-metadata:s:a:1 language=${audio_stream.tags?.language || "eng"}`,
         ]);
 
         if (audio_stream.channels === 6) {
