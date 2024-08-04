@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './Home.scss';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
-import moment from 'moment';
+import dayjs from '../../dayjs';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
 // import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 
@@ -40,10 +40,10 @@ async function getData (setData, setFileList, setDisks, setUtilization, setStatu
 }
 
 function estimated_local_time (seconds) {
-  const final_time = moment().add(seconds, 'seconds');
+  const final_time = dayjs().add(seconds, 'seconds');
   let fmt_string = 'MM/DD/YYYY HH:mm:ss';
 
-  if (final_time.isSame(moment(), 'day')) {
+  if (final_time.isSame(dayjs(), 'day')) {
     fmt_string = 'HH:mm:ss';
   }
   return final_time.format(fmt_string);

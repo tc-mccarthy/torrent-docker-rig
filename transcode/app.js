@@ -2,7 +2,7 @@ import { exec } from "child_process";
 import async from "async";
 import ffmpeg from "fluent-ffmpeg";
 import * as fs from "fs";
-import moment from "moment";
+import dayjs from "./lib/dayjs.js";
 import File from "./models/files.js";
 import Cleanup from "./models/cleanup.js";
 import ErrorLog from "./models/error.js";
@@ -12,7 +12,6 @@ import config from "./config.js";
 import { aspect_round } from "./base-config.js";
 import logger from "./lib/logger.js";
 import { createClient } from "redis";
-import { start } from "repl";
 
 const redisClient = createClient({ url: "redis://torrent-redis-local" });
 
@@ -96,7 +95,7 @@ async function upsert_video(video) {
 
 async function probe_and_upsert(file, record_id, opts = {}) {
   file = file.replace(/\n+$/, "");
-  const current_time = moment();
+  const current_time = dayjs();
   const ffprobe_data = await ffprobe(file);
   await upsert_video({
     record_id,
@@ -163,7 +162,11 @@ async function update_queue() {
     // get the last probe time from redis
     const last_probe =
       (await redisClient.get(last_probe_cache_key)) || "1969-12-31 23:59:59";
-    const current_time = moment();
+    
+    const current_time = dayjs();
+
+    // calculate the number of seconds until midnight
+    const seconds_until_midnight = dayjs().diff(dayjs().endOf("day"), "seconds");
 
     const file_ext = [
       "avi",
@@ -249,9 +252,11 @@ async function update_queue() {
     });
 
     logger.info("", { label: "PROBE COMPLETE. UPDATING REDIS..." });
+
     await redisClient.set(
       last_probe_cache_key,
-      current_time.format("MM/DD/YYYY HH:mm:ss")
+      current_time.format("MM/DD/YYYY HH:mm:ss"),
+      { EX: seconds_until_midnight }
     );
 
     logger.info("", { label: "REDIS UPDATED" });
@@ -533,7 +538,7 @@ function transcode(file) {
       cmd = cmd
         .on("start", async function (commandLine) {
           logger.info("Spawned Ffmpeg with command: " + commandLine);
-          start_time = moment();
+          start_time = dayjs();
           ffmpeg_cmd = commandLine;
 
           if (video_record) {
@@ -553,7 +558,7 @@ function transcode(file) {
           }
         })
         .on("progress", function (progress) {
-          const elapsed = moment().diff(start_time, "seconds");
+          const elapsed = dayjs().diff(start_time, "seconds");
           const run_time = moment.utc(elapsed * 1000).format("HH:mm:ss");
           const pct_per_second = progress.percent / elapsed;
           const seconds_pct = 1 / pct_per_second;
@@ -642,8 +647,8 @@ function transcode(file) {
           await probe_and_upsert(dest_file, video_record._id, {
             transcode_details: {
               ...video_record.transcode_details,
-              end_time: moment().toDate(),
-              duration: moment().diff(start_time, "seconds"),
+              end_time: dayjs().toDate(),
+              duration: dayjs().diff(start_time, "seconds"),
             },
           });
           resolve();
