@@ -188,7 +188,7 @@ async function update_queue() {
       .map((ext) => `-iname "*.${ext}"`)
       .join(
         " -o "
-      )} \\) -not \\( -iname "*.tc.mkv" \\) -newermt "${last_probe}" -print0 | sort -z | xargs -0`;
+      )} \\) -not \\( -iname "*.tc.mkv" \\) -newermt "${dayjs(last_probe).subtract(30, 'minutes').format("MM/DD/YYYY HH:mm:ss")}" -print0 | sort -z | xargs -0`;
 
     logger.info(findCMD, { label: "FIND COMMAND" });
 
