@@ -39,6 +39,10 @@ const schema = new Schema(
       type: Object,
       required: true,
     },
+    audio_language: {
+      type: String,
+      required: false,
+    },
     error: {
       type: Object,
       required: false,
