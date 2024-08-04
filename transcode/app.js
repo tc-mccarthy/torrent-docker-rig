@@ -567,7 +567,7 @@ function transcode(file) {
           const seconds_pct = 1 / pct_per_second;
           const pct_remaining = 100 - progress.percent;
           const est_completed_seconds = pct_remaining * seconds_pct;
-          const time_remaining = moment
+          const time_remaining = dayjs
             .utc(est_completed_seconds * 1000)
             .format("HH:mm:ss");
           const estimated_final_kb =
