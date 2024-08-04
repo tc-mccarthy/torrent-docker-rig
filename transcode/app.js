@@ -688,8 +688,8 @@ function transcode(file) {
               obj: stderr,
             },
             {
-              test: /no\s+suitable/i,
-              message: "Video is an unsupported size",
+              test: /[-]22/i,
+              message: "Unrecoverable Errors were found in the source",
               obj: stderr
             }
           ];
