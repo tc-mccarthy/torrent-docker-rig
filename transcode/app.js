@@ -167,7 +167,7 @@ async function update_queue() {
 
     // get seconds until midnight
     const seconds_until_midnight =
-      86400 - current_time.diff(current_time.endOf("day"), "seconds");
+      86400 - current_time.diff(current_time.endOf("day"), "seconds") - 60;
 
     console.log("Seconds until midnight", seconds_until_midnight);
 
@@ -263,17 +263,8 @@ async function update_queue() {
     );
 
     logger.info("", { label: "REDIS UPDATED" });
-
-    // run every 2 minutes
-    setTimeout(() => {
-      update_queue();
-    }, 2 * 60 * 1000);
   } catch (e) {
     logger.error(e, { label: "UPDATE QUEUE ERROR" });
-    // run every 2 minutes
-    setTimeout(() => {
-      update_queue();
-    }, 2 * 60 * 1000);
   }
 }
 
@@ -927,6 +918,10 @@ mongo_connect()
 
     cron.schedule("0 */3 * * *", () => {
       db_cleanup();
+    });
+
+    cron.schedule("*/5 * * * *", () => {
+      update_queue();
     });
   })
   .catch((e) => {
