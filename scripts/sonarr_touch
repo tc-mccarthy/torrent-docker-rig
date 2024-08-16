@@ -1,2 +1,3 @@
 #!/bin/bash
 touch "$sonarr_moviefile_path"
+exit 0
