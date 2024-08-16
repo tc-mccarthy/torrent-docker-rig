@@ -1,0 +1,3 @@
+#!/bin/bash
+touch "$radarr_moviefile_path"
+exit 0

@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import './Home.scss';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
-import moment from 'moment';
+import dayjs from '../../dayjs';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
-import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
+// import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 
-async function getData (setData, setFileList, setDisks, setUtilization) {
+async function getData (setData, setFileList, setDisks, setUtilization, setStatus) {
   try {
+    clearTimeout(window.dataTimeout);
     const d = await fetch('active.json').then((r) => r.json());
 
     setData(d);
@@ -24,21 +25,25 @@ async function getData (setData, setFileList, setDisks, setUtilization) {
 
     setUtilization(utilization);
 
-    setTimeout(() => {
-      getData(setData, setFileList, setDisks, setUtilization);
+    const status = await fetch('status.json').then((r) => r.json());
+
+    setStatus(status);
+
+    window.dataTimeout = setTimeout(() => {
+      getData(...arguments);
     }, 1 * 1000);
   } catch (e) {
-    setTimeout(() => {
-      getData(setData, setFileList);
+    window.dataTimeout = setTimeout(() => {
+      getData(...arguments);
     }, 1 * 1000);
   }
 }
 
 function estimated_local_time (seconds) {
-  const final_time = moment().add(seconds, 'seconds');
+  const final_time = dayjs().add(seconds, 'seconds');
   let fmt_string = 'MM/DD/YYYY HH:mm:ss';
 
-  if (final_time.isSame(moment(), 'day')) {
+  if (final_time.isSame(dayjs(), 'day')) {
     fmt_string = 'HH:mm:ss';
   }
   return final_time.format(fmt_string);
@@ -52,22 +57,37 @@ function human_size (size) {
   return rounded_size + output_size;
 }
 
+function make_human_readable (size) {
+  let calc_size = +size;
+  const units = ['kb', 'mb', 'gb'];
+  let unit = 0;
+
+  while (calc_size > 1024) {
+    calc_size /= 1024;
+    unit += 1;
+  }
+
+  return `${Math.round(calc_size * 100) / 100}${units[unit]}`;
+}
+
 function Home () {
   const [data, setData] = useState(false);
-  const [filelist, setFileList] = useState(false);
+  const [filelist, setFileList] = useState([]);
   const [disks, setDisks] = useState(false);
   const [utilization, setUtilization] = useState(false);
+  const [status, setStatus] = useState(false);
 
-  if (!data) {
-    getData(setData, setFileList, setDisks, setUtilization);
+  const mvp = [data, filelist, disks, utilization, status].filter((d) => !d);
+
+  // interface waits for all data to be loaded
+  if (mvp.length > 0) {
+    getData(setData, setFileList, setDisks, setUtilization, setStatus);
     return (
       <Box sx={{ display: 'flex' }}>
         <CircularProgress />
       </Box>
     );
   }
-
-  const [numerator, denominator] = data.overall_progress.replace(/[()]/g, '').split('/');
 
   return (
     <div className="container image">
@@ -118,12 +138,19 @@ function Home () {
       </div>
       <div className="flex">
         <div className="widget">
-          <strong>Overall Progress</strong>
-          <CircularProgressWithLabel numerator={numerator} denominator={denominator} />
+          <strong>Files Remaining</strong>
+          {status.unprocessed_files.toLocaleString()}
+          {/* <CircularProgressWithLabel numerator={numerator} denominator={denominator} /> */}
         </div>
         <div className="widget">
           <strong>File Progress</strong>
           <LinearProgressWithLabel value={data.output.percent} />
+        </div>
+      </div>
+      <div className="flex">
+        <div className="widget">
+          <strong>Library Coverage</strong>
+          <LinearProgressWithLabel value={Math.round(status.library_coverage)} />
         </div>
       </div>
 
@@ -165,15 +192,39 @@ function Home () {
       </div>
 
       <div className="widget list">
-        <strong>Remaining files</strong>
         {!filelist?.map && <em>Loading...</em>}
-        {filelist?.map && (
-          <ol>
-            {filelist.map((f) => (
-              <li>{f}</li>
-            ))}
-          </ol>
-        )}
+        <strong>
+          Next
+          {filelist.length.toLocaleString()}
+          {' '}
+          queued files
+        </strong>
+        <div className="overflow">
+          {filelist?.map && (
+            <table>
+              <tr>
+                <th>#</th>
+                <th>Priority</th>
+                <th>Path</th>
+                <th>Size</th>
+                <th>Resolution</th>
+                <th>Codec</th>
+                <th>Encode version</th>
+              </tr>
+              {filelist.map((f, idx) => (
+                <tr>
+                  <td>{idx + 1}</td>
+                  <td>{f.priority}</td>
+                  <td>{f.path}</td>
+                  <td>{make_human_readable(f.size)}</td>
+                  <td>{f.resolution}</td>
+                  <td>{f.codec}</td>
+                  <td>{f.encode_version}</td>
+                </tr>
+              ))}
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );

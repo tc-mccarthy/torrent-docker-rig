@@ -136,14 +136,15 @@ figcaption {
   margin-bottom: 10px;
   text-align: center;
 
+  .overflow {
+    overflow-x: auto;
+  }
+
   &.center {
     margin: 0 auto 10px;
   }
 
   &.list {
-    max-height: 100vh;
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
     ol,
     ul {
       text-align: left;
@@ -160,6 +161,18 @@ figcaption {
 
   em {
     font-size: 0.9rem;
+  }
+
+  table {
+    border-collapse: collapse;
+    tr {
+      td {
+        padding: 5px;
+      }
+      &:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+    }
   }
 }
 /*********************************************************************

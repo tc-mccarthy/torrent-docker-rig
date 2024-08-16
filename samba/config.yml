@@ -1,0 +1,16 @@
+auth:
+  - user: ${SAMBA_USER}
+    password: ${SAMBA_PASSWORD}
+    group: ${SAMBA_GROUP}
+    uid: 1000
+    gid: 1000
+
+share:
+  - name: visionshare
+    comment: Public
+    path: /samba/public
+    browsable: yes
+    readonly: no
+    guestok: yes
+    veto: no
+    recycle: yes

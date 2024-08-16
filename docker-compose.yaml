@@ -138,6 +138,8 @@ services:
     container_name: transcode
     build:
       context: ./transcode
+    devices:
+      - "/dev/dri:/dev/dri" # GPU passthrough for hardware transcoding (intel quicksync)
     environment:
       - TZ
       - TRANSCODE_PATHS
@@ -148,16 +150,21 @@ services:
       - ./transcode:/usr/app
       - /usr/app/node_modules
     restart: unless-stopped
+    depends_on:
+      - redis
+      - mongo
     deploy:
       resources:
         limits:
-          cpus: "16" # 12 cores
-          memory: 56G # 28GB
+          cpus: 16 # 16 cores
+          memory: 56G # 56GB
 
   plex:
     container_name: plex
     image: lscr.io/linuxserver/plex:latest
     network_mode: host
+    devices:
+      - "/dev/dri:/dev/dri" # GPU passthrough for hardware transcoding (intel quicksync)
     environment:
       - TZ
       - PUID=1000
@@ -343,6 +350,31 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  redis:
+    container_name: torrent-redis-local
+    image: redis:latest
+    hostname: torrent-redis-local
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    restart: always
+    entrypoint: redis-server --appendonly yes
+    
+  samba:
+    container_name: samba
+    image: crazymax/samba:latest
+    network_mode: host
+    environment:
+      - TZ
+      - SAMBA_USER
+      - SAMBA_PASSWORD
+      - SAMBA_GROUP
+    volumes:
+      - ${SAMBA_STORAGE}:/samba/public # path to my volumes for download storage
+      - ./samba:/data
+    restart: always
+
   usenet:
     image: linuxserver/sabnzbd
     container_name: usenet
@@ -371,6 +403,7 @@ services:
 volumes:
   mongo_db:
   portainer_db:
+  redis_data:
 
 networks:
   default:
