@@ -1,3 +1,5 @@
 #!/bin/bash
-touch "$radarr_moviefile_path"
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+echo "Radarr Movie File Path: $radarr_moviefile_path" >> $DIR/radarr_touch.log
+touch -c "$radarr_moviefile_path" >> $DIR/radarr_touch.log
 exit 0
