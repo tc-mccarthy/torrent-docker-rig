@@ -1,3 +1,5 @@
 #!/bin/bash
-touch "$sonarr_moviefile_path"
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+echo "Sonarr Movie File Path: $sonarr_moviefile_path" >> $DIR/sonarr_touch.log
+touch -c "$sonarr_moviefile_path" >> $DIR/sonarr_touch.log
 exit 0

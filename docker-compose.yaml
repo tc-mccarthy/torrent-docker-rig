@@ -281,6 +281,37 @@ services:
       sonarr: # wait for download client to start before starting
         condition: service_healthy
 
+  overseerr:
+    container_name: overseerr
+    image: lscr.io/linuxserver/overseerr:latest
+    network_mode: service:vpn # all traffic goes through vpn
+    environment:
+      - TZ
+      - PUID=1000
+      - PGID=1000
+      - SERVICE_NAME=${OVERSEERR_SERVICE_NAME}
+      - SERVICE_PORT=${OVERSEERR_SERVICE_PORT}
+    volumes:
+      - ${OVERSEERR_STORAGE}:${OVERSEERR_STORAGE} # path to my volumes for download storage
+      - ./overseerr:/config
+      - ./scripts:/scripts # health check script and more
+    healthcheck:
+      test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      interval: 10s
+      retries: 3
+      timeout: 5s
+      start_period: 10s
+    restart: unless-stopped
+    labels:
+      - "autoheal=true" # include in autoheal check
+    depends_on:
+      vpn: # wait for vpn to start before starting
+        condition: service_healthy
+      radarr: # wait for index service to start before starting
+        condition: service_healthy
+      sonarr: # wait for download client to start before starting
+        condition: service_healthy
+
   prowlarr:
     container_name: prowlarr
     image: lscr.io/linuxserver/prowlarr:latest
