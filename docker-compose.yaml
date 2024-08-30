@@ -22,6 +22,7 @@ services:
       - 9443:9443 ## portainer
       - 6767:6767 ## bazarr
       - 8090:8080 ## usenet
+      - 5055:5055 ## overseerr
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1 # Recommended if using ipv4 only
       - net.ipv4.conf.all.rp_filter=2
