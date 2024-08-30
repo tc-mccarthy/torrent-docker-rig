@@ -106,6 +106,7 @@ async function probe_and_upsert(file, record_id, opts = {}) {
     sortFields: {
       width: ffprobe_data.streams.find((s) => s.codec_type === "video")?.width,
       size: ffprobe_data.format.size,
+      bitrate: ffprobe_data.format.bit_rate,
     },
     ...opts,
   });
@@ -119,6 +120,7 @@ async function generate_filelist() {
     encode_version: { $ne: encode_version },
   }).sort({
     "sortFields.priority": 1,
+    "sortFields.bitrate": -1,
     "sortFields.size": -1,
     "sortFields.width": -1,
   });
@@ -157,7 +159,7 @@ async function generate_filelist() {
 async function update_queue() {
   try {
     // Get the list of files to be converted
-    const last_probe_cache_key = `last_probe_${encode_version}_c`;
+    const last_probe_cache_key = `last_probe_${encode_version}_d`;
 
     // get the last probe time from redis
     const last_probe =
@@ -167,7 +169,7 @@ async function update_queue() {
 
     // get seconds until midnight
     const seconds_until_midnight =
-      86400 - current_time.diff(current_time.endOf("day"), "seconds") - 60;
+      86400 - current_time.diff(current_time.endOf("day"), "seconds") - 90;
 
     console.log("Seconds until midnight", seconds_until_midnight);
 
