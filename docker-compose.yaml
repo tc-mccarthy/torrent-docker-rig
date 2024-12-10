@@ -23,6 +23,7 @@ services:
       - 6767:6767 ## bazarr
       - 8090:8080 ## usenet
       - 5055:5055 ## overseerr
+      - 8181:8181 ## duplicati
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1 # Recommended if using ipv4 only
       - net.ipv4.conf.all.rp_filter=2
@@ -341,6 +342,23 @@ services:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
       torrent: # wait for vpn to start before starting
+        condition: service_healthy
+
+  tautulli:
+    container_name: tautulli
+    image: lscr.io/linuxserver/tautulli:latest
+    network_mode: service:vpn # all traffic goes through vpn
+    environment:
+      - TZ
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ./tautulli/config:/config
+    restart: unless-stopped
+    labels:
+      - "autoheal=true" # include in autoheal check
+    depends_on:
+      plex: # wait for vpn to start before starting
         condition: service_healthy
 
   tmm:
