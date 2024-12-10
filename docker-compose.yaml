@@ -355,11 +355,6 @@ services:
     volumes:
       - ./tautulli/config:/config
     restart: unless-stopped
-    labels:
-      - "autoheal=true" # include in autoheal check
-    depends_on:
-      plex: # wait for vpn to start before starting
-        condition: service_healthy
 
   tmm:
     container_name: tinymediamanager
