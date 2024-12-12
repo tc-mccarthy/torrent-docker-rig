@@ -1,6 +1,6 @@
 # HTTP catchall server
 server {
-  listen 80 default_server;
+  listen ${NGINX_PORT} default_server;
   server_name _;
   return 301 https://$host$request_uri;
 }
@@ -12,7 +12,7 @@ server {
   server_name ${TORRENT_SSL_HOST};
   
   resolver_timeout 5s;
-  listen ${NGINX_PORT} ssl;
+  listen ${NGINX_PORT_SSL} ssl;
 
   client_max_body_size 10M;
 

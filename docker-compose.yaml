@@ -87,8 +87,10 @@ services:
       - ./transcode/output:/public/transcode
     ports:
       - "8080:80"
+      - "8443:443"
     environment:
       - NGINX_PORT=80
+      - NGINX_PORT_SSL=443
       - WEBUI_PORT=${QBIT_WEB_UI_PORT}
       - TORRENT_SSL_HOST
       - OVERSEERR_SSL_HOST
