@@ -107,7 +107,7 @@ services:
     command: >-
       certonly --dns-cloudflare
       --dns-cloudflare-credentials /root/cloudflare.ini
-      --dns-cloudflare-propagation-seconds 15
+      --dns-cloudflare-propagation-seconds 30
       --email ${CLOUDFLARE_EMAIL}
       --agree-tos --no-eff-email
       --force-renewal
