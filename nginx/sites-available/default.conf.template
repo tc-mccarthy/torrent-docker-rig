@@ -12,7 +12,7 @@ server {
   server_name ${TORRENT_SSL_HOST};
   
   resolver_timeout 5s;
-  listen ${NGINX_PORT_SSL} ssl;
+  listen ${NGINX_PORT_SSL};
 
   client_max_body_size 10M;
 
