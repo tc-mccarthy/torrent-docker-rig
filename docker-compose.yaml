@@ -115,7 +115,7 @@ services:
       -d ${OVERSEERR_SSL_HOST}
 
   ddns_torrent:
-    container_name: ddns
+    container_name: ddns_torrent
     restart: unless-stopped
     image: oznu/cloudflare-ddns
     environment:
@@ -124,7 +124,7 @@ services:
       - SUBDOMAIN=${TORRENT_DDNS_SUBDOMAIN}
   
   ddns_overseerr:
-    container_name: ddns
+    container_name: ddns_overseerr
     restart: unless-stopped
     image: oznu/cloudflare-ddns
     environment:
