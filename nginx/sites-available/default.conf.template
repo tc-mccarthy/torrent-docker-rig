@@ -1,22 +1,24 @@
+# RSA certificate
+ssl_certificate /ssl/live/${TORRENT_SSL_HOST}/fullchain.pem; 
+ssl_certificate_key /ssl/live/${TORRENT_SSL_HOST}/privkey.pem; 
+
+# HTTP catchall server
+server {
+  listen ${NGINX_PORT};
+  server_name _;
+  return 301 https://$host$request_uri;
+}
+
+# Default server configuration
 server {
   resolver 127.0.0.11 valid=10s; 
   
+  server_name ${TORRENT_SSL_HOST};
+  
   resolver_timeout 5s;
-  listen ${NGINX_PORT} ssl;
+  listen ${NGINX_PORT_SSL} ssl;
 
   client_max_body_size 10M;
-
-  # RSA certificate
-  ssl_certificate /ssl/live/${SSL_HOST}/fullchain.pem; 
-  ssl_certificate_key /ssl/live/${SSL_HOST}/privkey.pem; 
-
-  # HTTP requests redirected to https on same port
-  error_page 497 =307 https://$http_host$request_uri;
-
-  location / {
-    add_header Content-Type text/plain;
-    return 200 'gangnam style!';
-  }
 
   location /qbt/ {
     proxy_pass         http://vpn:8088/;
