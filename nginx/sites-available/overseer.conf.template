@@ -1,0 +1,29 @@
+server {
+  resolver 127.0.0.11 valid=10s; 
+  
+  server_name ${OVERSEERR_SSL_HOST};
+  
+  resolver_timeout 5s;
+  listen ${NGINX_PORT} ssl;
+
+  client_max_body_size 10M;
+
+  # RSA certificate
+  ssl_certificate /ssl/live/${OVERSEERR_SSL_HOST}/fullchain.pem; 
+  ssl_certificate_key /ssl/live/${OVERSEERR_SSL_HOST}/privkey.pem; 
+
+  proxy_set_header Referer $http_referer;
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Real-Port $remote_port;
+  proxy_set_header X-Forwarded-Host $host:$remote_port;
+  proxy_set_header X-Forwarded-Server $host;
+  proxy_set_header X-Forwarded-Port $remote_port;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Forwarded-Ssl on;
+
+  location / {
+    proxy_pass http://vpn:5055;
+  }
+}

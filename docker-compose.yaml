@@ -23,7 +23,7 @@ services:
       - 6767:6767 ## bazarr
       - 8090:8080 ## usenet
       - 5055:5055 ## overseerr
-      - 8181:8181 ## duplicati
+      - 8181:8181 ## tautulli
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1 # Recommended if using ipv4 only
       - net.ipv4.conf.all.rp_filter=2
@@ -90,7 +90,8 @@ services:
     environment:
       - NGINX_PORT=80
       - WEBUI_PORT=${QBIT_WEB_UI_PORT}
-      - SSL_HOST=${TORRENT_SSL_HOST}
+      - TORRENT_SSL_HOST
+      - OVERSEERR_SSL_HOST
     depends_on:
       - torrent
     networks:
@@ -111,15 +112,25 @@ services:
       --agree-tos --no-eff-email
       --force-renewal
       -d ${TORRENT_SSL_HOST}
+      -d ${OVERSEERR_SSL_HOST}
 
-  ddns:
+  ddns_torrent:
     container_name: ddns
     restart: unless-stopped
     image: oznu/cloudflare-ddns
     environment:
       - API_KEY=${CLOUDFLARE_API_KEY}
       - ZONE=${DDNS_ZONE}
-      - SUBDOMAIN=${DDNS_SUBDOMAIN}
+      - SUBDOMAIN=${TORRENT_DDNS_SUBDOMAIN}
+  
+  ddns_overseerr:
+    container_name: ddns
+    restart: unless-stopped
+    image: oznu/cloudflare-ddns
+    environment:
+      - API_KEY=${CLOUDFLARE_API_KEY}
+      - ZONE=${DDNS_ZONE}
+      - SUBDOMAIN=${OVERSEERR_DDNS_SUBDOMAIN}
 
   duplicati:
     image: lscr.io/linuxserver/duplicati:latest
