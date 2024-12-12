@@ -4,13 +4,9 @@ server {
   server_name ${OVERSEERR_SSL_HOST};
   
   resolver_timeout 5s;
-  listen ${NGINX_PORT} ssl;
+  listen ${NGINX_PORT_SSL} ssl;
 
   client_max_body_size 10M;
-
-  # RSA certificate
-  ssl_certificate /ssl/live/${TORRENT_SSL_HOST}/fullchain.pem; 
-  ssl_certificate_key /ssl/live/${TORRENT_SSL_HOST}/privkey.pem; 
 
   proxy_set_header Referer $http_referer;
   proxy_set_header Host $host;
