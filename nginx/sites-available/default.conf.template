@@ -1,6 +1,6 @@
 # HTTP catchall server
 server {
-  listen ${NGINX_PORT} default_server;
+  listen ${NGINX_PORT};
   server_name _;
   return 301 https://$host$request_uri;
 }
