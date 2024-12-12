@@ -1,3 +1,7 @@
+# RSA certificate
+ssl_certificate /ssl/live/${TORRENT_SSL_HOST}/fullchain.pem; 
+ssl_certificate_key /ssl/live/${TORRENT_SSL_HOST}/privkey.pem; 
+
 # HTTP catchall server
 server {
   listen ${NGINX_PORT};
@@ -12,16 +16,9 @@ server {
   server_name ${TORRENT_SSL_HOST};
   
   resolver_timeout 5s;
-  listen ${NGINX_PORT_SSL};
+  listen ${NGINX_PORT_SSL} ssl;
 
   client_max_body_size 10M;
-
-  # RSA certificate
-  ssl_certificate /ssl/live/${TORRENT_SSL_HOST}/fullchain.pem; 
-  ssl_certificate_key /ssl/live/${TORRENT_SSL_HOST}/privkey.pem; 
-
-  # HTTP requests redirected to https on same port
-  error_page 497 =307 https://$http_host$request_uri;
 
   location / {
     add_header Content-Type text/plain;
