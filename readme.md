@@ -27,6 +27,7 @@ This docker stack has all of the pieces for setting up and maintaining a home gr
 - [![Prowlarr][prowlarr]][prowlarr-url]
 - [![tinyMediaManager][tinymediamanager]][tinymediamanager-url]
 
+
 ### Included services
 
 - A NordLynx container serving as the gateway to the web. It's server selection is configurable via docker-compose
