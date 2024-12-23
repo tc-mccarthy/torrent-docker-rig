@@ -462,7 +462,7 @@ services:
   monitoring:
     image: nicolargo/glances:latest-full
     pid: host
-    container_name: duplicati
+    container_name: monitoring
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
