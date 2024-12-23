@@ -94,6 +94,7 @@ services:
       - WEBUI_PORT=${QBIT_WEB_UI_PORT}
       - TORRENT_SSL_HOST
       - OVERSEERR_SSL_HOST
+      - BACKUP_SSL_HOST
     depends_on:
       - torrent
     networks:
