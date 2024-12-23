@@ -461,12 +461,17 @@ services:
 
   monitoring:
     image: nicolargo/glances:latest-full
-    pid: host
     container_name: monitoring
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      - "GLANCES_OPT=-w"
+      - PUID=1000
+      - PGID=1000
+      - TZ
+      - GLANCES_OPT=-w
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock      
+    ports:
+      - 61208:61208
+    restart: unless-stopped
 volumes:
   mongo_db:
   portainer_db:
