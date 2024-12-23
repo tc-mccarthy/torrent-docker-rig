@@ -1,50 +1,63 @@
 # RSA certificate
-ssl_certificate /ssl/live/${TORRENT_SSL_HOST}/fullchain.pem; 
-ssl_certificate_key /ssl/live/${TORRENT_SSL_HOST}/privkey.pem; 
+ssl_certificate /ssl/live/$ {
+  TORRENT_SSL_HOS
+}
+/fullchain.pem;
+ssl_certificate_key /ssl/live/$ {
+  TORRENT_SSL_HOS
+}
+/privkey.pem;
 
 # HTTP catchall server
 server {
-  listen ${NGINX_PORT};
+  listen $ {
+    NGINX_POR
+  }
+  ;
   server_name _;
   return 301 https://$host$request_uri;
 }
 
 # Default server configuration
 server {
-  resolver 127.0.0.11 valid=10s; 
-  
-  server_name ${TORRENT_SSL_HOST};
-  
+  resolver 127.0.0.11 valid=10s;
+
+  server_name $ {
+    TORRENT_SSL_HOS
+  }
+  ;
+
   resolver_timeout 5s;
-  listen ${NGINX_PORT_SSL} ssl;
+  listen $ {
+    NGINX_PORT_SS
+  }
+  ssl;
 
   client_max_body_size 10M;
 
   location /qbt/ {
-    proxy_pass         http://vpn:8088/;
+    proxy_pass http://vpn:8088/;
     proxy_http_version 1.1;
 
-    proxy_set_header   Host               vpn:8088;
-    proxy_set_header   X-Forwarded-Host   $http_host;
-    proxy_set_header   X-Forwarded-For    $remote_addr;
+    proxy_set_header Host vpn:8088;
+    proxy_set_header X-Forwarded-Host $http_host;
+    proxy_set_header X-Forwarded-For $remote_addr;
 
-    proxy_cookie_path  /                  "/;";
+    proxy_cookie_path / "/;";
   }
 
   location /sabnzbd {
     proxy_pass http://vpn:8080/sabnzbd;
   }
 
-  location /backup/ {
-    rewrite /backup/(.*) /$1 break;
-    proxy_pass         http://duplicati:8200/;
-    proxy_http_version 1.1;
+  location /backup {
+    return 301 $scheme://$host/backup/;
+  }
 
-    proxy_set_header   Host               duplicati:8200;
-    proxy_set_header   X-Forwarded-Host   $http_host;
-    proxy_set_header   X-Forwarded-For    $remote_addr;
-
-    proxy_cookie_path  /                  "/;";
+  location ^~ /backup/ {
+    rewrite /backup(.*) $1 break;
+    proxy_redirect / /backup/;
+    proxy_pass http://duplicati:8200;
   }
 
   location /monitoring/ {
@@ -57,7 +70,7 @@ server {
   }
 
   location /sonarr {
-    proxy_pass         http://vpn:8989;
+    proxy_pass http://vpn:8989;
 
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -69,32 +82,32 @@ server {
   }
 
   location /radarr {
-    proxy_pass         http://vpn:7878;
+    proxy_pass http://vpn:7878;
 
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    
-    proxy_http_version 1.1; 
-    proxy_set_header Upgrade $http_upgrade; 
+
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection $http_connection;
   }
 
   location /bazarr {
-    proxy_pass         http://vpn:6767;
+    proxy_pass http://vpn:6767;
 
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    
-    proxy_http_version 1.1; 
-    proxy_set_header Upgrade $http_upgrade; 
+
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection $http_connection;
   }
 
 
   location /prowlarr {
-    proxy_pass         http://vpn:9696;
+    proxy_pass http://vpn:9696;
 
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -146,7 +159,7 @@ server {
   location /tmm {
     return 301 $scheme://$http_host/tinymediamanager/vnc.html?path=tinymediamanager/websockify&autoconnect=true&resize=remote&reconnect=true&show_dot=true&bell=false&view_only=false;
   }
-  
+
   location /tinymediamanager/ {
     proxy_pass http://vpn:4000/;
 
@@ -157,26 +170,26 @@ server {
   }
 
   location /portainer/ {
-    proxy_pass         https://vpn:9443/;
+    proxy_pass https://vpn:9443/;
     proxy_http_version 1.1;
 
-    proxy_set_header   Host               vpn:9443;
-    proxy_set_header   X-Forwarded-Host   $http_host;
-    proxy_set_header   X-Forwarded-For    $remote_addr;
+    proxy_set_header Host vpn:9443;
+    proxy_set_header X-Forwarded-Host $http_host;
+    proxy_set_header X-Forwarded-For $remote_addr;
 
-    proxy_cookie_path  /                  "/;";
+    proxy_cookie_path / "/;";
   }
 
   location /tautulli/ {
-    proxy_pass         http://vpn:8181;
+    proxy_pass http://vpn:8181;
 
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 
     # SSL proxying headers
-    proxy_set_header    X-Forwarded-Proto   $scheme;
-    proxy_set_header    X-Forwarded-Ssl     on;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Ssl on;
 
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
