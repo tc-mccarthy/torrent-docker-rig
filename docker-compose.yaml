@@ -458,6 +458,20 @@ services:
     #   retries: 0
     #   timeout: 5s
     #   start_period: 30s
+
+  monitoring:
+    image: nicolargo/glances:latest-full
+    container_name: monitoring
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ
+      - GLANCES_OPT=-w
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock      
+    ports:
+      - 61208:61208
+    restart: unless-stopped
 volumes:
   mongo_db:
   portainer_db:
