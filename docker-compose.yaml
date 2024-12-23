@@ -115,6 +115,7 @@ services:
       --force-renewal
       -d ${TORRENT_SSL_HOST}
       -d ${OVERSEERR_SSL_HOST}
+      -d ${BACKUP_SSL_HOST}
 
   ddns_torrent:
     container_name: ddns_torrent
@@ -133,6 +134,15 @@ services:
       - API_KEY=${CLOUDFLARE_API_KEY}
       - ZONE=${DDNS_ZONE}
       - SUBDOMAIN=${OVERSEERR_DDNS_SUBDOMAIN}
+
+  ddns_backup:
+    container_name: ddns_backup
+    restart: unless-stopped
+    image: oznu/cloudflare-ddns
+    environment:
+      - API_KEY=${CLOUDFLARE_API_KEY}
+      - ZONE=${DDNS_ZONE}
+      - SUBDOMAIN=${BACKUP_DDNS_SUBDOMAIN}
 
   duplicati:
     image: lscr.io/linuxserver/duplicati:latest
