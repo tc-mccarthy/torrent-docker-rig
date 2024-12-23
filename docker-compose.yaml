@@ -152,6 +152,8 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ
+      - DUPLICATI__WEBSERVICE_PASSWORD=${BACKUP_PASSWORD}
+      - SETTINGS_ENCRYPTION_KEY=${BACKUP_PASSWORD}
     volumes:
       - ./duplicati/config:/config
       - ${BACKUP_DESTINATION}:/backups
