@@ -36,6 +36,7 @@ server {
   }
 
   location /backup/ {
+    rewrite /backup/(.*) /$1 break;
     proxy_pass         http://duplicati:8200/;
     proxy_http_version 1.1;
 
