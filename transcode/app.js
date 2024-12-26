@@ -984,7 +984,7 @@ mongo_connect()
     const watcher = chokidar.watch(PATHS, {
       ignored: (file, stats) => {
         // never ignore directories
-        if(!stats.isFile()){
+        if(stats?.isFile && !stats.isFile()){
           return false;
         }
 
