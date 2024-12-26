@@ -15,8 +15,6 @@ import { createClient } from "redis";
 import rabbit_connect from "./lib/rabbitmq.js";
 import chokidar from "chokidar";
 
-const {send, receive} = await rabbit_connect();
-
 const redisClient = createClient({ url: "redis://torrent-redis-local" });
 
 const PATHS = config.sources.map((p) => p.path);
@@ -973,18 +971,18 @@ async function create_scratch_disks() {
 
 mongo_connect()
   .then(() => redisClient.connect())
-  .then(() => {
+  .then(() => rabbit_connect())
+  .then(({send, receive}) => {
     run();
 
     // establish fs event listeners on the watched directories
-    const watchers = chokidar.watch(PATHS, {
+    const watcher = chokidar.watch(PATHS, {
       // ignore any paths that don't include at least one of the above file extensions
       ignored: (path, stats) => !file_ext.find((ext) => path.endsWith(ext)),
       persistent: true
     });
 
-    watcher
-      .on('add', path => send({ path }))
+    watcher.on('add', path => send({ path }))
       .on('change', path => send({ path }))
       .on('unlink', path => send({ path }));
 
