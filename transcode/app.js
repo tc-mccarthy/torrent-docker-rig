@@ -977,7 +977,13 @@ mongo_connect()
       // ignore any paths that don't include at least one of the above file extensions
       ignored: (path, stats) => {
         const ext_expression = new RegExp(".(" + file_ext.join("|") + ")", "i");
-        return ext_expression.test(path);
+        const ignore = !ext_expression.test(path);
+
+        if(ignore){
+          console.log(">> WATCHER IGNORED PATH >>", path);
+        }
+        
+        return ignore;
       },
       persistent: true,
     });
