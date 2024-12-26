@@ -205,7 +205,7 @@ services:
 
   mongo:
     container_name: torrent-mongo-local
-    image: mongo:3.6.23-xenial
+    image: mongo:4.4.29-focal
     hostname: torrent-mongo-local
     ports:
       - 27017:27017
