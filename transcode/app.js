@@ -650,7 +650,7 @@ function transcode(file) {
             { label: "Job" }
           );
 
-          logger.info(output);
+          // logger.info(output);
 
           fs.writeFileSync(
             "/usr/app/output/active.json",
