@@ -497,6 +497,12 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq/mnesia/
 
+logging: 
+  driver: "json-file"
+  options: 
+    max-size: "200k"
+    max-file: "10"
+
 volumes:
   mongo_db_8:
   portainer_db:
