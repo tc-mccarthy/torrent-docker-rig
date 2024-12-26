@@ -786,9 +786,13 @@ function transcode(file) {
       });
 
       if (/no\s+(video|audio)\s+stream\s+found/gi.test(e.message)) {
-
         await trash(file);
       }
+
+      if(/file\s+not\s+found/gi.test(e.message)) {
+        await trash(file);
+      }
+      
       resolve();
     }
   });
