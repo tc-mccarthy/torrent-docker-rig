@@ -174,7 +174,7 @@ async function update_queue() {
     // get current date
     const current_date = dayjs().format("MMDDYYYY");
     // Get the list of files to be converted
-    const last_probe_cache_key = `last_probe_${encode_version}_${current_date}_c`;
+    const last_probe_cache_key = `last_probe_${encode_version}_${current_date}_a`;
 
     // get the last probe time from redis
     const last_probe =
@@ -792,7 +792,7 @@ function transcode(file) {
       if(/file\s+not\s+found/gi.test(e.message)) {
         await trash(file);
       }
-      
+
       resolve();
     }
   });
