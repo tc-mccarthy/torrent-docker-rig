@@ -18,7 +18,7 @@ export default async function rabbit_connect(){
     function receive(callback){
         receive_channel.consume(queue, (msg) => {
             console.log("Received message from queue: ", msg.content.toString());
-            callback(JSON.parse(msg.content.toString()));
+            callback(JSON.parse(msg.content.toString()), receive_channel);
         }, {prefetch: 1});
     }
 

@@ -1015,8 +1015,14 @@ mongo_connect()
       });
 
     // listen for messages in rabbit and run an probe and upsert on the paths
-    receive((msg) => {
-      probe_and_upsert(msg.path);
+    receive(async (msg, channel) => {
+      try{
+        await probe_and_upsert(msg.path);
+        channel.ack(msg);
+      } catch(e){
+        logger.error(e, { label: "RABBITMQ ERROR" });
+        channel.ack(msg);
+      }
     });
 
     cron.schedule("0 */3 * * *", () => {
