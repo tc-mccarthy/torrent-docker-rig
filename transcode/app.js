@@ -983,6 +983,7 @@ mongo_connect()
     console.log("Configuring watcher for paths: ", PATHS);
     const watcher = chokidar.watch(PATHS, {
       ignored: (file, stats) => {
+        // if the stats object exists and has a method called isFile, and that method returns false, this is a directory.
         // never ignore directories
         if(stats?.isFile && !stats.isFile()){
           return false;
