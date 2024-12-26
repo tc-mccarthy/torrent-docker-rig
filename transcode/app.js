@@ -983,6 +983,7 @@ mongo_connect()
       .on("ready", () => {
         console.log(">> WATCHER IS READY AND WATCHING >>", watcher.getWatched());
       })
+      .on('error', error => console.log(`Watcher error: ${error}`))
       .on("add", (path) => {
         console.log(">> FILE ADD DETECTED >>", path);
         send({ path });
