@@ -974,19 +974,7 @@ mongo_connect()
     // establish fs event listeners on the watched directories
     console.log("Configuring watcher for paths: ", PATHS);
     const watcher = chokidar.watch(PATHS, {
-      // ignore any paths that don't include at least one of the above file extensions
-      ignored: (path, stats) => {
-        const ext_expression = new RegExp(".(" + file_ext.join("|") + ")", "i");
-        const ignore = !ext_expression.test(path);
-        console.log(">> EXT EXPRESSION >>", ext_expression);
-        if(ignore){
-          console.log(">> WATCHER IGNORED PATH >>", path);
-        } else {
-          console.log(">> WATCHER ACCEPTED PATH >>", path);
-        }
-        
-        return ignore;
-      },
+      ignoreInitial: true,
       persistent: true,
     });
 
@@ -996,16 +984,22 @@ mongo_connect()
       })
       .on('error', error => console.log(`Watcher error: ${error}`))
       .on("add", (path) => {
-        console.log(">> FILE ADD DETECTED >>", path);
-        send({ path });
+        if (file_ext.some((ext) => new RegExp(`.${ext}$`, "i").test(path))) {
+          console.log(">> NEW FILE DETECTED >>", path);
+          send({ path });
+        }
       })
       .on("change", (path) => {
-        console.log(">> FILE CHANGE DETECTED >>", path);
-        send({ path });
+        if (file_ext.some((ext) => new RegExp(`.${ext}$`, "i").test(path))) {
+          console.log(">> FILE CHANGE DETECTED >>", path);
+          send({ path });
+        }
       })
       .on("unlink", (path) => {
-        console.log(">> FILE DELETE DETECTED >>", path);
-        send({ path });
+        if (file_ext.some((ext) => new RegExp(`.${ext}$`, "i").test(path))) {
+          console.log(">> FILE DELETE DETECTED >>", path);
+          send({ path });
+        }
       });
 
     // listen for messages in rabbit and run an probe and upsert on the paths
