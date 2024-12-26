@@ -181,6 +181,7 @@ services:
     depends_on:
       - redis
       - mongo
+      - rabbitmq
     deploy:
       resources:
         limits:
@@ -494,8 +495,7 @@ services:
       - "5672:5672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq/mnesia/
-    networks:
-      - rabbitmq
+
 volumes:
   mongo_db_8:
   portainer_db:
