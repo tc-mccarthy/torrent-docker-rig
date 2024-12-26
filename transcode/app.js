@@ -305,6 +305,7 @@ async function update_queue() {
 }
 
 async function ffprobe(file) {
+  try{
   const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams '${escape_file_path(
     file
   )}'`;
@@ -330,6 +331,13 @@ async function ffprobe(file) {
   }
 
   return data;
+} catch(e){
+  if(/command\s+failed/gi.test(e.message)){
+    trash(file);
+  }
+  logger.error("FFPROBE FAILED", e);
+  return false;
+}
 }
 
 function transcode(file) {
