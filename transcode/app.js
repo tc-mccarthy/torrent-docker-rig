@@ -196,8 +196,8 @@ async function generate_filelist() {
 
 async function update_queue() {
   try {
-    // update the status of any files who have an encode version that matches the current encode version
-    await File.updateMany({ encode_version }, { $set: { status: "complete" } });
+    // update the status of any files who have an encode version that matches the current encode version and that haven't been marked as deleted
+    await File.updateMany({ encode_version, status: {$ne: "deleted"} }, { $set: { status: "complete" } });
 
     // get current date
     const current_date = dayjs().format("MMDDYYYY");
