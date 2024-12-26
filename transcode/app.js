@@ -975,7 +975,10 @@ mongo_connect()
     console.log("Configuring watcher for paths: ", PATHS);
     const watcher = chokidar.watch(PATHS, {
       // ignore any paths that don't include at least one of the above file extensions
-      // ignored: (path, stats) => !file_ext.find((ext) => path.endsWith(ext)),
+      ignored: (path, stats) => {
+        const ext_expression = new RegExp("." + file_ext.join("|"), "i");
+        return !ext_expression.test(path);
+      },
       persistent: true,
     });
 
