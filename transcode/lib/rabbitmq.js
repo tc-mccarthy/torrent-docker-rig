@@ -11,7 +11,7 @@ export default async function rabbit_connect(){
     await receive_channel.assertQueue(queue);
 
     function send(msg){
-        console.log("Sending message to queue: ", msg.content.toString());
+        console.log("Sending message to queue: ", msg);
         send_channel.sendToQueue(queue, Buffer.from(JSON.stringify(msg)));
     }
 
