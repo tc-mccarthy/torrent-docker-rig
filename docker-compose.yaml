@@ -205,12 +205,12 @@ services:
 
   mongo:
     container_name: torrent-mongo-local
-    image: mongo:4.4.29-focal
+    image: mongo:8.0.4-noble
     hostname: torrent-mongo-local
     ports:
       - 27017:27017
     volumes:
-      - mongo_db:/data/db
+      - mongo_db_8:/data/db
     restart: always
 
   sonarr:
@@ -486,7 +486,7 @@ services:
       - 61208:61208
     restart: unless-stopped
 volumes:
-  mongo_db:
+  mongo_db_8:
   portainer_db:
   redis_data:
 
