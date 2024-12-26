@@ -978,9 +978,11 @@ mongo_connect()
       ignored: (path, stats) => {
         const ext_expression = new RegExp(".(" + file_ext.join("|") + ")", "i");
         const ignore = !ext_expression.test(path);
-
+        console.log(">> EXT EXPRESSION >>", ext_expression);
         if(ignore){
           console.log(">> WATCHER IGNORED PATH >>", path);
+        } else {
+          console.log(">> WATCHER ACCEPTED PATH >>", path);
         }
         
         return ignore;
