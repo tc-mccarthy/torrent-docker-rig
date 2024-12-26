@@ -38,6 +38,10 @@ function escape_file_path(file) {
 
 function trash(file) {
   return new Promise(async (resolve, reject) => {
+    if(!file) {
+      return resolve();
+    }
+
     file = escape_file_path(file.replace(/\/$/g, "")).trim();
 
     // update the file's status to deleted
@@ -881,6 +885,14 @@ function transcode_loop() {
         filelist.length +
         " FILES TO TRANSCODE."
     );
+
+    // if there are no files, wait 1 minute and try again
+    if(filelist.length === 0) {
+      return setTimeout(() => {
+        return transcode_loop();
+      }, 60 * 1000);
+    }
+
     await update_status();
     const file = filelist[0];
     logger.info("BEGINNING TRANSCODE");
