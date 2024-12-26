@@ -973,14 +973,16 @@ mongo_connect()
 
     // establish fs event listeners on the watched directories
     console.log("Configuring watcher for paths: ", PATHS);
-    const watcher = chokidar.watch(PATHS[0], {
+    const watcher = chokidar.watch(PATHS, {
       // ignore any paths that don't include at least one of the above file extensions
       ignored: (path, stats) => !file_ext.find((ext) => path.endsWith(ext)),
       persistent: true,
     });
 
-    console.log(">> WATCHER >>", watcher.getWatched());
     watcher
+      .on("ready", () => {
+        console.log(">> WATCHER IS READY AND WATCHING >>", watcher.getWatched());
+      })
       .on("add", (path) => {
         console.log(">> FILE ADD DETECTED >>", path);
         send({ path });
