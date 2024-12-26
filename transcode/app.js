@@ -54,14 +54,14 @@ function escape_file_path(file) {
 
 function trash(file) {
   return new Promise(async (resolve, reject) => {
-    if(!file) {
+    if (!file) {
       return resolve();
     }
 
     file = escape_file_path(file.replace(/\/$/g, "")).trim();
 
     // update the file's status to deleted
-    await File.updateOne({ path: file }, { $set: {status: "deleted" }});
+    await File.updateOne({ path: file }, { $set: { status: "deleted" } });
 
     exec(`rm '${file}'`, (error, stdout, stderr) => {
       if (error) {
@@ -119,14 +119,14 @@ async function upsert_video(video) {
 
 async function probe_and_upsert(file, record_id, opts = {}) {
   file = file.replace(/\n+$/, "");
-  try{
+  try {
     const current_time = dayjs();
 
     // check if the file exists
     if (!fs.existsSync(file)) {
       throw new Error("File not found");
     }
-    
+
     const ffprobe_data = await ffprobe(file);
 
     await upsert_video({
@@ -136,16 +136,17 @@ async function probe_and_upsert(file, record_id, opts = {}) {
       encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
       last_probe: current_time,
       sortFields: {
-        width: ffprobe_data.streams.find((s) => s.codec_type === "video")?.width,
+        width: ffprobe_data.streams.find((s) => s.codec_type === "video")
+          ?.width,
         size: ffprobe_data.format.size,
       },
       ...opts,
     });
 
     return ffprobe_data;
-  } catch(e){
+  } catch (e) {
     // if the file wasn't found
-    if(/file\s+not\s+found/gi.test(e.message)) {
+    if (/file\s+not\s+found/gi.test(e.message)) {
       await trash(file);
     }
 
@@ -157,7 +158,7 @@ async function generate_filelist() {
   // query for any files that have an encode version that doesn't match the current encode version
   let filelist = await File.find({
     encode_version: { $ne: encode_version },
-    status: 'pending'
+    status: "pending",
   }).sort({
     "sortFields.priority": 1,
     "sortFields.size": -1,
@@ -198,12 +199,7 @@ async function generate_filelist() {
 async function update_queue() {
   try {
     // update the status of any files who have an encode version that matches the current encode version
-    await File.updateMany(
-      { encode_version },
-      { $set: { status: "complete" } }
-    );
-
-
+    await File.updateMany({ encode_version }, { $set: { status: "complete" } });
 
     // get current date
     const current_date = dayjs().format("MMDDYYYY");
@@ -213,7 +209,7 @@ async function update_queue() {
     // get the last probe time from redis
     const last_probe =
       (await redisClient.get(last_probe_cache_key)) || "1969-12-31 23:59:59";
-    
+
     const current_time = dayjs();
 
     // get seconds until midnight
@@ -224,9 +220,11 @@ async function update_queue() {
 
     const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(" ")} \\( ${file_ext
       .map((ext) => `-iname "*.${ext}"`)
-      .join(
-        " -o "
-      )} \\) -not \\( -iname "*.tc.mkv" \\) -newermt "${dayjs(last_probe).subtract(30, 'minutes').format("MM/DD/YYYY HH:mm:ss")}" -print0 | sort -z | xargs -0`;
+      .join(" -o ")} \\) -not \\( -iname "*.tc.mkv" \\) -newermt "${dayjs(
+      last_probe
+    )
+      .subtract(30, "minutes")
+      .format("MM/DD/YYYY HH:mm:ss")}" -print0 | sort -z | xargs -0`;
 
     logger.info(findCMD, { label: "FIND COMMAND" });
 
@@ -341,7 +339,7 @@ function transcode(file) {
       // mongo record of the video
       const video_record = await File.findOne({ path: file });
       const exists = fs.existsSync(file);
-    
+
       if (!exists) {
         throw new Error("File not found");
       }
@@ -349,7 +347,7 @@ function transcode(file) {
       const ffprobe_data = await ffprobe(file);
 
       logger.debug(ffprobe_data, { label: "FFPROBE DATA >>" });
-      
+
       const video_stream = ffprobe_data.streams.find(
         (s) => s.codec_type === "video"
       );
@@ -674,9 +672,7 @@ function transcode(file) {
           await exec_promise(
             `mv '${escape_file_path(scratch_file)}' '${escape_file_path(
               dest_file
-            )}' && touch '${escape_file_path(
-              dest_file
-            )}'`
+            )}' && touch '${escape_file_path(dest_file)}'`
           );
 
           await probe_and_upsert(dest_file, video_record._id, {
@@ -809,7 +805,7 @@ function transcode(file) {
         await trash(file);
       }
 
-      if(/file\s+not\s+found/gi.test(e.message)) {
+      if (/file\s+not\s+found/gi.test(e.message)) {
         await trash(file);
       }
 
@@ -903,7 +899,7 @@ function transcode_loop() {
     );
 
     // if there are no files, wait 1 minute and try again
-    if(filelist.length === 0) {
+    if (filelist.length === 0) {
       return setTimeout(() => {
         return transcode_loop();
       }, 60 * 1000);
@@ -972,19 +968,30 @@ async function create_scratch_disks() {
 mongo_connect()
   .then(() => redisClient.connect())
   .then(() => rabbit_connect())
-  .then(({send, receive}) => {
+  .then(({ send, receive }) => {
     run();
 
     // establish fs event listeners on the watched directories
     const watcher = chokidar.watch(PATHS, {
       // ignore any paths that don't include at least one of the above file extensions
       ignored: (path, stats) => !file_ext.find((ext) => path.endsWith(ext)),
-      persistent: true
+      persistent: true,
     });
 
-    watcher.on('add', path => send({ path }))
-      .on('change', path => send({ path }))
-      .on('unlink', path => send({ path }));
+    console.log(">> WATCHER >>", watcher.getWatched());
+    watcher
+      .on("add", (path) => {
+        console.log(">> FILE ADD DETECTED >>", path);
+        send({ path });
+      })
+      .on("change", (path) => {
+        console.log(">> FILE CHANGE DETECTED >>", path);
+        send({ path });
+      })
+      .on("unlink", (path) => {
+        console.log(">> FILE DELETE DETECTED >>", path);
+        send({ path });
+      });
 
     // listen for messages in rabbit and run an probe and upsert on the paths
     receive((msg) => {
