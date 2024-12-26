@@ -485,10 +485,22 @@ services:
     ports:
       - 61208:61208
     restart: unless-stopped
+  
+  rabbitmq:
+    hostname: rabbitmq
+    image: rabbitmq:4-management-alpine
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/mnesia/
+    networks:
+      - rabbitmq
 volumes:
   mongo_db_8:
   portainer_db:
   redis_data:
+  rabbitmq_data:
 
 networks:
   default:

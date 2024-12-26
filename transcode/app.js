@@ -12,10 +12,28 @@ import config from "./config.js";
 import { aspect_round } from "./base-config.js";
 import logger from "./lib/logger.js";
 import { createClient } from "redis";
+import rabbit_connect from "./lib/rabbitmq.js";
+import chokidar from "chokidar";
+
+const {send, receive} = await rabbit_connect();
 
 const redisClient = createClient({ url: "redis://torrent-redis-local" });
 
 const PATHS = config.sources.map((p) => p.path);
+
+const file_ext = [
+  "avi",
+  "mkv",
+  "m4v",
+  "flv",
+  "mov",
+  "wmv",
+  "webm",
+  "gif",
+  "mpg",
+  "mp4",
+  "m2ts",
+];
 
 const { encode_version, concurrent_file_checks } = config;
 
@@ -103,24 +121,38 @@ async function upsert_video(video) {
 
 async function probe_and_upsert(file, record_id, opts = {}) {
   file = file.replace(/\n+$/, "");
-  const current_time = dayjs();
-  
-  const ffprobe_data = await ffprobe(file);
+  try{
+    const current_time = dayjs();
 
-  await upsert_video({
-    record_id,
-    path: file,
-    probe: ffprobe_data,
-    encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
-    last_probe: current_time,
-    sortFields: {
-      width: ffprobe_data.streams.find((s) => s.codec_type === "video")?.width,
-      size: ffprobe_data.format.size,
-    },
-    ...opts,
-  });
+    // check if the file exists
+    if (!fs.existsSync(file)) {
+      throw new Error("File not found");
+    }
+    
+    const ffprobe_data = await ffprobe(file);
 
-  return ffprobe_data;
+    await upsert_video({
+      record_id,
+      path: file,
+      probe: ffprobe_data,
+      encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
+      last_probe: current_time,
+      sortFields: {
+        width: ffprobe_data.streams.find((s) => s.codec_type === "video")?.width,
+        size: ffprobe_data.format.size,
+      },
+      ...opts,
+    });
+
+    return ffprobe_data;
+  } catch(e){
+    // if the file wasn't found
+    if(/file\s+not\s+found/gi.test(e.message)) {
+      await trash(file);
+    }
+
+    return false;
+  }
 }
 
 async function generate_filelist() {
@@ -191,20 +223,6 @@ async function update_queue() {
       86400 - current_time.diff(current_time.endOf("day"), "seconds") - 60;
 
     console.log("Seconds until midnight", seconds_until_midnight);
-
-    const file_ext = [
-      "avi",
-      "mkv",
-      "m4v",
-      "flv",
-      "mov",
-      "wmv",
-      "webm",
-      "gif",
-      "mpg",
-      "mp4",
-      "m2ts",
-    ];
 
     const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(" ")} \\( ${file_ext
       .map((ext) => `-iname "*.${ext}"`)
@@ -957,6 +975,23 @@ mongo_connect()
   .then(() => redisClient.connect())
   .then(() => {
     run();
+
+    // establish fs event listeners on the watched directories
+    const watchers = chokidar.watch(PATHS, {
+      // ignore any paths that don't include at least one of the above file extensions
+      ignored: (path, stats) => !file_ext.find((ext) => path.endsWith(ext)),
+      persistent: true
+    });
+
+    watcher
+      .on('add', path => send({ path }))
+      .on('change', path => send({ path }))
+      .on('unlink', path => send({ path }));
+
+    // listen for messages in rabbit and run an probe and upsert on the paths
+    receive((msg) => {
+      probe_and_upsert(msg.path);
+    });
 
     cron.schedule("0 */3 * * *", () => {
       db_cleanup();
