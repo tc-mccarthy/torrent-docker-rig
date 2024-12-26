@@ -984,7 +984,7 @@ mongo_connect()
 
     watcher
       .on("ready", () => {
-        console.log(">> WATCHER IS READY AND WATCHING >>", watcher.getWatched());
+        console.log(">> WATCHER IS READY AND WATCHING >>", watcher, watcher.getWatched());
       })
       .on('error', error => console.log(`Watcher error: ${error}`))
       .on("add", (path) => {
