@@ -489,6 +489,7 @@ services:
   
   rabbitmq:
     hostname: rabbitmq
+    container_name: rabbitmq
     image: rabbitmq:4-management-alpine
     ports:
       - "15672:15672"
