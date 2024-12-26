@@ -187,6 +187,11 @@ services:
         limits:
           cpus: '16' # 16 cores
           memory: 56G # 56GB
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   plex:
     container_name: plex
@@ -496,12 +501,6 @@ services:
       - "5672:5672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq/mnesia/
-
-logging: 
-  driver: "json-file"
-  options: 
-    max-size: "200k"
-    max-file: "10"
 
 volumes:
   mongo_db_8:
