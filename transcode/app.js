@@ -109,8 +109,6 @@ async function upsert_video(video) {
     // merge the file object with the video object and override with sortFields
     file = Object.assign(file, video, { sortFields });
 
-    // console.log(file, { label: "UPSERT" });
-
     await file.save();
   } catch (e) {
     logger.error(e, { label: "UPSERT FAILURE" });
@@ -216,7 +214,7 @@ async function update_queue() {
     const seconds_until_midnight =
       86400 - current_time.diff(current_time.endOf("day"), "seconds") - 60;
 
-    console.log("Seconds until midnight", seconds_until_midnight);
+    logger.debug("Seconds until midnight", seconds_until_midnight);
 
     const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(" ")} \\( ${file_ext
       .map((ext) => `-iname "*.${ext}"`)
@@ -656,7 +654,7 @@ function transcode(file) {
             { label: "Job" }
           );
 
-          // logger.info(output);
+          logger.debug(output);
 
           fs.writeFileSync(
             "/usr/app/output/active.json",
@@ -980,7 +978,7 @@ mongo_connect()
     run();
 
     // establish fs event listeners on the watched directories
-    console.log("Configuring watcher for paths: ", PATHS);
+    logger.debug("Configuring watcher for paths: ", PATHS);
     const watcher = chokidar.watch(PATHS, {
       ignored: (file, stats) => {
         // if the file doesn't have a file extension at all, or it has an approved file_ext do not ignore
@@ -996,24 +994,24 @@ mongo_connect()
 
     watcher
       .on("ready", () => {
-        console.log(">> WATCHER IS READY AND WATCHING >>", watcher.getWatched());
+        logger.debug(">> WATCHER IS READY AND WATCHING >>", watcher.getWatched());
       })
-      .on('error', error => console.log(`Watcher error: ${error}`))
+      .on('error', error => logger.error(`Watcher error: ${error}`))
       .on("add", (path) => {
         if (file_ext.some((ext) => new RegExp(`.${ext}$`, "i").test(path))) {
-          console.log(">> NEW FILE DETECTED >>", path);
+          logger.debug(">> NEW FILE DETECTED >>", path);
           send({ path });
         }
       })
       .on("change", (path) => {
         if (file_ext.some((ext) => new RegExp(`.${ext}$`, "i").test(path))) {
-          console.log(">> FILE CHANGE DETECTED >>", path);
+          logger.debug(">> FILE CHANGE DETECTED >>", path);
           send({ path });
         }
       })
       .on("unlink", (path) => {
         if (file_ext.some((ext) => new RegExp(`.${ext}$`, "i").test(path))) {
-          console.log(">> FILE DELETE DETECTED >>", path);
+          logger.debug(">> FILE DELETE DETECTED >>", path);
           send({ path });
         }
       });
