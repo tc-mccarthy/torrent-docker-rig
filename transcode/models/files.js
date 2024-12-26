@@ -23,6 +23,12 @@ const schema = new Schema(
       required: false,
       index: true,
     },
+    status: {
+      type: String,
+      required: true,
+      index: true,
+      default: 'pending',
+    },
     probe: {
       type: Object,
       required: false, // making this false so that we can easily add registration to the site without needing a subscription

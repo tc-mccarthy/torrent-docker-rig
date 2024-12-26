@@ -37,8 +37,12 @@ function escape_file_path(file) {
 }
 
 function trash(file) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     file = escape_file_path(file.replace(/\/$/g, "")).trim();
+
+    // update the file's status to deleted
+    await File.updateOne({ path: file }, { $set: {status: "deleted" }});
+
     exec(`rm '${file}'`, (error, stdout, stderr) => {
       if (error) {
         console.error(`exec error: ${error}`);
@@ -96,7 +100,9 @@ async function upsert_video(video) {
 async function probe_and_upsert(file, record_id, opts = {}) {
   file = file.replace(/\n+$/, "");
   const current_time = dayjs();
+  
   const ffprobe_data = await ffprobe(file);
+
   await upsert_video({
     record_id,
     path: file,
@@ -117,6 +123,7 @@ async function generate_filelist() {
   // query for any files that have an encode version that doesn't match the current encode version
   let filelist = await File.find({
     encode_version: { $ne: encode_version },
+    status: 'pending'
   }).sort({
     "sortFields.priority": 1,
     "sortFields.size": -1,
@@ -156,6 +163,14 @@ async function generate_filelist() {
 
 async function update_queue() {
   try {
+    // update the status of any files who have an encode version that matches the current encode version
+    await File.updateMany(
+      { encode_version },
+      { $set: { status: "complete" } }
+    );
+
+
+
     // get current date
     const current_date = dayjs().format("MMDDYYYY");
     // Get the list of files to be converted
@@ -186,6 +201,7 @@ async function update_queue() {
       "mp4",
       "m2ts",
     ];
+
     const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(" ")} \\( ${file_ext
       .map((ext) => `-iname "*.${ext}"`)
       .join(
@@ -305,15 +321,18 @@ function transcode(file) {
       // mongo record of the video
       const video_record = await File.findOne({ path: file });
       const exists = fs.existsSync(file);
-      const ffprobe_data = await ffprobe(file);
-      logger.debug(ffprobe_data, { label: "FFPROBE DATA >>" });
-      const video_stream = ffprobe_data.streams.find(
-        (s) => s.codec_type === "video"
-      );
-
+    
       if (!exists) {
         throw new Error("File not found");
       }
+
+      const ffprobe_data = await ffprobe(file);
+
+      logger.debug(ffprobe_data, { label: "FFPROBE DATA >>" });
+      
+      const video_stream = ffprobe_data.streams.find(
+        (s) => s.codec_type === "video"
+      );
 
       if (!video_stream) {
         throw new Error("No video stream found");
@@ -767,6 +786,7 @@ function transcode(file) {
       });
 
       if (/no\s+(video|audio)\s+stream\s+found/gi.test(e.message)) {
+
         await trash(file);
       }
       resolve();
@@ -896,6 +916,10 @@ async function run() {
 }
 
 async function db_cleanup() {
+  // first purge any files marked for delete
+  await File.deleteMany({ status: "deleted" });
+
+  // then verify that all remaining files exist in the filesystem
   const files = await File.find({}).sort({ path: 1 });
   const to_remove = files.map((f) => f.path).filter((p) => !fs.existsSync(p));
 
