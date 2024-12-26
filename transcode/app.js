@@ -58,18 +58,22 @@ function trash(file) {
       return resolve();
     }
 
-    file = escape_file_path(file.replace(/\/$/g, "")).trim();
-
     // update the file's status to deleted
     await File.updateOne({ path: file }, { $set: { status: "deleted" } });
 
-    exec(`rm '${file}'`, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`exec error: ${error}`);
-        reject(error);
-      }
+    file = escape_file_path(file.replace(/\/$/g, "")).trim();
+
+    if (fs.existsSync(file)) {
+      exec(`rm '${file}'`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`exec error: ${error}`);
+          reject(error);
+        }
+        resolve();
+      });
+    } else {
       resolve();
-    });
+    }
   });
 }
 
@@ -197,7 +201,10 @@ async function generate_filelist() {
 async function update_queue() {
   try {
     // update the status of any files who have an encode version that matches the current encode version and that haven't been marked as deleted
-    await File.updateMany({ encode_version, status: {$ne: "deleted"} }, { $set: { status: "complete" } });
+    await File.updateMany(
+      { encode_version, status: { $ne: "deleted" } },
+      { $set: { status: "complete" } }
+    );
 
     // get current date
     const current_date = dayjs().format("MMDDYYYY");
@@ -303,39 +310,39 @@ async function update_queue() {
 }
 
 async function ffprobe(file) {
-  try{
-  const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams '${escape_file_path(
-    file
-  )}'`;
-  logger.info(ffprobeCMD, { label: "FFPROBE COMMAND" });
-  const { stdout, stderr } = await exec_promise(ffprobeCMD);
+  try {
+    const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams '${escape_file_path(
+      file
+    )}'`;
+    logger.info(ffprobeCMD, { label: "FFPROBE COMMAND" });
+    const { stdout, stderr } = await exec_promise(ffprobeCMD);
 
-  logger.info({ stdout, stderr }, { label: "FFPROBE OUTPUT" });
+    logger.info({ stdout, stderr }, { label: "FFPROBE OUTPUT" });
 
-  const data = JSON.parse(stdout);
+    const data = JSON.parse(stdout);
 
-  data.format.duration = +data.format.duration;
-  data.format.size = +data.format.size;
-  data.format.bit_rate = +data.format.bit_rate;
-  data.format.size = +data.format.size / 1024;
+    data.format.duration = +data.format.duration;
+    data.format.size = +data.format.size;
+    data.format.bit_rate = +data.format.bit_rate;
+    data.format.size = +data.format.size / 1024;
 
-  const video = data.streams.find((s) => s.codec_type === "video");
+    const video = data.streams.find((s) => s.codec_type === "video");
 
-  if (video.display_aspect_ratio) {
-    const [width, height] = video.display_aspect_ratio.split(":");
-    video.aspect = aspect_round(width / height);
-  } else {
-    video.aspect = aspect_round(video.width / video.height);
+    if (video.display_aspect_ratio) {
+      const [width, height] = video.display_aspect_ratio.split(":");
+      video.aspect = aspect_round(width / height);
+    } else {
+      video.aspect = aspect_round(video.width / video.height);
+    }
+
+    return data;
+  } catch (e) {
+    if (/command\s+failed/gi.test(e.message)) {
+      trash(file);
+    }
+    logger.error("FFPROBE FAILED", e);
+    return false;
   }
-
-  return data;
-} catch(e){
-  if(/command\s+failed/gi.test(e.message)){
-    trash(file);
-  }
-  logger.error("FFPROBE FAILED", e);
-  return false;
-}
 }
 
 function transcode(file) {
@@ -994,9 +1001,12 @@ mongo_connect()
 
     watcher
       .on("ready", () => {
-        logger.debug(">> WATCHER IS READY AND WATCHING >>", watcher.getWatched());
+        logger.debug(
+          ">> WATCHER IS READY AND WATCHING >>",
+          watcher.getWatched()
+        );
       })
-      .on('error', error => logger.error(`Watcher error: ${error}`))
+      .on("error", (error) => logger.error(`Watcher error: ${error}`))
       .on("add", (path) => {
         if (file_ext.some((ext) => new RegExp(`.${ext}$`, "i").test(path))) {
           logger.debug(">> NEW FILE DETECTED >>", path);
@@ -1018,10 +1028,10 @@ mongo_connect()
 
     // listen for messages in rabbit and run an probe and upsert on the paths
     receive(async (msg, message_content, channel) => {
-      try{
+      try {
         await probe_and_upsert(message_content.path);
         channel.ack(msg);
-      } catch(e){
+      } catch (e) {
         logger.error(e, { label: "RABBITMQ ERROR" });
         channel.ack(msg);
       }
