@@ -174,7 +174,7 @@ services:
       - LOG_PRETTY=on
       - LOG_LEVEL=info # make debug when debugging
       - CHOKIDAR_USEPOLLING=1
-      - NODE_OPTIONS=--max-old-space-size=8192
+      - NODE_OPTIONS=--max-old-space-size=57344
     volumes:
       - ${TRANSCODE_STORAGE}:/source_media # path to my volumes for download storage
       - ./transcode:/usr/app
