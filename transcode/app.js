@@ -199,20 +199,7 @@ async function generate_filelist() {
 }
 
 async function update_queue() {
-  let queue_lock_heartbeat
   try {
-    // first check for a lock in redis
-    const lock = (await redisClient.get("update_queue_lock")) || false;
-
-    // if the lock is set, return
-    if (lock) {
-      logger.info("Update queue locked. Exiting...");
-      return;
-    }
-
-    // set the lock
-    await redisClient.set("update_queue_lock", 1, { EX: 60 });
-
     // update the status of any files who have an encode version that matches the current encode version and that haven't been marked as deleted
     await File.updateMany(
       { encode_version, status: { $ne: "deleted" } },
@@ -317,14 +304,8 @@ async function update_queue() {
       { EX: seconds_until_midnight }
     );
 
-    // clear the lock
-    clearInterval(queue_lock_heartbeat);
-    await redisClient.del("update_queue_lock");
-
     logger.info("", { label: "REDIS UPDATED" });
   } catch (e) {
-    clearInterval(queue_lock_heartbeat);
-    await redisClient.del("update_queue_lock");
     logger.error(e, { label: "UPDATE QUEUE ERROR" });
   }
 }
@@ -1057,13 +1038,11 @@ mongo_connect()
       }
     });
 
-    // clean up the DB every three hours
     cron.schedule("0 */3 * * *", () => {
       db_cleanup();
     });
 
-    // refresh the queue every 5 minutes
-    cron.schedule("*/5 * * * *", () => {
+    cron.schedule("0 0 * * *", () => {
       update_queue();
     });
   })
