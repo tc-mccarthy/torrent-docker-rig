@@ -949,13 +949,13 @@ function transcode_loop() {
 
 async function run() {
   try {
-    console.log("Creating scratch space");
+    logger.info("Creating scratch space");
     await create_scratch_disks();
-    console.log("Getting system utilization values");
+    logger.info("Getting system utilization values");
     await get_utilization();
-    console.log("Getting disk space");
+    logger.info("Getting disk space");
     await get_disk_space();
-    console.log("Cleaning up the FS before running the queue");
+    logger.info("Cleaning up the FS before running the queue");
     await pre_sanitize();
 
     // parallelize the detection of new videos
