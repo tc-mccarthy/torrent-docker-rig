@@ -1013,6 +1013,11 @@ mongo_connect()
     logger.debug("Configuring watcher for paths: ", PATHS);
     const watcher = chokidar.watch(PATHS, {
       ignored: (file, stats) => {
+        //if .deletedByTMM is in the path, ignore
+        if (file.includes(".deletedByTMM")) {
+          return true;
+        }
+
         // if the file doesn't have a file extension at all, or it has an approved file_ext do not ignore
         if (!/\.[A-Za-z0-9]+$/i.test(file)) {
           return false;
