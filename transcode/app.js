@@ -941,7 +941,10 @@ async function run() {
     await pre_sanitize();
 
     // parallelize the detection of new videos
+    logger.info("Startup complete. Updating the queue...");
     update_queue();
+
+    logger.info("Starting transcode loop...");
     await transcode_loop();
 
     logger.info("Requeuing in 30 seconds...");
