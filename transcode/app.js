@@ -1041,7 +1041,7 @@ mongo_connect()
       db_cleanup();
     });
 
-    cron.schedule("*/5 * * * *", () => {
+    cron.schedule("0 0 * * *", () => {
       update_queue();
     });
   })
