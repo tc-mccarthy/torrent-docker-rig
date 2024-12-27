@@ -1080,4 +1080,5 @@ mongo_connect()
   })
   .catch((e) => {
     console.error(">> COULD NOT CONNECT TO MONGO >>", e);
+    process.exit(1);
   });
