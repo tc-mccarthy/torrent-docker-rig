@@ -213,11 +213,6 @@ async function update_queue() {
     // set the lock
     await redisClient.set("update_queue_lock", 1, { EX: 60 });
 
-    // create a heartbeat that maintains the lock
-    queue_lock_heartbeat = setInterval(() => {
-      redisClient.set("update_queue_lock", 1, { EX: 60 });
-    }, 30 * 1000);
-
     // update the status of any files who have an encode version that matches the current encode version and that haven't been marked as deleted
     await File.updateMany(
       { encode_version, status: { $ne: "deleted" } },
