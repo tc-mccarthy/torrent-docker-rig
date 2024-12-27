@@ -210,7 +210,7 @@ async function update_queue() {
     }
 
     // set the lock
-    await redisClient.set("update_queue_lock", true, { EX: 60 });
+    await redisClient.set("update_queue_lock", 1, { EX: 60 });
 
     // update the status of any files who have an encode version that matches the current encode version and that haven't been marked as deleted
     await File.updateMany(
