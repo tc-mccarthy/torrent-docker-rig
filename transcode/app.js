@@ -937,7 +937,7 @@ async function run() {
   try {
     await create_scratch_disks();
     await get_utilization();
-    // await get_disk_space();
+    await get_disk_space();
     // await pre_sanitize();
 
     // parallelize the detection of new videos
