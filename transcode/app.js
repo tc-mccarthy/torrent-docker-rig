@@ -200,6 +200,15 @@ async function generate_filelist() {
 
 async function update_queue() {
   try {
+    // check for a lock in redis
+    const lock = await redisClient.get("update_queue_lock");
+
+    // short circuit the function if the lock is set
+    if (lock) {
+      logger.info("Update queue locked. Exiting...");
+      return;
+    }
+
     // update the status of any files who have an encode version that matches the current encode version and that haven't been marked as deleted
     await File.updateMany(
       { encode_version, status: { $ne: "deleted" } },
@@ -246,6 +255,8 @@ async function update_queue() {
     await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
       const file_idx = filelist.indexOf(file);
       logger.info("Processing file", { file, file_idx, total: filelist.length, pct: Math.round((file_idx / filelist.length) * 100) });
+      // set a 60 second lock with each file so that the lock lives no longer than 60 seconds beyond the final probe
+      await redisClient.set("update_queue_lock", "locked", { EX: 60 });
       try {
         const ffprobe_data = await probe_and_upsert(file);
 
@@ -303,6 +314,9 @@ async function update_queue() {
       current_time.format("MM/DD/YYYY HH:mm:ss"),
       { EX: seconds_until_midnight }
     );
+
+    // clear the lock
+    await redisClient.del("update_queue_lock");
 
     logger.info("", { label: "REDIS UPDATED" });
   } catch (e) {
@@ -938,7 +952,7 @@ async function run() {
     await create_scratch_disks();
     await get_utilization();
     await get_disk_space();
-    // await pre_sanitize();
+    await pre_sanitize();
 
     // parallelize the detection of new videos
     logger.info("Startup complete. Updating the queue...");
@@ -1050,7 +1064,7 @@ mongo_connect()
       db_cleanup();
     });
 
-    cron.schedule("0 0 * * *", () => {
+    cron.schedule("*/5 * * * *", () => {
       update_queue();
     });
   })
