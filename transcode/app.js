@@ -935,10 +935,10 @@ function transcode_loop() {
 
 async function run() {
   try {
-    await create_scratch_disks();
-    await get_utilization();
-    await get_disk_space();
-    await pre_sanitize();
+    // await create_scratch_disks();
+    // await get_utilization();
+    // await get_disk_space();
+    // await pre_sanitize();
 
     // parallelize the detection of new videos
     logger.info("Startup complete. Updating the queue...");
