@@ -1027,6 +1027,7 @@ mongo_connect()
       },
       ignoreInitial: true,
       persistent: true,
+      awaitWriteFinish: true
     });
 
     watcher
