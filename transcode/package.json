@@ -5,7 +5,7 @@
   "main": "transcode.js",
   "type": "module",
   "scripts": {
-    "start": "node ./app.js",
+    "start": "node --max-old-space-size=4096 ./app.js",
     "start:dev": "npx nodemon -L ./app.js",
     "knex": "knex"
   },
