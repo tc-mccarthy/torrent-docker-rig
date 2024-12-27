@@ -199,6 +199,7 @@ async function generate_filelist() {
 }
 
 async function update_queue() {
+  let queue_lock_heartbeat
   try {
     // first check for a lock in redis
     const lock = (await redisClient.get("update_queue_lock")) || false;
@@ -211,6 +212,11 @@ async function update_queue() {
 
     // set the lock
     await redisClient.set("update_queue_lock", 1, { EX: 60 });
+
+    // create a heartbeat that maintains the lock
+    queue_lock_heartbeat = setInterval(() => {
+      redisClient.set("update_queue_lock", 1, { EX: 60 });
+    }, 30 * 1000);
 
     // update the status of any files who have an encode version that matches the current encode version and that haven't been marked as deleted
     await File.updateMany(
@@ -259,8 +265,6 @@ async function update_queue() {
       const file_idx = filelist.indexOf(file);
       logger.info("Processing file", { file, file_idx, total: filelist.length, pct: Math.round((file_idx / filelist.length) * 100) });
       try {
-        // extend the lock
-        await redisClient.set("update_queue_lock", 1, { EX: 60 });
         const ffprobe_data = await probe_and_upsert(file);
 
         // if the file is already encoded, remove it from the list
@@ -319,10 +323,13 @@ async function update_queue() {
     );
 
     // clear the lock
+    clearInterval(queue_lock_heartbeat);
     await redisClient.del("update_queue_lock");
 
     logger.info("", { label: "REDIS UPDATED" });
   } catch (e) {
+    clearInterval(queue_lock_heartbeat);
+    await redisClient.del("update_queue_lock");
     logger.error(e, { label: "UPDATE QUEUE ERROR" });
   }
 }
