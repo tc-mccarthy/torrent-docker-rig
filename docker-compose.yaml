@@ -503,7 +503,7 @@ services:
       - "5672:5672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq/mnesia/
-    restart: unless-stopped
+    restart: always
 
 volumes:
   mongo_db_8:
