@@ -983,8 +983,11 @@ mongo_connect()
   .then(() => redisClient.connect())
   .then(() => rabbit_connect())
   .then(({ send, receive }) => {
+    logger.info("Connected to RabbitMQ");
+    logger.info("Starting main thread");
     run();
 
+    logger.info("Establishing file watcher");
     // establish fs event listeners on the watched directories
     logger.debug("Configuring watcher for paths: ", PATHS);
     const watcher = chokidar.watch(PATHS, {
@@ -1027,6 +1030,7 @@ mongo_connect()
         }
       });
 
+    logger.info("Creating message consumer");
     // listen for messages in rabbit and run an probe and upsert on the paths
     receive(async (msg, message_content, channel) => {
       try {
@@ -1038,6 +1042,7 @@ mongo_connect()
       }
     });
 
+    logger.info("Scheduling jobs");
     cron.schedule("0 */3 * * *", () => {
       db_cleanup();
     });
