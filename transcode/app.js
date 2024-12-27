@@ -245,6 +245,7 @@ async function update_queue() {
 
     await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
       const file_idx = filelist.indexOf(file);
+      logger.info("Processing file", { file, file_idx, total: filelist.length });
       try {
         const ffprobe_data = await probe_and_upsert(file);
 
@@ -317,7 +318,7 @@ async function ffprobe(file) {
     logger.info(ffprobeCMD, { label: "FFPROBE COMMAND" });
     const { stdout, stderr } = await exec_promise(ffprobeCMD);
 
-    logger.info({ stdout, stderr }, { label: "FFPROBE OUTPUT" });
+    logger.debug({ stdout, stderr }, { label: "FFPROBE OUTPUT" });
 
     const data = JSON.parse(stdout);
 
