@@ -260,7 +260,7 @@ async function update_queue() {
       logger.info("Processing file", { file, file_idx, total: filelist.length, pct: Math.round((file_idx / filelist.length) * 100) });
       try {
         // extend the lock
-        await redisClient.set("update_queue_lock", true, { EX: 60 });
+        await redisClient.set("update_queue_lock", 1, { EX: 60 });
         const ffprobe_data = await probe_and_upsert(file);
 
         // if the file is already encoded, remove it from the list
