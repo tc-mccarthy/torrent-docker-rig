@@ -552,9 +552,10 @@ function transcode(file) {
       cmd = cmd.outputOptions(input_maps);
 
       if (transcode_video) {
-        const pix_fmt =
-          video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
-
+        // const pix_fmt =
+          // video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
+        const pix_fmt = "yuv420p10le";
+        
         conversion_profile.output.video.addFlags({
           maxrate: `${conversion_profile.output.video.bitrate}M`,
           bufsize: `${conversion_profile.output.video.bitrate * 3}M`,
