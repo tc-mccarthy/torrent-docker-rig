@@ -520,7 +520,8 @@ function transcode(file) {
           `-metadata:s:a:1 language=${audio_stream.tags?.language || "eng"}`,
         ]);
 
-        if (audio_stream.channels === 6) {
+        // adjust channel layout for opus to account for (side) incompatibility
+        if (audio_stream.channels === 5 || audio_stream.channels === 6) {
           audio_filters.push("-af:0 channelmap=channel_layout=5.1");
         }
       }
