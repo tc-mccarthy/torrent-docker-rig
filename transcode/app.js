@@ -395,7 +395,7 @@ function transcode(file) {
       // set the scratch file path and name
       const scratch_file = `${scratch_path}/${filename}`.replace(
         /\.[A-Za-z0-9]+$/,
-        ".tc.mkv"
+        "-optimized.tc.mkv"
       );
 
       // set the destination file path and name
