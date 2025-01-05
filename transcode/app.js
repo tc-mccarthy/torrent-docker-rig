@@ -368,7 +368,7 @@ function transcode(file) {
       // mongo record of the video
       const video_record = await File.findOne({ path: file });
       const exists = fs.existsSync(file);
-      const threads = os.cpus().length * (process.env.CPU_PCT || 1);
+      const threads = Math.floor(os.cpus().length * (process.env.CPU_PCT || 1));
 
       if (!exists) {
         throw new Error("File not found");
