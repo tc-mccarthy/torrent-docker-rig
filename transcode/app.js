@@ -599,7 +599,7 @@ function transcode(file) {
       }
 
       cmd = cmd.outputOptions(`-metadata encode_version=${encode_version}`);
-      cmd = cmd.outputOptions(`--threads ${threads}`);
+      cmd = cmd.outputOptions(`-threads ${threads}`);
 
       let ffmpeg_cmd;
 
