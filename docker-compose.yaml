@@ -187,7 +187,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '18' # 18 cores
+          cpus: '12' # 12 cores
           memory: 56G # 56GB
     logging: 
       driver: "json-file"
