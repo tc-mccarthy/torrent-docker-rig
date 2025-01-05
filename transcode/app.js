@@ -14,6 +14,7 @@ import logger from "./lib/logger.js";
 import { createClient } from "redis";
 import rabbit_connect from "./lib/rabbitmq.js";
 import chokidar from "chokidar";
+import os from 'os';
 
 const redisClient = createClient({ url: "redis://torrent-redis-local" });
 
@@ -367,6 +368,7 @@ function transcode(file) {
       // mongo record of the video
       const video_record = await File.findOne({ path: file });
       const exists = fs.existsSync(file);
+      const threads = os.cpus().length * (process.env.CPU_PCT || 1);
 
       if (!exists) {
         throw new Error("File not found");
@@ -597,6 +599,7 @@ function transcode(file) {
       }
 
       cmd = cmd.outputOptions(`-metadata encode_version=${encode_version}`);
+      cmd = cmd.outputOptions(`--threads ${threads}`);
 
       let ffmpeg_cmd;
 
