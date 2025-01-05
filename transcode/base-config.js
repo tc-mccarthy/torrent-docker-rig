@@ -73,7 +73,7 @@ const config = {
         codec_name: "av1",
         flags: {
           crf: 35,
-          preset: 5,
+          preset: 4
         },
       },
       audio: {
