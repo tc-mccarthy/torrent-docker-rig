@@ -6,7 +6,7 @@ export function aspect_round(val) {
 
 const config = {
   encode_version: "20231113a",
-  concurrent_file_checks: 30,
+  concurrent_file_checks: 50,
   profiles: [
     {
       name: "uhd",
@@ -73,12 +73,12 @@ const config = {
         codec_name: "av1",
         flags: {
           crf: 35,
-          preset: 7,
+          preset: 7
         },
       },
       audio: {
         codec: "libopus",
-        codes_name: "opus",
+        codec_name: "opus",
         per_channel_bitrate: 64,
         downmix: true, // downmix to stereo in a duplicate channel
       },

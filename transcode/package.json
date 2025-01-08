@@ -20,7 +20,9 @@
   },
   "homepage": "https://github.com/tc-mccarthy/plex-transcoder#readme",
   "dependencies": {
+    "amqplib": "^0.10.5",
     "async": "^3.2.4",
+    "chokidar": "^4.0.3",
     "dayjs": "^1.11.12",
     "fast-copy": "^3.0.1",
     "fluent-ffmpeg": "^2.1.2",

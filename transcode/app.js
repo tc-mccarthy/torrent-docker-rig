@@ -12,10 +12,26 @@ import config from "./config.js";
 import { aspect_round } from "./base-config.js";
 import logger from "./lib/logger.js";
 import { createClient } from "redis";
+import rabbit_connect from "./lib/rabbitmq.js";
+import chokidar from "chokidar";
 
 const redisClient = createClient({ url: "redis://torrent-redis-local" });
 
 const PATHS = config.sources.map((p) => p.path);
+
+const file_ext = [
+  "avi",
+  "mkv",
+  "m4v",
+  "flv",
+  "mov",
+  "wmv",
+  "webm",
+  "gif",
+  "mpg",
+  "mp4",
+  "m2ts",
+];
 
 const { encode_version, concurrent_file_checks } = config;
 
@@ -37,15 +53,27 @@ function escape_file_path(file) {
 }
 
 function trash(file) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    if (!file) {
+      return resolve();
+    }
+
+    // update the file's status to deleted
+    await File.updateOne({ path: file }, { $set: { status: "deleted" } });
+
     file = escape_file_path(file.replace(/\/$/g, "")).trim();
-    exec(`rm '${file}'`, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`exec error: ${error}`);
-        reject(error);
-      }
+
+    if (fs.existsSync(file)) {
+      exec(`rm '${file}'`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`exec error: ${error}`);
+          reject(error);
+        }
+        resolve();
+      });
+    } else {
       resolve();
-    });
+    }
   });
 }
 
@@ -85,8 +113,6 @@ async function upsert_video(video) {
     // merge the file object with the video object and override with sortFields
     file = Object.assign(file, video, { sortFields });
 
-    // console.log(file, { label: "UPSERT" });
-
     await file.save();
   } catch (e) {
     logger.error(e, { label: "UPSERT FAILURE" });
@@ -95,28 +121,46 @@ async function upsert_video(video) {
 
 async function probe_and_upsert(file, record_id, opts = {}) {
   file = file.replace(/\n+$/, "");
-  const current_time = dayjs();
-  const ffprobe_data = await ffprobe(file);
-  await upsert_video({
-    record_id,
-    path: file,
-    probe: ffprobe_data,
-    encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
-    last_probe: current_time,
-    sortFields: {
-      width: ffprobe_data.streams.find((s) => s.codec_type === "video")?.width,
-      size: ffprobe_data.format.size,
-    },
-    ...opts,
-  });
+  try {
+    const current_time = dayjs();
 
-  return ffprobe_data;
+    // check if the file exists
+    if (!fs.existsSync(file)) {
+      throw new Error("File not found");
+    }
+
+    const ffprobe_data = await ffprobe(file);
+
+    await upsert_video({
+      record_id,
+      path: file,
+      probe: ffprobe_data,
+      encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
+      last_probe: current_time,
+      sortFields: {
+        width: ffprobe_data.streams.find((s) => s.codec_type === "video")
+          ?.width,
+        size: ffprobe_data.format.size,
+      },
+      ...opts,
+    });
+
+    return ffprobe_data;
+  } catch (e) {
+    // if the file wasn't found
+    if (/file\s+not\s+found/gi.test(e.message)) {
+      await trash(file);
+    }
+
+    return false;
+  }
 }
 
 async function generate_filelist() {
   // query for any files that have an encode version that doesn't match the current encode version
   let filelist = await File.find({
     encode_version: { $ne: encode_version },
+    status: "pending",
   }).sort({
     "sortFields.priority": 1,
     "sortFields.size": -1,
@@ -156,41 +200,45 @@ async function generate_filelist() {
 
 async function update_queue() {
   try {
+    // check for a lock in redis
+    const lock = await redisClient.get("update_queue_lock");
+
+    // short circuit the function if the lock is set
+    if (lock) {
+      logger.info("Update queue locked. Exiting...");
+      return;
+    }
+
+    // update the status of any files who have an encode version that matches the current encode version and that haven't been marked as deleted
+    await File.updateMany(
+      { encode_version, status: { $ne: "deleted" } },
+      { $set: { status: "complete" } }
+    );
+
     // get current date
     const current_date = dayjs().format("MMDDYYYY");
     // Get the list of files to be converted
-    const last_probe_cache_key = `last_probe_${encode_version}_${current_date}_c`;
+    const last_probe_cache_key = `last_probe_${encode_version}_${current_date}_b`;
 
     // get the last probe time from redis
     const last_probe =
       (await redisClient.get(last_probe_cache_key)) || "1969-12-31 23:59:59";
-    
+
     const current_time = dayjs();
 
     // get seconds until midnight
     const seconds_until_midnight =
       86400 - current_time.diff(current_time.endOf("day"), "seconds") - 60;
 
-    console.log("Seconds until midnight", seconds_until_midnight);
+    logger.debug("Seconds until midnight", seconds_until_midnight);
 
-    const file_ext = [
-      "avi",
-      "mkv",
-      "m4v",
-      "flv",
-      "mov",
-      "wmv",
-      "webm",
-      "gif",
-      "mpg",
-      "mp4",
-      "m2ts",
-    ];
     const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(" ")} \\( ${file_ext
       .map((ext) => `-iname "*.${ext}"`)
-      .join(
-        " -o "
-      )} \\) -not \\( -iname "*.tc.mkv" \\) -newermt "${dayjs(last_probe).subtract(30, 'minutes').format("MM/DD/YYYY HH:mm:ss")}" -print0 | sort -z | xargs -0`;
+      .join(" -o ")} \\) -not \\( -iname "*.tc.mkv" \\) -newermt "${dayjs(
+      last_probe
+    )
+      .subtract(30, "minutes")
+      .format("MM/DD/YYYY HH:mm:ss")}" -print0 | sort -z | xargs -0`;
 
     logger.info(findCMD, { label: "FIND COMMAND" });
 
@@ -206,6 +254,9 @@ async function update_queue() {
 
     await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
       const file_idx = filelist.indexOf(file);
+      logger.info("Processing file", { file, file_idx, total: filelist.length, pct: Math.round((file_idx / filelist.length) * 100) });
+      // set a 60 second lock with each file so that the lock lives no longer than 60 seconds beyond the final probe
+      await redisClient.set("update_queue_lock", "locked", { EX: 60 });
       try {
         const ffprobe_data = await probe_and_upsert(file);
 
@@ -264,6 +315,9 @@ async function update_queue() {
       { EX: seconds_until_midnight }
     );
 
+    // clear the lock
+    await redisClient.del("update_queue_lock");
+
     logger.info("", { label: "REDIS UPDATED" });
   } catch (e) {
     logger.error(e, { label: "UPDATE QUEUE ERROR" });
@@ -271,31 +325,39 @@ async function update_queue() {
 }
 
 async function ffprobe(file) {
-  const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams '${escape_file_path(
-    file
-  )}'`;
-  logger.info(ffprobeCMD, { label: "FFPROBE COMMAND" });
-  const { stdout, stderr } = await exec_promise(ffprobeCMD);
+  try {
+    const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams '${escape_file_path(
+      file
+    )}'`;
+    logger.info(ffprobeCMD, { label: "FFPROBE COMMAND" });
+    const { stdout, stderr } = await exec_promise(ffprobeCMD);
 
-  logger.info({ stdout, stderr }, { label: "FFPROBE OUTPUT" });
+    logger.debug({ stdout, stderr }, { label: "FFPROBE OUTPUT" });
 
-  const data = JSON.parse(stdout);
+    const data = JSON.parse(stdout);
 
-  data.format.duration = +data.format.duration;
-  data.format.size = +data.format.size;
-  data.format.bit_rate = +data.format.bit_rate;
-  data.format.size = +data.format.size / 1024;
+    data.format.duration = +data.format.duration;
+    data.format.size = +data.format.size;
+    data.format.bit_rate = +data.format.bit_rate;
+    data.format.size = +data.format.size / 1024;
 
-  const video = data.streams.find((s) => s.codec_type === "video");
+    const video = data.streams.find((s) => s.codec_type === "video");
 
-  if (video.display_aspect_ratio) {
-    const [width, height] = video.display_aspect_ratio.split(":");
-    video.aspect = aspect_round(width / height);
-  } else {
-    video.aspect = aspect_round(video.width / video.height);
+    if (video.display_aspect_ratio) {
+      const [width, height] = video.display_aspect_ratio.split(":");
+      video.aspect = aspect_round(width / height);
+    } else {
+      video.aspect = aspect_round(video.width / video.height);
+    }
+
+    return data;
+  } catch (e) {
+    if (/command\s+failed/gi.test(e.message)) {
+      trash(file);
+    }
+    logger.error("FFPROBE FAILED", e);
+    return false;
   }
-
-  return data;
 }
 
 function transcode(file) {
@@ -305,15 +367,18 @@ function transcode(file) {
       // mongo record of the video
       const video_record = await File.findOne({ path: file });
       const exists = fs.existsSync(file);
-      const ffprobe_data = await ffprobe(file);
-      logger.debug(ffprobe_data, { label: "FFPROBE DATA >>" });
-      const video_stream = ffprobe_data.streams.find(
-        (s) => s.codec_type === "video"
-      );
 
       if (!exists) {
         throw new Error("File not found");
       }
+
+      const ffprobe_data = await ffprobe(file);
+
+      logger.debug(ffprobe_data, { label: "FFPROBE DATA >>" });
+
+      const video_stream = ffprobe_data.streams.find(
+        (s) => s.codec_type === "video"
+      );
 
       if (!video_stream) {
         throw new Error("No video stream found");
@@ -330,7 +395,7 @@ function transcode(file) {
       // set the scratch file path and name
       const scratch_file = `${scratch_path}/${filename}`.replace(
         /\.[A-Za-z0-9]+$/,
-        ".tc.mkv"
+        "-optimized.tc.mkv"
       );
 
       // set the destination file path and name
@@ -371,7 +436,7 @@ function transcode(file) {
         (s) =>
           s.codec_type === "subtitle" &&
           s.tags?.language === "eng" &&
-          /subrip|hdmv_pgs_subtitle/i.test(s.codec_name)
+          /subrip|hdmv_pgs_subtitle|substation/i.test(s.codec_name)
       );
       let transcode_video = false;
       let transcode_audio = false;
@@ -455,6 +520,11 @@ function transcode(file) {
           `-metadata:s:a:1 language=${audio_stream.tags?.language || "eng"}`,
         ]);
 
+        // adjust channel layout for opus to account for (side) incompatibility
+        if (audio_stream.channels === 5) {
+          audio_filters.push("-af:0 channelmap=channel_layout=5.0");
+        }
+
         if (audio_stream.channels === 6) {
           audio_filters.push("-af:0 channelmap=channel_layout=5.1");
         }
@@ -487,9 +557,10 @@ function transcode(file) {
       cmd = cmd.outputOptions(input_maps);
 
       if (transcode_video) {
-        const pix_fmt =
-          video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
-
+        // const pix_fmt =
+          // video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
+        const pix_fmt = "yuv420p10le";
+        
         conversion_profile.output.video.addFlags({
           maxrate: `${conversion_profile.output.video.bitrate}M`,
           bufsize: `${conversion_profile.output.video.bitrate * 3}M`,
@@ -611,7 +682,7 @@ function transcode(file) {
             { label: "Job" }
           );
 
-          logger.info(output);
+          logger.debug(output);
 
           fs.writeFileSync(
             "/usr/app/output/active.json",
@@ -635,9 +706,7 @@ function transcode(file) {
           await exec_promise(
             `mv '${escape_file_path(scratch_file)}' '${escape_file_path(
               dest_file
-            )}' && touch '${escape_file_path(
-              dest_file
-            )}'`
+            )}' && touch '${escape_file_path(dest_file)}'`
           );
 
           await probe_and_upsert(dest_file, video_record._id, {
@@ -769,6 +838,11 @@ function transcode(file) {
       if (/no\s+(video|audio)\s+stream\s+found/gi.test(e.message)) {
         await trash(file);
       }
+
+      if (/file\s+not\s+found/gi.test(e.message)) {
+        await trash(file);
+      }
+
       resolve();
     }
   });
@@ -857,6 +931,14 @@ function transcode_loop() {
         filelist.length +
         " FILES TO TRANSCODE."
     );
+
+    // if there are no files, wait 1 minute and try again
+    if (filelist.length === 0) {
+      return setTimeout(() => {
+        return transcode_loop();
+      }, 60 * 1000);
+    }
+
     await update_status();
     const file = filelist[0];
     logger.info("BEGINNING TRANSCODE");
@@ -873,13 +955,20 @@ function transcode_loop() {
 
 async function run() {
   try {
+    logger.info("Creating scratch space");
     await create_scratch_disks();
+    logger.info("Getting system utilization values");
     await get_utilization();
+    logger.info("Getting disk space");
     await get_disk_space();
+    logger.info("Cleaning up the FS before running the queue");
     await pre_sanitize();
 
     // parallelize the detection of new videos
+    logger.info("Startup complete. Updating the queue...");
     update_queue();
+
+    logger.info("Starting transcode loop...");
     await transcode_loop();
 
     logger.info("Requeuing in 30 seconds...");
@@ -896,6 +985,10 @@ async function run() {
 }
 
 async function db_cleanup() {
+  // first purge any files marked for delete
+  await File.deleteMany({ status: "deleted" });
+
+  // then verify that all remaining files exist in the filesystem
   const files = await File.find({}).sort({ path: 1 });
   const to_remove = files.map((f) => f.path).filter((p) => !fs.existsSync(p));
 
@@ -915,9 +1008,74 @@ async function create_scratch_disks() {
 
 mongo_connect()
   .then(() => redisClient.connect())
-  .then(() => {
+  .then(() => rabbit_connect())
+  .then(({ send, receive }) => {
+    logger.info("Connected to RabbitMQ");
+    logger.info("Starting main thread");
     run();
 
+    logger.info("Establishing file watcher");
+    // establish fs event listeners on the watched directories
+    logger.debug("Configuring watcher for paths: ", PATHS);
+    const watcher = chokidar.watch(PATHS, {
+      ignored: (file, stats) => {
+        //if .deletedByTMM is in the path, ignore
+        if (file.includes(".deletedByTMM")) {
+          return true;
+        }
+
+        // if the file doesn't have a file extension at all, or it has an approved file_ext do not ignore
+        if (!/\.[A-Za-z0-9]+$/i.test(file)) {
+          return false;
+        }
+
+        return !file_ext.some((ext) => new RegExp(`.${ext}$`, "i").test(file));
+      },
+      ignoreInitial: true,
+      persistent: true,
+      awaitWriteFinish: true
+    });
+
+    watcher
+      .on("ready", () => {
+        logger.debug(
+          ">> WATCHER IS READY AND WATCHING >>",
+          watcher.getWatched()
+        );
+      })
+      .on("error", (error) => logger.error(`Watcher error: ${error}`))
+      .on("add", (path) => {
+        if (file_ext.some((ext) => new RegExp(`.${ext}$`, "i").test(path))) {
+          logger.debug(">> NEW FILE DETECTED >>", path);
+          send({ path });
+        }
+      })
+      .on("change", (path) => {
+        if (file_ext.some((ext) => new RegExp(`.${ext}$`, "i").test(path))) {
+          logger.debug(">> FILE CHANGE DETECTED >>", path);
+          send({ path });
+        }
+      })
+      .on("unlink", (path) => {
+        if (file_ext.some((ext) => new RegExp(`.${ext}$`, "i").test(path))) {
+          logger.debug(">> FILE DELETE DETECTED >>", path);
+          send({ path });
+        }
+      });
+
+    logger.info("Creating message consumer");
+    // listen for messages in rabbit and run an probe and upsert on the paths
+    receive(async (msg, message_content, channel) => {
+      try {
+        await probe_and_upsert(message_content.path);
+        channel.ack(msg);
+      } catch (e) {
+        logger.error(e, { label: "RABBITMQ ERROR" });
+        channel.ack(msg);
+      }
+    });
+
+    logger.info("Scheduling jobs");
     cron.schedule("0 */3 * * *", () => {
       db_cleanup();
     });
@@ -928,4 +1086,5 @@ mongo_connect()
   })
   .catch((e) => {
     console.error(">> COULD NOT CONNECT TO MONGO >>", e);
+    process.exit(1);
   });

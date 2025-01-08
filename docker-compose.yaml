@@ -173,6 +173,8 @@ services:
       - TRANSCODE_PATHS
       - LOG_PRETTY=on
       - LOG_LEVEL=info # make debug when debugging
+      - CHOKIDAR_USEPOLLING=1
+      - NODE_OPTIONS=--max-old-space-size=57344
     volumes:
       - ${TRANSCODE_STORAGE}:/source_media # path to my volumes for download storage
       - ./transcode:/usr/app
@@ -181,11 +183,17 @@ services:
     depends_on:
       - redis
       - mongo
+      - rabbitmq
     deploy:
       resources:
         limits:
-          cpus: '16' # 16 cores
+          cpus: '12' # 12 cores
           memory: 56G # 56GB
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   plex:
     container_name: plex
@@ -205,12 +213,12 @@ services:
 
   mongo:
     container_name: torrent-mongo-local
-    image: mongo:3.6.23-xenial
+    image: mongo:8.0.4-noble
     hostname: torrent-mongo-local
     ports:
       - 27017:27017
     volumes:
-      - mongo_db:/data/db
+      - mongo_db_8:/data/db
     restart: always
 
   sonarr:
@@ -485,10 +493,23 @@ services:
     ports:
       - 61208:61208
     restart: unless-stopped
+  
+  rabbitmq:
+    hostname: rabbitmq
+    container_name: rabbitmq
+    image: rabbitmq:4-management-alpine
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/mnesia/
+    restart: always
+
 volumes:
-  mongo_db:
+  mongo_db_8:
   portainer_db:
   redis_data:
+  rabbitmq_data:
 
 networks:
   default:
