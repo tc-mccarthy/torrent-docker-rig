@@ -521,13 +521,13 @@ function transcode(file) {
         ]);
 
         // adjust channel layout for opus to account for (side) incompatibility
-        if (audio_stream.channels === 5) {
-          audio_filters.push("-af:0 channelmap=channel_layout=5.0");
-        }
+        // if (audio_stream.channels === 5) {
+        //   audio_filters.push("-af:0 channelmap=channel_layout=5.0");
+        // }
 
-        if (audio_stream.channels === 6) {
-          audio_filters.push("-af:0 channelmap=channel_layout=5.1");
-        }
+        // if (audio_stream.channels === 6) {
+        //   audio_filters.push("-af:0 channelmap=channel_layout=5.1");
+        // }
       }
 
       const input_maps = [

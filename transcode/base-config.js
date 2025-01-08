@@ -77,9 +77,9 @@ const config = {
         },
       },
       audio: {
-        codec: "libopus",
-        codec_name: "opus",
-        per_channel_bitrate: 64,
+        codec: "libfdk_aac",
+        codec_name: "aac",
+        per_channel_bitrate: 96,
         downmix: true, // downmix to stereo in a duplicate channel
       },
     },
