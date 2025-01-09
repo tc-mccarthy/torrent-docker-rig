@@ -5,7 +5,7 @@ export function aspect_round(val) {
 }
 
 const config = {
-  encode_version: "20231113a",
+  encode_version: "20250108a",
   concurrent_file_checks: 50,
   profiles: [
     {
