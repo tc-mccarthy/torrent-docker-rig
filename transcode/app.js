@@ -484,7 +484,7 @@ function transcode(file) {
       if (
         ffprobe_data.format.bit_rate >
           conversion_profile.bitrate * 1024 * 1024 &&
-        !transcode_video
+        !transcode_video && video_record.encode_version !== "20231113a"
       ) {
         logger.debug(
           "Video stream bitrate higher than conversion profile. Transcoding"
