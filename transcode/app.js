@@ -108,7 +108,7 @@ async function upsert_video(video) {
       video.sortFields?.priority || file?.sortFields?.priority || 100;
 
     // merge the sortFields object with the priority
-    const sortFields = { ...file.sortFields, priority };
+    const sortFields = { ...(video.sortFields || file.sortFields), priority };
 
     // merge the file object with the video object and override with sortFields
     file = Object.assign(file, video, { sortFields });
