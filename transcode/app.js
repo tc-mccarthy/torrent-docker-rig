@@ -943,8 +943,9 @@ function transcode_loop() {
     logger.info("BEGINNING TRANSCODE");
 
     // run the transcode function on the top 5 files in the list
-    await async.each(filelist.slice(0, config.concurrent_transcodes), async (file) => {
+    await async.eachLimit(filelist.slice(0, 100), config.concurrent_transcodes, async (file) => {
       await transcode(file);
+      return true;
     });
 
 
