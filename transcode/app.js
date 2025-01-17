@@ -254,7 +254,12 @@ async function update_queue() {
 
     await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
       const file_idx = filelist.indexOf(file);
-      logger.info("Processing file", { file, file_idx, total: filelist.length, pct: Math.round((file_idx / filelist.length) * 100) });
+      logger.info("Processing file", {
+        file,
+        file_idx,
+        total: filelist.length,
+        pct: Math.round((file_idx / filelist.length) * 100),
+      });
       // set a 60 second lock with each file so that the lock lives no longer than 60 seconds beyond the final probe
       await redisClient.set("update_queue_lock", "locked", { EX: 60 });
       try {
@@ -484,7 +489,8 @@ function transcode(file) {
       if (
         ffprobe_data.format.bit_rate >
           conversion_profile.bitrate * 1024 * 1024 &&
-        !transcode_video && video_record.encode_version !== "20231113a"
+        !transcode_video &&
+        video_record.encode_version !== "20231113a"
       ) {
         logger.debug(
           "Video stream bitrate higher than conversion profile. Transcoding"
@@ -558,9 +564,9 @@ function transcode(file) {
 
       if (transcode_video) {
         // const pix_fmt =
-          // video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
+        // video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
         const pix_fmt = "yuv420p10le";
-        
+
         conversion_profile.output.video.addFlags({
           maxrate: `${conversion_profile.output.video.bitrate}M`,
           bufsize: `${conversion_profile.output.video.bitrate * 3}M`,
@@ -942,13 +948,20 @@ function transcode_loop() {
     await update_status();
     logger.info("BEGINNING TRANSCODE");
 
-    // run the transcode function on the top 5 files in the list
-    await async.eachLimit(filelist.slice(0, 100), config.concurrent_transcodes, async (file) => {
+    if (config.concurrent_transcodes === 1) {
+      const file = filelist[0];
       await transcode(file);
-      return true;
-    });
-
-
+    } else {
+      // run the transcode function on the top 5 files in the list
+      await async.eachLimit(
+        filelist.slice(0, 100),
+        config.concurrent_transcodes,
+        async (file) => {
+          await transcode(file);
+          return true;
+        }
+      );
+    }
 
     // if there are more files, run the loop again
     if (filelist.length > 1) {
@@ -1039,7 +1052,7 @@ mongo_connect()
       },
       ignoreInitial: true,
       persistent: true,
-      awaitWriteFinish: true
+      awaitWriteFinish: true,
     });
 
     watcher
