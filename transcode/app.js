@@ -940,9 +940,14 @@ function transcode_loop() {
     }
 
     await update_status();
-    const file = filelist[0];
     logger.info("BEGINNING TRANSCODE");
-    await transcode(file);
+
+    // run the transcode function on the top 5 files in the list
+    await async.each(filelist.slice(0, config.concurrent_transcodes), async (file) => {
+      await transcode(file);
+    });
+
+
 
     // if there are more files, run the loop again
     if (filelist.length > 1) {
