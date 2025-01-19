@@ -15,7 +15,7 @@ const config = {
       height: 2160,
       aspect: 16 / 9,
       bitrate: 10,
-      crf: 35,
+      crf: 28,
       output: "av1",
     },
     {
@@ -24,7 +24,7 @@ const config = {
       height: 1080,
       aspect: 16 / 9,
       bitrate: 7,
-      crf: 35,
+      crf: 28,
       output: "av1",
     },
     {
@@ -33,7 +33,7 @@ const config = {
       height: 1080,
       aspect: 4 / 3,
       bitrate: 7,
-      crf: 35,
+      crf: 28,
       output: "av1",
     },
     {
@@ -43,7 +43,7 @@ const config = {
       dest_width: 1920,
       aspect: 16 / 9,
       bitrate: 7,
-      crf: 35,
+      crf: 28,
       output: "av1"
     },
     {
@@ -62,7 +62,7 @@ const config = {
       height: 1920,
       aspect: 9 / 16,
       bitrate: 12,
-      crf: 35,
+      crf: 28,
       output: "av1",
     },
   ],
@@ -73,8 +73,8 @@ const config = {
         codec: "libsvtav1",
         codec_name: "av1",
         flags: {
-          crf: 35,
-          preset: 7
+          crf: 28,
+          preset: 6
         },
       },
       audio: {
