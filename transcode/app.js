@@ -1026,9 +1026,6 @@ async function run() {
     logger.info("Startup complete. Updating the queue...");
     update_queue();
 
-    logger.info("Starting catchup thread...");
-    transcode_loop_catchup();
-
     logger.info("Starting transcode loop...");
     await transcode_loop();
 
@@ -1074,6 +1071,9 @@ mongo_connect()
     logger.info("Connected to RabbitMQ");
     logger.info("Starting main thread");
     run();
+
+    logger.info("Starting catchup thread...");
+    transcode_loop_catchup();
 
     logger.info("Establishing file watcher");
     // establish fs event listeners on the watched directories
