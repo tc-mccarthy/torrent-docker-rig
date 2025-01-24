@@ -972,6 +972,43 @@ function transcode_loop() {
   });
 }
 
+function transcode_loop_catchup() {
+  return new Promise(async (resolve, reject) => {
+    logger.info("STARTING TRANSCODE LOOP");
+    const filelist = await File.find({encode_version: "20231113a", path: {$exists: true}}).limit(2);
+
+    // if there are no files, wait 1 minute and try again
+    if (filelist.length === 0) {
+      return false;
+    }
+
+    await update_status();
+    logger.info("BEGINNING TRANSCODE OF FILES MARKED FOR CATCHUP");
+
+    if (config.concurrent_transcodes === 1) {
+      const file = filelist[0];
+      await transcode_loop_catchup(file);
+    } else {
+      // run the transcode function on the top 5 files in the list
+      await async.eachLimit(
+        filelist.slice(0, 100),
+        config.concurrent_transcodes,
+        async (file) => {
+          await transcode_loop_catchup(file);
+          return true;
+        }
+      );
+    }
+
+    // if there are more files, run the loop again
+    if (filelist.length > 1) {
+      return transcode_loop_catchup();
+    }
+
+    resolve();
+  });
+}
+
 async function run() {
   try {
     logger.info("Creating scratch space");
@@ -1032,6 +1069,9 @@ mongo_connect()
     logger.info("Connected to RabbitMQ");
     logger.info("Starting main thread");
     run();
+
+    logger.info("Starting catchup thread");
+    transcode_loop_catchup();
 
     logger.info("Establishing file watcher");
     // establish fs event listeners on the watched directories
