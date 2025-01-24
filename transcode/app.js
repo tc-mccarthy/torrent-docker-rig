@@ -984,29 +984,15 @@ function transcode_loop_catchup() {
       return false;
     }
 
-    await update_status();
-    logger.info("BEGINNING TRANSCODE OF FILES MARKED FOR CATCHUP");
-
-    if (config.concurrent_transcodes === 1) {
-      const file = filelist[0];
-      await transcode(file);
-    } else {
-      // run the transcode function on the top 5 files in the list
-      await async.eachLimit(
-        filelist.slice(0, 100),
-        config.concurrent_transcodes,
-        async (file) => {
-          await transcode(file);
-          return true;
-        }
-      );
-    }
-
-    // if there are more files, run the loop again
-    if (filelist.length > 1) {
-      return transcode_loop_catchup();
-    }
-
+    await async.eachLimit(
+      filelist,
+      10,
+      async (file) => {
+        await transcode(file);
+        return true;
+      }
+    );
+    
     resolve();
   });
 }
