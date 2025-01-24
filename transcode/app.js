@@ -974,8 +974,10 @@ function transcode_loop() {
 
 function transcode_loop_catchup() {
   return new Promise(async (resolve, reject) => {
-    logger.info("STARTING TRANSCODE LOOP");
+    logger.info("STARTING CATCHUP TRANSCODE LOOP");
     const filelist = await File.find({encode_version: "20231113a", path: {$exists: true}}).limit(2);
+
+    logger.info("FILE LIST ACQUIRED. THERE ARE " + filelist.length + " FILES TO TRANSCODE.");
 
     // if there are no files, wait 1 minute and try again
     if (filelist.length === 0) {
@@ -987,14 +989,14 @@ function transcode_loop_catchup() {
 
     if (config.concurrent_transcodes === 1) {
       const file = filelist[0];
-      await transcode_loop_catchup(file);
+      await transcode(file);
     } else {
       // run the transcode function on the top 5 files in the list
       await async.eachLimit(
         filelist.slice(0, 100),
         config.concurrent_transcodes,
         async (file) => {
-          await transcode_loop_catchup(file);
+          await transcode(file);
           return true;
         }
       );
