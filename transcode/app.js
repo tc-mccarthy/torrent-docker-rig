@@ -161,6 +161,7 @@ async function probe_and_upsert(file, record_id, opts = {}) {
 }
 
 async function generate_filelist() {
+  logger.info("GENERATING PRIMARY FILE LIST");
   // query for any files that have an encode version that doesn't match the current encode version
   let filelist = await File.find({
     encode_version: { $ne: encode_version },
