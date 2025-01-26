@@ -1083,7 +1083,7 @@ async function update_active() {
 
   // purge inactive files 
   exec_promise(
-    `find /usr/app/output/ -iname "active-*.json" -type f -mmin +${6 / 60} -exec rm {} \;`
+    `find /usr/app/output/ -iname "active-*.json" -type f -mmin +${6 / 60} -exec rm {} \\;`
   );
 
   const active_files = active_list.stdout.split(/\n+/).filter((f) => f);
