@@ -173,6 +173,7 @@ async function generate_filelist() {
   // filter out files that are missing paths
   filelist = filelist.filter((f) => f.path);
 
+  logger.info("REMOVING LOCKED FILES FROM FILELIST");
   // now filter out files that have locks
   await async.eachLimit(filelist, 25, async (f) => {
     const lock = await memcached.get(`transcode_lock_${f._id}`);
@@ -955,7 +956,7 @@ async function transcode_loop() {
   logger.info("STARTING TRANSCODE LOOP");
   const filelist = await generate_filelist();
   logger.info(
-    "FILE LIST ACQUIRED. THERE ARE " + filelist.length + " FILES TO TRANSCODE."
+    "PRIMARY FILE LIST ACQUIRED. THERE ARE " + filelist.length + " FILES TO TRANSCODE."
   );
 
   // if there are no files, wait 1 minute and try again
@@ -987,7 +988,7 @@ function transcode_loop_catchup() {
       .map((f) => f.path);
 
     logger.info(
-      "FILE LIST ACQUIRED. THERE ARE " +
+      "SECONDARY FILE LIST ACQUIRED. THERE ARE " +
         filelist.length +
         " FILES TO TRANSCODE."
     );
@@ -1021,8 +1022,7 @@ async function run() {
     logger.info("Startup complete. Updating the queue...");
     update_queue();
 
-    logger.info("Starting transcode loop...");
-
+    logger.info(`Starting ${config.concurrent_transcodes} transcode loops...`);
     Array.from({ length: concurrent_transcodes }).forEach(() => {
       transcode_loop();
     });
