@@ -326,6 +326,12 @@ async function update_queue() {
         filelist[file_idx] = null;
 
         return true;
+      } finally {
+        // clear the lock
+        await redisClient.del("update_queue_lock");
+        setTimeout(() => {
+          update_queue();
+        }, 1000 * 60);
       }
     });
 
@@ -1027,11 +1033,6 @@ async function run() {
     Array.from({ length: config.concurrent_transcodes }).forEach(() => {
       transcode_loop();
     });
-
-    logger.info("Requeuing in 30 seconds...");
-    global.runTimeout = setTimeout(() => {
-      run();
-    }, 30 * 1000);
   } catch (e) {
     logger.error(e, { label: "ERROR" });
     logger.info("Requeuing in 30 seconds...");
