@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import md5 from 'crypto-js/md5';
+import './Nav.scss';
 
 export default function Nav ({ data, setDataSelection, dataSelection }) {
   function display_file_name (file) {
