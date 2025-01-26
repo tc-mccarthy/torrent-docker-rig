@@ -5,6 +5,7 @@ import Box from '@mui/material/Box';
 import dayjs from '../../dayjs';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
 // import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
+import Nav from '../Navigation/Nav';
 
 async function getData (setData, setFileList, setDisks, setUtilization, setStatus) {
   try {
@@ -71,13 +72,14 @@ function make_human_readable (size) {
 }
 
 function Home () {
-  const [data, setData] = useState(false);
+  const [dataSource, setData] = useState(false);
   const [filelist, setFileList] = useState([]);
   const [disks, setDisks] = useState(false);
   const [utilization, setUtilization] = useState(false);
   const [status, setStatus] = useState(false);
+  const [dataSelection, setDataSelection] = useState(0);
 
-  const mvp = [data, filelist, disks, utilization, status].filter((d) => !d);
+  const mvp = [dataSource, filelist, disks, utilization, status].filter((d) => !d);
 
   // interface waits for all data to be loaded
   if (mvp.length > 0) {
@@ -89,10 +91,13 @@ function Home () {
     );
   }
 
+  const data = dataSource[dataSelection];
+
   return (
     <div className="container image">
       <div className="overline" />
       <h1>Optimized video encoding</h1>
+      <Nav data={dataSource} dataSelection={dataSelection} setDataSelection={setDataSelection} />
       <div className="widget center">
         <strong>{data.file}</strong>
         {' '}
