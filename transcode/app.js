@@ -14,9 +14,9 @@ import logger from "./lib/logger.js";
 import { createClient } from "redis";
 import rabbit_connect from "./lib/rabbitmq.js";
 import chokidar from "chokidar";
-import memcached from "memcached-promise";
+import Memcached from "memcached-promise";
 
-const m_connection = memcached("memcached:11211");
+const memcached = new Memcached("memcached:11211");
 
 const redisClient = createClient({ url: "redis://torrent-redis-local" });
 
@@ -175,7 +175,7 @@ async function generate_filelist() {
 
   // now filter out files that have locks
   await async.eachLimit(filelist, 25, async (f) => {
-    const lock = await m_connection.get(`transcode_lock_${f._id}`);
+    const lock = await memcached.get(`transcode_lock_${f._id}`);
     if (lock) {
       f.locked = true;
     }
@@ -387,7 +387,7 @@ function transcode(file) {
       // mongo record of the video
       const video_record = await File.findOne({ path: file });
       const exists = fs.existsSync(file);
-      const locked = await m_connection.get(`transcode_lock_${video_record._id}`);
+      const locked = await memcached.get(`transcode_lock_${video_record._id}`);
 
       if (!exists) {
         throw new Error("File not found");
@@ -653,7 +653,7 @@ function transcode(file) {
         })
         .on("progress", function (progress) {
           // set a 20 second lock on the video record
-          m_connection.set(`transcode_lock_${video_record._id}`, "locked", 20);
+          memcached.set(`transcode_lock_${video_record._id}`, "locked", 20);
           const elapsed = dayjs().diff(start_time, "seconds");
           const run_time = dayjs.utc(elapsed * 1000).format("HH:mm:ss");
           const pct_per_second = progress.percent / elapsed;
