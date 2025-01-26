@@ -529,17 +529,17 @@ function transcode(file) {
         transcode_video = true;
       }
 
-      // if the video was encoded in version 20231113a, don't re-encode it
-      if(/20231113a/i.test(ffprobe_data.format.tags?.ENCODE_VERSION)) {
-        transcode_video = false;
-      }
-
       // if the input stream width doesn't equal the conversion profile width
       if (video_stream.width !== conversion_profile.width) {
         transcode_video = true;
         video_filters.push(
           `scale=${conversion_profile.width}:-2:flags=lanczos`
         );
+      }
+
+      // if the video was encoded in version 20231113a, don't re-encode it
+      if(/20231113a/i.test(ffprobe_data.format.tags?.ENCODE_VERSION)) {
+        transcode_video = false;
       }
 
       // if the audio stream has more than two channels, and the profile is set to downmix, create a stereo version
