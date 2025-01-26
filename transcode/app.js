@@ -521,13 +521,17 @@ function transcode(file) {
       if (
         ffprobe_data.format.bit_rate >
           conversion_profile.bitrate * 1024 * 1024 &&
-        !transcode_video &&
-        video_record.encode_version !== "20231113a"
+        !transcode_video
       ) {
         logger.debug(
           "Video stream bitrate higher than conversion profile. Transcoding"
         );
         transcode_video = true;
+      }
+
+      // if the video was encoded in version 20231113a, don't re-encode it
+      if(/20231113a/i.test(ffprobe_data.format.tags?.ENCODE_VERSION)) {
+        transcode_video = false;
       }
 
       // if the input stream width doesn't equal the conversion profile width
