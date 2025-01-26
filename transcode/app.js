@@ -15,6 +15,7 @@ import { createClient } from "redis";
 import rabbit_connect from "./lib/rabbitmq.js";
 import chokidar from "chokidar";
 import Memcached from "memcached-promise";
+import { log } from "console";
 
 const memcached = new Memcached("memcached:11211");
 
@@ -172,6 +173,7 @@ async function generate_filelist() {
     "sortFields.width": -1,
   });
 
+  logger.info("FILTERING FILELIST");
   // filter out files that are missing paths
   filelist = filelist.filter((f) => f.path);
 
