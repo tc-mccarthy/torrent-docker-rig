@@ -175,6 +175,8 @@ services:
       - LOG_LEVEL=info # make debug when debugging
       - CHOKIDAR_USEPOLLING=1
       - NODE_OPTIONS=--max-old-space-size=57344
+      - CONCURRENT_TRANSCODES
+      - CONCURRENT_FILE_CHECKS
     volumes:
       - ${TRANSCODE_STORAGE}:/source_media # path to my volumes for download storage
       - ./transcode:/usr/app
@@ -503,6 +505,13 @@ services:
       - "5672:5672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq/mnesia/
+    restart: always
+  
+  memcached:
+    container_name: memcached
+    image: memcached:latest
+    ports:
+      - "11211:11211"
     restart: always
 
 volumes:

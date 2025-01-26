@@ -26,6 +26,8 @@
     "dayjs": "^1.11.12",
     "fast-copy": "^3.0.1",
     "fluent-ffmpeg": "^2.1.2",
+    "memcached": "^2.2.2",
+    "memcached-promise": "^1.0.1",
     "mongoose": "^7.6.2",
     "node-cron": "^3.0.2",
     "nodemon": "^2.0.20",

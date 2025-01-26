@@ -5,6 +5,7 @@ nav {
   ul {
     margin: 0;
     padding: 0;
+    display: flex;
 
     li {
       list-style: none;
@@ -16,9 +17,10 @@ nav {
         background: transparent;
         border: 0;
         background: #fff;
-        width: auto;
         margin-right: 10px;
         cursor: pointer;
+        width: max-content;
+        padding: 22px;
 
         &.active {
           border-bottom: 2px solid #000;

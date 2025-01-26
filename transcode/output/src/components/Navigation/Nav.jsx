@@ -20,10 +20,7 @@ export default function Nav ({ data, setDataSelection, dataSelection }) {
             <button type="button" className={dataSelection === index && 'active'} onClick={() => setDataSelection(index)}>
               {display_file_name(item.file)}
               {' '}
-              -
-              {' '}
-              {Math.round(item.output.percent)}
-              %
+              <strong>({Math.round(item.output.percent)}%)</strong>
             </button>
           </li>
         ))}

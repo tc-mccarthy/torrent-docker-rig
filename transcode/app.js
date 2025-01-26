@@ -14,6 +14,9 @@ import logger from "./lib/logger.js";
 import { createClient } from "redis";
 import rabbit_connect from "./lib/rabbitmq.js";
 import chokidar from "chokidar";
+import memcached from "memcached-promise";
+
+const m_connection = memcached("memcached:11211");
 
 const redisClient = createClient({ url: "redis://torrent-redis-local" });
 
@@ -167,7 +170,19 @@ async function generate_filelist() {
     "sortFields.width": -1,
   });
 
+  // filter out files that are missing paths
   filelist = filelist.filter((f) => f.path);
+
+  // now filter out files that have locks
+  await async.eachLimit(filelist, 25, async (f) => {
+    const lock = await m_connection.get(`transcode_lock_${f._id}`);
+    if (lock) {
+      f.locked = true;
+    }
+
+    return true;
+  });
+  filelist = filelist.filter((f) => !f.locked);
 
   // remove first item from the list and write the rest to a file
   fs.writeFileSync(
@@ -372,9 +387,15 @@ function transcode(file) {
       // mongo record of the video
       const video_record = await File.findOne({ path: file });
       const exists = fs.existsSync(file);
+      const locked = await m_connection.get(`transcode_lock_${video_record._id}`);
 
       if (!exists) {
         throw new Error("File not found");
+      }
+
+      // if the file is locked, short circuit
+      if(locked) {
+        return resolve();
       }
 
       const ffprobe_data = await ffprobe(file);
@@ -631,6 +652,8 @@ function transcode(file) {
           }
         })
         .on("progress", function (progress) {
+          // set a 20 second lock on the video record
+          m_connection.set(`transcode_lock_${video_record._id}`, "locked", 20);
           const elapsed = dayjs().diff(start_time, "seconds");
           const run_time = dayjs.utc(elapsed * 1000).format("HH:mm:ss");
           const pct_per_second = progress.percent / elapsed;
@@ -928,10 +951,41 @@ async function update_status() {
   fs.writeFileSync("/usr/app/output/status.json", JSON.stringify(data));
 }
 
-function transcode_loop() {
+async function transcode_loop() {
+  logger.info("STARTING TRANSCODE LOOP");
+  const filelist = await generate_filelist();
+  logger.info(
+    "FILE LIST ACQUIRED. THERE ARE " + filelist.length + " FILES TO TRANSCODE."
+  );
+
+  // if there are no files, wait 1 minute and try again
+  if (filelist.length === 0) {
+    return setTimeout(() => {
+      return transcode_loop();
+    }, 60 * 1000);
+  }
+
+  await update_status();
+  logger.info("BEGINNING TRANSCODE");
+
+  const file = filelist[0];
+  await transcode(file);
+
+  // if there are more files, run the loop again
+  if (filelist.length > 1) {
+    return transcode_loop();
+  }
+}
+
+function transcode_loop_catchup() {
   return new Promise(async (resolve, reject) => {
-    logger.info("STARTING TRANSCODE LOOP");
-    const filelist = await generate_filelist();
+    logger.info("STARTING CATCHUP TRANSCODE LOOP");
+    const filelist = (
+      await File.find({ encode_version: "20231113a", path: { $exists: true } })
+    )
+      .filter((f) => f.path)
+      .map((f) => f.path);
+
     logger.info(
       "FILE LIST ACQUIRED. THERE ARE " +
         filelist.length +
@@ -940,59 +994,14 @@ function transcode_loop() {
 
     // if there are no files, wait 1 minute and try again
     if (filelist.length === 0) {
-      return setTimeout(() => {
-        return transcode_loop();
-      }, 60 * 1000);
-    }
-
-    await update_status();
-    logger.info("BEGINNING TRANSCODE");
-
-    if (config.concurrent_transcodes === 1) {
-      const file = filelist[0];
-      await transcode(file);
-    } else {
-      // run the transcode function on the top 5 files in the list
-      await async.eachLimit(
-        filelist.slice(0, 100),
-        config.concurrent_transcodes,
-        async (file) => {
-          await transcode(file);
-          return true;
-        }
-      );
-    }
-
-    // if there are more files, run the loop again
-    if (filelist.length > 1) {
-      return transcode_loop();
-    }
-
-    resolve();
-  });
-}
-
-function transcode_loop_catchup() {
-  return new Promise(async (resolve, reject) => {
-    logger.info("STARTING CATCHUP TRANSCODE LOOP");
-    const filelist = (await File.find({encode_version: "20231113a", path: {$exists: true}})).filter(f => f.path).map(f => f.path);
-
-    logger.info("FILE LIST ACQUIRED. THERE ARE " + filelist.length + " FILES TO TRANSCODE.");
-
-    // if there are no files, wait 1 minute and try again
-    if (filelist.length === 0) {
       return false;
     }
 
-    await async.eachLimit(
-      filelist,
-      10,
-      async (file) => {
-        await transcode(file);
-        return true;
-      }
-    );
-    
+    await async.eachLimit(filelist, 10, async (file) => {
+      await transcode(file);
+      return true;
+    });
+
     resolve();
   });
 }
@@ -1013,7 +1022,10 @@ async function run() {
     update_queue();
 
     logger.info("Starting transcode loop...");
-    await transcode_loop();
+
+    Array.from({ length: concurrent_transcodes }).forEach(() => {
+      transcode_loop();
+    });
 
     logger.info("Requeuing in 30 seconds...");
     global.runTimeout = setTimeout(() => {
@@ -1050,13 +1062,17 @@ async function create_scratch_disks() {
   );
 }
 
-async function update_active(){
-  const active_list = await exec_promise('find /usr/app/output/ -iname "active-*.json" -type f -mtime -0.0028472222222222');
-  const active_files = active_list.stdout.split(/\n+/).filter(f => f);
-  const active_data = active_files.map(f => JSON.parse(fs.readFileSync(f)));
+async function update_active() {
+  const active_list = await exec_promise(
+    'find /usr/app/output/ -iname "active-*.json" -type f -mtime -0.0028472222222222'
+  );
+  const active_files = active_list.stdout.split(/\n+/).filter((f) => f);
+  const active_data = active_files.map((f) => JSON.parse(fs.readFileSync(f)));
 
   // sort the data by the output.size.original.kb descending
-  active_data.sort((a, b) => b.output.size.original.kb - a.output.size.original.kb);
+  active_data.sort(
+    (a, b) => b.output.size.original.kb - a.output.size.original.kb
+  );
 
   fs.writeFileSync("/usr/app/output/active.json", JSON.stringify(active_data));
 
@@ -1070,8 +1086,9 @@ mongo_connect()
   .then(() => rabbit_connect())
   .then(({ send, receive }) => {
     logger.info("Connected to RabbitMQ");
-    logger.info("Starting main thread");
     update_active();
+
+    logger.info("Starting main thread");
     run();
 
     logger.info("Starting catchup thread...");
