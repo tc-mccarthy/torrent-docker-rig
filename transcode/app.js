@@ -85,6 +85,7 @@ async function pre_sanitize() {
   const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(
     " "
   )} -iname ".deletedByTMM" -type d -exec rm -Rf {} \\;`;
+  logger.info(findCMD, { label: "PRE-SANITIZE COMMAND" });
   await exec_promise(findCMD);
 }
 
@@ -1012,11 +1013,11 @@ async function run() {
     logger.info("Creating scratch space");
     await create_scratch_disks();
     logger.info("Getting system utilization values");
-    await get_utilization();
+    get_utilization();
     logger.info("Getting disk space");
-    await get_disk_space();
+    get_disk_space();
     logger.info("Cleaning up the FS before running the queue");
-    await pre_sanitize();
+    pre_sanitize();
 
     // parallelize the detection of new videos
     logger.info("Startup complete. Updating the queue...");
@@ -1041,6 +1042,7 @@ async function run() {
 }
 
 async function db_cleanup() {
+  logger.info("Cleaning up the database...");
   // first purge any files marked for delete
   await File.deleteMany({ status: "deleted" });
 
