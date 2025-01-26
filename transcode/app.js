@@ -1097,8 +1097,8 @@ mongo_connect()
     logger.info("Starting main thread");
     run();
 
-    logger.info("Starting catchup thread...");
-    transcode_loop_catchup();
+    // logger.info("Starting catchup thread...");
+    // transcode_loop_catchup();
 
     logger.info("Establishing file watcher");
     // establish fs event listeners on the watched directories
