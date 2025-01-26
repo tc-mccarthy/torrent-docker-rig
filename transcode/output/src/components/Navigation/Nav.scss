@@ -1,0 +1,29 @@
+nav {
+  overflow-x: auto;
+  /* momentum scrolling */
+  -webkit-overflow-scrolling: touch;
+  ul {
+    margin: 0;
+    padding: 0;
+
+    li {
+      list-style: none;
+      display: inline-block;
+      padding: 10px;
+      margin: 10px;
+
+      button {
+        background: transparent;
+        border: 0;
+        background: #fff;
+        width: auto;
+        margin-right: 10px;
+        cursor: pointer;
+
+        &.active {
+          border-bottom: 2px solid #000;
+        }
+      }
+    }
+  }
+}
