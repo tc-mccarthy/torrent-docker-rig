@@ -691,7 +691,7 @@ function transcode(file) {
           logger.debug(output);
 
           fs.writeFileSync(
-            "/usr/app/output/active.json",
+            `/usr/app/output/active-${video_record._id}.json`,
             JSON.stringify({
               ...conversion_profile,
               ffmpeg_cmd,
@@ -1050,12 +1050,28 @@ async function create_scratch_disks() {
   );
 }
 
+async function update_active(){
+  const active_list = await exec_promise('find /usr/app/output/ -iname "active-*.json" -type f -mtime -0.0028472222222222');
+  const active_files = active_list.stdout.split(/\n+/).filter(f => f);
+  const active_data = active_files.map(f => JSON.parse(fs.readFileSync(f)));
+
+  // sort the data by the output.size.original.kb descending
+  active_data.sort((a, b) => b.output.size.original.kb - a.output.size.original.kb);
+
+  fs.writeFileSync("/usr/app/output/active.json", JSON.stringify(active_data));
+
+  global.active_timeout = setTimeout(() => {
+    update_active();
+  }, 1 * 1000);
+}
+
 mongo_connect()
   .then(() => redisClient.connect())
   .then(() => rabbit_connect())
   .then(({ send, receive }) => {
     logger.info("Connected to RabbitMQ");
     logger.info("Starting main thread");
+    update_active();
     run();
 
     logger.info("Starting catchup thread...");
