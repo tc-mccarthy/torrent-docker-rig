@@ -962,7 +962,7 @@ async function update_status() {
   fs.writeFileSync("/usr/app/output/status.json", JSON.stringify(data));
 }
 
-async function transcode_loop() {
+async function transcode_loop(idx = 0) {
   logger.info("STARTING TRANSCODE LOOP");
   const filelist = await generate_filelist();
   logger.info(
@@ -979,7 +979,7 @@ async function transcode_loop() {
   await update_status();
   logger.info("BEGINNING TRANSCODE");
 
-  const file = filelist[0];
+  const file = filelist[idx];
   await transcode(file);
 
   // if there are more files, run the loop again
@@ -1033,8 +1033,8 @@ async function run() {
     update_queue();
 
     logger.info(`Starting ${config.concurrent_transcodes} transcode loops...`);
-    Array.from({ length: config.concurrent_transcodes }).forEach(() => {
-      transcode_loop();
+    Array.from({ length: config.concurrent_transcodes }).forEach((idx) => {
+      transcode_loop(idx);
     });
   } catch (e) {
     logger.error(e, { label: "ERROR" });
