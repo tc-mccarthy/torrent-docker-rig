@@ -663,7 +663,7 @@ function transcode(file) {
         })
         .on("progress", function (progress) {
           // set a 20 second lock on the video record
-          memcached.set(`transcode_lock_${video_record._id}`, "locked", 20);
+          memcached.set(`transcode_lock_${video_record._id}`, "locked", 5);
           const elapsed = dayjs().diff(start_time, "seconds");
           const run_time = dayjs.utc(elapsed * 1000).format("HH:mm:ss");
           const pct_per_second = progress.percent / elapsed;
@@ -1069,7 +1069,7 @@ async function create_scratch_disks() {
 
 async function update_active() {
   const active_list = await exec_promise(
-    'find /usr/app/output/ -iname "active-*.json" -type f -mtime -0.0028472222222222'
+    `find /usr/app/output/ -iname "active-*.json" -type f -mmin -${5 / 60}`
   );
   const active_files = active_list.stdout.split(/\n+/).filter((f) => f);
   const active_data = active_files.map((f) => JSON.parse(fs.readFileSync(f)));
