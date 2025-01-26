@@ -164,6 +164,8 @@ async function probe_and_upsert(file, record_id, opts = {}) {
 async function generate_filelist() {
   logger.info("GENERATING PRIMARY FILE LIST");
   // query for any files that have an encode version that doesn't match the current encode version
+  // do not hydrate results into models
+  // sort by priority, then size, then width
   let filelist = await File.find({
     encode_version: { $ne: encode_version },
     status: "pending",
@@ -171,7 +173,7 @@ async function generate_filelist() {
     "sortFields.priority": 1,
     "sortFields.size": -1,
     "sortFields.width": -1,
-  });
+  }).limit(1000);
 
   logger.info("FILTERING FILELIST");
   // filter out files that are missing paths
