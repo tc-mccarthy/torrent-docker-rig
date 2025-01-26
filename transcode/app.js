@@ -1016,7 +1016,7 @@ function transcode_loop_catchup() {
       return false;
     }
 
-    await async.eachLimit(filelist, 10, async (file) => {
+    await async.eachLimit(filelist, 5, async (file) => {
       await transcode(file);
       return true;
     });
