@@ -332,9 +332,6 @@ async function update_queue() {
       } finally {
         // clear the lock
         await redisClient.del("update_queue_lock");
-        setTimeout(() => {
-          update_queue();
-        }, 1000 * 60);
       }
     });
 
@@ -1097,8 +1094,8 @@ mongo_connect()
     logger.info("Starting main thread");
     run();
 
-    // logger.info("Starting catchup thread...");
-    // transcode_loop_catchup();
+    logger.info("Starting catchup thread...");
+    transcode_loop_catchup();
 
     logger.info("Establishing file watcher");
     // establish fs event listeners on the watched directories
