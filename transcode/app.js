@@ -540,6 +540,7 @@ function transcode(file) {
       // if the video was encoded in version 20231113a, don't re-encode it
       if(/20231113a/i.test(ffprobe_data.format.tags?.ENCODE_VERSION)) {
         transcode_video = false;
+        video_filters = [];
       }
 
       // if the audio stream has more than two channels, and the profile is set to downmix, create a stereo version
