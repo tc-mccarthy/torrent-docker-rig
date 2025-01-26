@@ -15,8 +15,6 @@ import { createClient } from "redis";
 import rabbit_connect from "./lib/rabbitmq.js";
 import chokidar from "chokidar";
 import Memcached from "memcached-promise";
-import { log } from "console";
-import { child } from "winston";
 
 const memcached = new Memcached("memcached:11211");
 
