@@ -8,6 +8,10 @@ const transcode_config = {
       scratch: "/source_media/Drax/transcode_scratch",
     },
     {
+      path: "/source_media/Rogers/Movies",
+      scratch: "/source_media/Rogers/transcode_scratch",
+    },
+    {
       path: "/source_media/Drax/Disney",
       scratch: "/source_media/Drax/transcode_scratch",
     },
@@ -26,6 +30,10 @@ const transcode_config = {
     {
       path: "/source_media/Stark/TV Shows",
       scratch: "/source_media/Stark/transcode_scratch",
+    },
+    {
+      path: "/source_media/Parker/TV Shows",
+      scratch: "/source_media/Parker/transcode_scratch",
     },
   ],
 };

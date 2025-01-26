@@ -5,8 +5,9 @@ export function aspect_round(val) {
 }
 
 const config = {
-  encode_version: "20231113a",
+  encode_version: "20250108a",
   concurrent_file_checks: 50,
+  concurrent_transcodes: 1,
   profiles: [
     {
       name: "uhd",
@@ -14,7 +15,7 @@ const config = {
       height: 2160,
       aspect: 16 / 9,
       bitrate: 10,
-      crf: 35,
+      crf: 28,
       output: "av1",
     },
     {
@@ -23,7 +24,7 @@ const config = {
       height: 1080,
       aspect: 16 / 9,
       bitrate: 7,
-      crf: 35,
+      crf: 28,
       output: "av1",
     },
     {
@@ -32,7 +33,7 @@ const config = {
       height: 1080,
       aspect: 4 / 3,
       bitrate: 7,
-      crf: 35,
+      crf: 28,
       output: "av1",
     },
     {
@@ -42,7 +43,7 @@ const config = {
       dest_width: 1920,
       aspect: 16 / 9,
       bitrate: 7,
-      crf: 35,
+      crf: 28,
       output: "av1"
     },
     {
@@ -61,7 +62,7 @@ const config = {
       height: 1920,
       aspect: 9 / 16,
       bitrate: 12,
-      crf: 35,
+      crf: 28,
       output: "av1",
     },
   ],
@@ -72,14 +73,14 @@ const config = {
         codec: "libsvtav1",
         codec_name: "av1",
         flags: {
-          crf: 35,
+          crf: 28,
           preset: 7
         },
       },
       audio: {
-        codec: "libopus",
-        codec_name: "opus",
-        per_channel_bitrate: 64,
+        codec: "libfdk_aac",
+        codec_name: "aac",
+        per_channel_bitrate: 96,
         downmix: true, // downmix to stereo in a duplicate channel
       },
     },

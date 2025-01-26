@@ -108,7 +108,7 @@ async function upsert_video(video) {
       video.sortFields?.priority || file?.sortFields?.priority || 100;
 
     // merge the sortFields object with the priority
-    const sortFields = { ...file.sortFields, priority };
+    const sortFields = { ...(video.sortFields || file.sortFields), priority };
 
     // merge the file object with the video object and override with sortFields
     file = Object.assign(file, video, { sortFields });
@@ -254,7 +254,12 @@ async function update_queue() {
 
     await async.eachLimit(filelist, concurrent_file_checks, async (file) => {
       const file_idx = filelist.indexOf(file);
-      logger.info("Processing file", { file, file_idx, total: filelist.length, pct: Math.round((file_idx / filelist.length) * 100) });
+      logger.info("Processing file", {
+        file,
+        file_idx,
+        total: filelist.length,
+        pct: Math.round((file_idx / filelist.length) * 100),
+      });
       // set a 60 second lock with each file so that the lock lives no longer than 60 seconds beyond the final probe
       await redisClient.set("update_queue_lock", "locked", { EX: 60 });
       try {
@@ -484,7 +489,8 @@ function transcode(file) {
       if (
         ffprobe_data.format.bit_rate >
           conversion_profile.bitrate * 1024 * 1024 &&
-        !transcode_video
+        !transcode_video &&
+        video_record.encode_version !== "20231113a"
       ) {
         logger.debug(
           "Video stream bitrate higher than conversion profile. Transcoding"
@@ -521,13 +527,13 @@ function transcode(file) {
         ]);
 
         // adjust channel layout for opus to account for (side) incompatibility
-        if (audio_stream.channels === 5) {
-          audio_filters.push("-af:0 channelmap=channel_layout=5.0");
-        }
+        // if (audio_stream.channels === 5) {
+        //   audio_filters.push("-af:0 channelmap=channel_layout=5.0");
+        // }
 
-        if (audio_stream.channels === 6) {
-          audio_filters.push("-af:0 channelmap=channel_layout=5.1");
-        }
+        // if (audio_stream.channels === 6) {
+        //   audio_filters.push("-af:0 channelmap=channel_layout=5.1");
+        // }
       }
 
       const input_maps = [
@@ -558,9 +564,9 @@ function transcode(file) {
 
       if (transcode_video) {
         // const pix_fmt =
-          // video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
+        // video_stream.pix_fmt === "yuv420p" ? "yuv420p" : "yuv420p10le";
         const pix_fmt = "yuv420p10le";
-        
+
         conversion_profile.output.video.addFlags({
           maxrate: `${conversion_profile.output.video.bitrate}M`,
           bufsize: `${conversion_profile.output.video.bitrate * 3}M`,
@@ -940,15 +946,53 @@ function transcode_loop() {
     }
 
     await update_status();
-    const file = filelist[0];
     logger.info("BEGINNING TRANSCODE");
-    await transcode(file);
+
+    if (config.concurrent_transcodes === 1) {
+      const file = filelist[0];
+      await transcode(file);
+    } else {
+      // run the transcode function on the top 5 files in the list
+      await async.eachLimit(
+        filelist.slice(0, 100),
+        config.concurrent_transcodes,
+        async (file) => {
+          await transcode(file);
+          return true;
+        }
+      );
+    }
 
     // if there are more files, run the loop again
     if (filelist.length > 1) {
       return transcode_loop();
     }
 
+    resolve();
+  });
+}
+
+function transcode_loop_catchup() {
+  return new Promise(async (resolve, reject) => {
+    logger.info("STARTING CATCHUP TRANSCODE LOOP");
+    const filelist = (await File.find({encode_version: "20231113a", path: {$exists: true}})).filter(f => f.path).map(f => f.path);
+
+    logger.info("FILE LIST ACQUIRED. THERE ARE " + filelist.length + " FILES TO TRANSCODE.");
+
+    // if there are no files, wait 1 minute and try again
+    if (filelist.length === 0) {
+      return false;
+    }
+
+    await async.eachLimit(
+      filelist,
+      10,
+      async (file) => {
+        await transcode(file);
+        return true;
+      }
+    );
+    
     resolve();
   });
 }
@@ -1014,6 +1058,9 @@ mongo_connect()
     logger.info("Starting main thread");
     run();
 
+    logger.info("Starting catchup thread...");
+    transcode_loop_catchup();
+
     logger.info("Establishing file watcher");
     // establish fs event listeners on the watched directories
     logger.debug("Configuring watcher for paths: ", PATHS);
@@ -1033,7 +1080,7 @@ mongo_connect()
       },
       ignoreInitial: true,
       persistent: true,
-      awaitWriteFinish: true
+      awaitWriteFinish: true,
     });
 
     watcher
