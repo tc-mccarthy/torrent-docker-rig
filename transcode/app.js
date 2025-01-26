@@ -16,6 +16,7 @@ import rabbit_connect from "./lib/rabbitmq.js";
 import chokidar from "chokidar";
 import Memcached from "memcached-promise";
 import { log } from "console";
+import { child } from "winston";
 
 const memcached = new Memcached("memcached:11211");
 
@@ -169,11 +170,13 @@ async function generate_filelist() {
   let filelist = await File.find({
     encode_version: { $ne: encode_version },
     status: "pending",
-  }).sort({
-    "sortFields.priority": 1,
-    "sortFields.size": -1,
-    "sortFields.width": -1,
-  }).limit(1000);
+  })
+    .sort({
+      "sortFields.priority": 1,
+      "sortFields.size": -1,
+      "sortFields.width": -1,
+    })
+    .limit(1000);
 
   logger.info("FILTERING FILELIST");
   // filter out files that are missing paths
@@ -404,7 +407,7 @@ function transcode(file) {
       }
 
       // if the file is locked, short circuit
-      if(locked) {
+      if (locked) {
         return resolve();
       }
 
@@ -965,7 +968,9 @@ async function transcode_loop(idx = 0) {
   logger.info("STARTING TRANSCODE LOOP");
   const filelist = await generate_filelist();
   logger.info(
-    "PRIMARY FILE LIST ACQUIRED. THERE ARE " + filelist.length + " FILES TO TRANSCODE."
+    "PRIMARY FILE LIST ACQUIRED. THERE ARE " +
+      filelist.length +
+      " FILES TO TRANSCODE."
   );
 
   // if there are no files, wait 1 minute and try again
@@ -991,11 +996,13 @@ function transcode_loop_catchup() {
   return new Promise(async (resolve, reject) => {
     logger.info("STARTING CATCHUP TRANSCODE LOOP");
     const filelist = (
-      await File.find({ encode_version: "20231113a", path: { $exists: true } }).sort({
-        "sortFields.priority": 1,
-        "sortFields.size": 1,
-        "sortFields.width": -1,
-      }).limit(1000)
+      await File.find({ encode_version: "20231113a", path: { $exists: true } })
+        .sort({
+          "sortFields.priority": 1,
+          "sortFields.size": 1,
+          "sortFields.width": -1,
+        })
+        .limit(1000)
     )
       .filter((f) => f.path)
       .map((f) => f.path);
@@ -1075,6 +1082,12 @@ async function update_active() {
   const active_list = await exec_promise(
     `find /usr/app/output/ -iname "active-*.json" -type f -mmin -${5 / 60}`
   );
+
+  // purge inactive files 
+  exec_promise(
+    `find /usr/app/output/ -iname "active-*.json" -type f -mmin +${6 / 60} -exec rm {} \;`
+  );
+
   const active_files = active_list.stdout.split(/\n+/).filter((f) => f);
   const active_data = active_files.map((f) => JSON.parse(fs.readFileSync(f)));
 
@@ -1083,11 +1096,15 @@ async function update_active() {
     (a, b) => b.output.size.original.kb - a.output.size.original.kb
   );
 
-  fs.writeFileSync("/usr/app/output/active.json", JSON.stringify(active_data));
+  fs.writeFileSync(
+    "/usr/app/output/active-pending.json",
+    JSON.stringify(active_data)
+  );
+  await exec_promise(
+    "mv /usr/app/output/active-pending.json /usr/app/output/active.json"
+  );
 
-  global.active_timeout = setTimeout(() => {
-    update_active();
-  }, 1 * 1000);
+  update_active();
 }
 
 mongo_connect()
