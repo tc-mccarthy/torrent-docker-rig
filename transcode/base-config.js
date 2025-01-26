@@ -52,7 +52,7 @@ const config = {
       height: 480,
       aspect: 4 / 3,
       bitrate: 3.5,
-      crf: 50,
+      crf: 28,
       output: "av1",
       default: true
     },
