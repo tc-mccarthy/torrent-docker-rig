@@ -1033,7 +1033,7 @@ async function run() {
     update_queue();
 
     logger.info(`Starting ${config.concurrent_transcodes} transcode loops...`);
-    Array.from({ length: config.concurrent_transcodes }).forEach((idx) => {
+    Array.from({ length: config.concurrent_transcodes }).forEach((val, idx) => {
       transcode_loop(idx);
     });
   } catch (e) {
