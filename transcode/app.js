@@ -991,7 +991,11 @@ function transcode_loop_catchup() {
   return new Promise(async (resolve, reject) => {
     logger.info("STARTING CATCHUP TRANSCODE LOOP");
     const filelist = (
-      await File.find({ encode_version: "20231113a", path: { $exists: true } })
+      await File.find({ encode_version: "20231113a", path: { $exists: true } }).sort({
+        "sortFields.priority": 1,
+        "sortFields.size": 1,
+        "sortFields.width": -1,
+      }).limit(1000)
     )
       .filter((f) => f.path)
       .map((f) => f.path);
