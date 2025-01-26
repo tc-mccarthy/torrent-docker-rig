@@ -173,7 +173,7 @@ async function generate_filelist() {
     "sortFields.priority": 1,
     "sortFields.size": -1,
     "sortFields.width": -1,
-  }).limit(1000 + config.concurrent_transcodes);
+  }).limit(1000);
 
   logger.info("FILTERING FILELIST");
   // filter out files that are missing paths
