@@ -91,6 +91,14 @@ function Home () {
     );
   }
 
+  if (dataSource.length === 0) {
+    return (
+      <Box sx={{ display: 'flex' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   const data = dataSource[dataSelection];
 
   return (
