@@ -1021,7 +1021,7 @@ function transcode_loop_catchup() {
       return false;
     }
 
-    await async.eachLimit(filelist, config.concurrent_transcodes, async (file) => {
+    await async.eachLimit(filelist, config.concurrent_transcodes * 3, async (file) => {
       await transcode(file);
       return true;
     });
