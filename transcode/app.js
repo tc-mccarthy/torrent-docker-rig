@@ -995,8 +995,8 @@ async function transcode_loop(idx = 0) {
   }
 }
 
-function transcode_loop_catchup() {
-  return new Promise(async (resolve, reject) => {
+async function transcode_loop_catchup() {
+  
     logger.info("STARTING CATCHUP TRANSCODE LOOP");
     const filelist = (
       await File.find({ encode_version: "20231113a", path: { $exists: true } })
@@ -1026,8 +1026,7 @@ function transcode_loop_catchup() {
       return true;
     });
 
-    resolve();
-  });
+    return transcode_loop_catchup();
 }
 
 async function run() {
