@@ -1100,11 +1100,11 @@ async function update_active() {
   );
 
   fs.writeFileSync(
-    "/usr/app/output/active-pending.json",
+    "/usr/app/output/pending-active.json",
     JSON.stringify(active_data)
   );
   await exec_promise(
-    "mv /usr/app/output/active-pending.json /usr/app/output/active.json"
+    "mv /usr/app/output/pending-active.json /usr/app/output/active.json"
   );
 
   update_active();
