@@ -1,15 +1,17 @@
 nav {
-  overflow-x: auto;
+  overflow-y: auto;
   /* momentum scrolling */
   -webkit-overflow-scrolling: touch;
+  max-height: 20vh;
+  margin: 0 auto 22px;
+
   ul {
     margin: 0;
     padding: 0;
-    display: flex;
 
     li {
       list-style: none;
-      display: inline-block;
+      display: block;
       padding: 10px;
       margin: 10px;
 
@@ -19,12 +21,12 @@ nav {
         background: #fff;
         margin-right: 10px;
         cursor: pointer;
-        width: max-content;
+        width: 100%;
         padding: 22px;
         color: #000;
 
         &.active {
-          border-bottom: 2px solid #000;
+          border-bottom: 3px solid #000;
         }
       }
     }

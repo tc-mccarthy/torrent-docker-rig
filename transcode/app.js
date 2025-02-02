@@ -919,7 +919,11 @@ function get_disk_space() {
                   return false;
                 }
               }) > -1
-          );
+          ).map((obj) => {
+            obj.percent_used = parseInt(obj.use.replace("%", ""));
+            obj.above_threshold = obj.percent_used > 85;
+            return obj;
+          });
         fs.writeFileSync("/usr/app/output/disk.json", JSON.stringify(rows));
         global.disk_space_timeout = setTimeout(() => {
           get_disk_space();

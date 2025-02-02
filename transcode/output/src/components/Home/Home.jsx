@@ -192,14 +192,14 @@ function Home () {
         {data.ffmpeg_cmd}
       </div>
 
-      <div className="flex quarter">
+      <div className="flex quarter disks">
         {!disks?.map && <div className="widget center">Loading...</div>}
         {disks?.map &&
           disks?.map((disk) => (
-            <div className="widget">
+            <div className={['widget', disk.above_threshold && 'danger'].filter((c) => c).join(' ')}>
               <strong>{disk.mounted}</strong>
               <em>{[disk.used, 'of', disk.size].join(' ')}</em>
-              <LinearProgressWithLabel value={parseFloat(disk.use.replace('%', ''))} />
+              <LinearProgressWithLabel value={disk.percent_used} className={[disk.above_threshold && 'danger'].filter((c) => c).join(' ')} />
             </div>
           ))}
       </div>
@@ -208,6 +208,7 @@ function Home () {
         {!filelist?.map && <em>Loading...</em>}
         <strong>
           Next
+          {' '}
           {filelist.length.toLocaleString()}
           {' '}
           queued files
