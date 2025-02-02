@@ -1076,7 +1076,7 @@ async function db_cleanup() {
 
 async function create_scratch_disks() {
   await exec_promise(
-    `mkdir -p ${config.sources.map((p) => `"${p.scratch}"`).join(" ")}`
+    `mkdir -p ${config.sources.map((p) => `"${p.path}" "${p.scratch}"`).join(" ")}`
   );
 }
 
