@@ -28,6 +28,7 @@ export default async function transcode (file) {
 
     // if the file is locked, short circuit
     if (locked) {
+      logger.info('File is locked. Exiting transcode...');
       return true;
     }
 
@@ -70,6 +71,7 @@ export default async function transcode (file) {
       );
       video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
       await video_record.save();
+      logger.info('File already encoded. Exiting transcode...');
       return true;
     }
 
@@ -340,8 +342,6 @@ export default async function transcode (file) {
         );
       })
       .on('end', async (stdout, stderr) => {
-        logger.info('Transcoding succeeded!');
-
         // delete the original file
         await trash(file);
 
@@ -359,6 +359,7 @@ export default async function transcode (file) {
             duration: dayjs().diff(start_time, 'seconds')
           }
         });
+        logger.info('Transcoding complete!');
         return Promise.resolve();
       })
       .on('error', async (err, stdout, stderr) => {
@@ -460,6 +461,7 @@ export default async function transcode (file) {
           trash(file);
           await File.deleteOne({ path: file });
         }
+        logger.info("TRANSCODING FAILED. EXITING...");
         return Promise.resolve();
       });
     cmd.save(scratch_file);
@@ -484,6 +486,7 @@ export default async function transcode (file) {
       await trash(file);
     }
 
+    logger.info("TRANSCODING FAILED DUE TO ERROR. EXITING...");
     return Promise.resolve();
   }
 }
