@@ -13,6 +13,8 @@ import db_cleanup from './lib/db_cleanup';
 import config from './lib/config';
 import generate_filelist from './lib/generate_filelist';
 
+const {concurrent_transcodes} = config;
+
 async function run () {
   try {
     // connect to mongo
@@ -47,8 +49,9 @@ async function run () {
     update_queue();
 
     // start the transcode loops
-    logger.info(`Starting ${config.concurrent_transcodes} transcode loops...`);
-    Array.from({ length: config.concurrent_transcodes }).forEach((val, idx) => {
+    logger.info(`Starting ${concurrent_transcodes} transcode loops...`);
+
+    Array.from({ length: concurrent_transcodes }).forEach((val, idx) => {
       transcode_loop(idx);
     });
 
