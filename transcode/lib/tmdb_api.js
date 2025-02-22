@@ -20,7 +20,7 @@ export default async function tmdb_api(file_path) {
     const nfo = fs.readFileSync(nfo_path, "utf8");
 
     // parse the nfo file
-    const nfo_data = parseStringPromise(nfo);
+    const nfo_data = await parseStringPromise(nfo);
 
     // determine the video type
     const video_type = nfo_data.movie ? "movie" : "tv";
