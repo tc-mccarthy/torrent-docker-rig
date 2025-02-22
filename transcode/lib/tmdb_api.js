@@ -42,7 +42,8 @@ export default async function tmdb_api(file_path) {
       const external_id_url = `https://api.themoviedb.org/3/find/${tvdb_id}?external_source=tvdb_id`;
       const external_id_data = await query_tmdb(external_id_url);
 
-      if (external_id_data.tv_results.length === 0) {
+      if (!external_id_data.tv_results?.length) {
+        console.error(`https://api.themoviedb.org/3/find/${tvdb_id}?external_source=tvdb_id`, external_id_data);
         throw new Error("No series found in TMDB");
       }
 
