@@ -1,6 +1,5 @@
-#!/bin/bash
 if [[ $ENV == "local" ]]; then
-    npm run start:dev
+    yarn dev
 else
-    npm run start
+    yarn start
 fi

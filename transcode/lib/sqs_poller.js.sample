@@ -1,0 +1,173 @@
+/**
+ * Sample poller file for SQS
+ *
+ * Connects based on environment and repolls at different intervals based on response payload
+ */
+
+import { SQS } from 'aws-sdk';
+import async, { asyncify } from 'async';
+
+export function SQS_Poller(config = {}) {
+  const sqs = new SQS();
+
+  this.config = {
+    queues: {
+      local: '',
+      stage: '',
+      prod: ''
+    },
+    emptyTimeout: 2 * 60 * 1000, // 2 minutes when the response is empty
+    timeout: 10 * 1000, // 10 seconds when the response is not empty
+    messagesPerPoll: 10,
+    concurrentOps: 5,
+    ...config // override defaults with any provided config
+  };
+
+  this.tasks = [];
+
+  /**
+   * Add a task to be run after receiving messages
+   *
+   * Each task should expect an array of Message objects
+   * @returns {SQS_Poller} Returns the poller object to allow chaining
+   */
+  this.addTask = task => {
+    this.tasks.push(task);
+    return this;
+  };
+
+  /**
+   * Update the config
+   *
+   * Provided object will be shallow merged into the config object
+   * @returns {SQS_Poller} Returns the poller object to allow chaining
+   */
+  this.setConfig = config => {
+    this.config = { ...this.config, ...config };
+    return this;
+  };
+
+  this.getMessages = async () => {
+    // clear any timeouts to free up memory
+    clearTimeout(this.repollTimeout);
+
+    // get the next batch of messages
+    const { Messages } = await sqs
+      .receiveMessage({
+        QueueUrl: this.config.queues[process.env.ENV],
+        MaxNumberOfMessages: this.config.messagesPerPoll
+      })
+      .promise();
+
+    // if there are no messages, wait a bit and try again
+    if (!Messages || Messages.length === 0) {
+      console.log('No messages found');
+      this.repollTimeout = setTimeout(
+        this.getMessages,
+        this.config.emptyTimeout
+      );
+      return false;
+    }
+
+    // otherwise, create a new Message object for each message
+    const messages = Messages.map(
+      m =>
+        new Message({
+          message: m,
+          sqs,
+          queueUrl: this.config.queues[process.env.ENV]
+        })
+    );
+
+    /**
+     * Run each task in parallel
+     *
+     * Each task should expect an array of Message objects
+     */
+    await async.eachLimit(
+      this.tasks,
+      this.config.concurrentOps, // limit the number of concurrent tasks to preserve resources
+      asyncify(async task => {
+        try {
+          await task(messages);
+          return true;
+        } catch (e) {
+          console.error('>> ERROR RUNNING TASK LIST', e.message);
+        }
+      })
+    );
+
+    // and repoll after the timeout
+    this.repollTimeout = setTimeout(this.getMessages, this.config.timeout);
+  };
+}
+
+/**
+ * Creates a message object with some helpful default behaviors for consuming SQS messages
+ *
+ * Messages are kept out of requeue when retrieved. A delete function has been provided to clear intervals and delete the message when done
+ */
+export function Message({ message, sqs, queueUrl }) {
+  this.message = message;
+  this.sqs = sqs;
+  this.queueUrl = queueUrl;
+  let { Body } = this.message;
+  const { ReceiptHandle } = this.message;
+
+  this.delete = () => {
+    clearInterval(this.messageVisibilityInterval);
+    return sqs
+      .deleteMessage({
+        QueueUrl: this.queueUrl,
+        ReceiptHandle: this.message.ReceiptHandle
+      })
+      .promise();
+  };
+
+  this.requeue = () => {
+    clearInterval(this.messageVisibilityInterval);
+  };
+
+  this.getMessage = () => {
+    clearInterval(this.messageVisibilityInterval);
+    this.messageVisibilityInterval = setInterval(() => {
+      sqs.changeMessageVisibility({
+        QueueUrl: this.queueUrl,
+        ReceiptHandle,
+        VisibilityTimeout: 30
+      });
+    }, 27 * 1000);
+
+    if (Body) {
+      Body = JSON.parse(Body);
+    }
+
+    return Body;
+  };
+}
+
+const sqs_poller = new SQS_Poller();
+
+export default sqs_poller;
+
+/** Example usage
+
+function run() {
+  // set up the tasks to run when messages are received
+  sqs_poller.addTask(messages => {
+    messages.forEach(message => {
+      try {
+        const messageBody = message.getMessage();
+        console.log('>>> MESSAGE BODY >>>', messageBody);
+        message.delete();
+      } catch (e) {
+        // if errored, let message go back into the queue to be retried
+        message.requeue();
+      }
+    });
+  }).addTask(...);
+
+  // start polling
+  sqs_poller.getMessages();
+}
+*/
