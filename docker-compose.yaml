@@ -227,6 +227,7 @@ services:
       - ${TRANSCODE_STORAGE}:/source_media # path to my volumes for download storage
       - ./transcode:/usr/app
       - /usr/app/node_modules
+      - /usr/app/bin
     restart: unless-stopped
     depends_on:
       - redis
