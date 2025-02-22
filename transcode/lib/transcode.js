@@ -318,6 +318,8 @@ export default async function transcode (file) {
           4
         );
         
+        logger.info(">> PROGRESS ON TRANSCODING >>", file);
+
         logger.debug(
           {
             ...conversion_profile,
