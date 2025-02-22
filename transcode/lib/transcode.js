@@ -318,7 +318,7 @@ export default async function transcode (file) {
           4
         );
         
-        logger.info(">> PROGRESS ON TRANSCODING >>", file);
+        logger.info(">> PROGRESS ON TRANSCODING >>", file.path);
 
         logger.debug(
           {
