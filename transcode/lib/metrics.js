@@ -5,7 +5,7 @@ import config from './config';
 
 const { encode_version, get_paths } = config;
 
-const PATHS = get_paths();
+const PATHS = get_paths(config);
 
 export function get_disk_space () {
   clearTimeout(global.disk_space_timeout);

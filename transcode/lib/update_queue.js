@@ -11,7 +11,7 @@ import upsert_video from './upsert_video';
 import { trash } from './fs';
 
 const { encode_version, file_ext, concurrent_file_checks, get_paths } = config;
-const PATHS = get_paths();
+const PATHS = get_paths(config);
 
 export default async function update_queue () {
   try {

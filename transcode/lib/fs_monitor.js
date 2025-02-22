@@ -8,7 +8,7 @@ const { file_ext } = config;
 
 const { get_paths } = config;
 
-const PATHS = get_paths();
+const PATHS = get_paths(config);
 
 // connect to rabbit
 const { send, receive } = await rabbit_connect();

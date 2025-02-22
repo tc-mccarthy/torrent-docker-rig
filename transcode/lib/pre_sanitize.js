@@ -4,7 +4,7 @@ import logger from './logger';
 import exec_promise from './exec_promise';
 
 const { get_paths } = config;
-const PATHS = get_paths();
+const PATHS = get_paths(config);
 
 export default async function pre_sanitize () {
   await db_cleanup();
