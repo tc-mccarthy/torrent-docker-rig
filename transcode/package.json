@@ -3,8 +3,8 @@
   "version": "25.1.0",
   "private": true,
   "scripts": {
-    "dev": "npx eslint --fix '**/*.js,**/*.cjs,**/*.mjs'; npx webpack watch --mode development",
-    "build": "echo 'Building production pack'; npx eslint --fix --ext 'js' .; npx webpack --mode production",
+    "dev": "npx eslint --fix '**/*.js'; npx webpack watch --mode development",
+    "build": "echo 'Building production pack'; npx eslint --fix '**/*.js'; npx webpack --mode production",
     "start": "node ./bin/server.js",
     "lint:fix": "npx eslint --fix '**/*.js'"
   },
