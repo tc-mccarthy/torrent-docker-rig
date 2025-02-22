@@ -219,7 +219,7 @@ services:
       - LOG_PRETTY=on
       - LOG_LEVEL=info # make debug when debugging
       - CHOKIDAR_USEPOLLING=1
-      - NODE_OPTIONS=--max-old-space-size=57344
+      - NODE_OPTIONS=--max-old-space-size=57344 --enable-source-maps
       - CONCURRENT_TRANSCODES
       - CONCURRENT_FILE_CHECKS
       - ENV=${ENV:-prod}
