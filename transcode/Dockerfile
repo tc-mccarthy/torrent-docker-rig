@@ -14,8 +14,6 @@ RUN apt-get -y update
 RUN apt-get -y install nodejs
 RUN npm i -g yarn
 
-# Create a non-root user
-RUN adduser --disabled-password --gecos "" node
 
 # Set up directories in advance so we can control the permissions
 RUN mkdir -p /usr/app/bin && mkdir -p /usr/app/node_modules && chown -R node:node /usr/app
@@ -23,20 +21,18 @@ RUN mkdir -p /usr/app/bin && mkdir -p /usr/app/node_modules && chown -R node:nod
 # Set the work directory
 WORKDIR /usr/app
 
-# Set the user
-USER node
 
 ## Dependencies are handled in their own layer so that we can leverage layer cache and save time on rebuild
 
 # Copy over the dependencies
-COPY --chown=node:node package.json .
-COPY --chown=node:node yarn.lock .
+COPY package.json .
+COPY yarn.lock .
 
 # Install the dependencies
 RUN yarn install
 
 # Copy over application files
-COPY --chown=node:node . .
+COPY . .
 RUN chmod +x /usr/app/start-service
 
 # Set ARGs and ENV vars
