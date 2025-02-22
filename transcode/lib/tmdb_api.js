@@ -19,6 +19,10 @@ export default async function tmdb_api(file_path) {
     // first get the nfo file
     const nfo_path = file_path.replace(/\.\w+$/, ".nfo");
 
+    if(!fs.existsSync(nfo_path)) {
+        return {};
+    }
+    
     // read the nfo file
     const nfo = fs.readFileSync(nfo_path, "utf8");
 
