@@ -80,6 +80,8 @@ export default function transcode (file) {
         'i'
       );
 
+      logger.info(audio_stream_test, { label: 'Audio Stream Test', file });
+
       // preserve the audio lines specified in the video record, sorted by channel count
       const audio_streams = ffprobe_data.streams.filter(
         (s) =>
