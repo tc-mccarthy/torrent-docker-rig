@@ -27,6 +27,7 @@ export default async function transcode_loop(idx = 0) {
       return transcode_loop();
     }
   } catch (e) {
-    logger.error(e);
+    logger.error("TRANSCODE LOOP ERROR");
+    console.error(e);
   }
 }
