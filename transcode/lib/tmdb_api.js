@@ -6,13 +6,16 @@ function query_tmdb(url) {
   return fetch(url, {
     headers: {
       Accept: "application/json",
-      Authorization: `Bearer ${process.env.TMDB_API_KEY}`,
+      Authorization: `Bearer ${process.env.TMDB_READ_ACCESS_TOKEN}`,
     },
   }).then((res) => res.json());
 }
 
 export default async function tmdb_api(file_path) {
   try {
+    if(!process.env.TMDB_READ_ACCESS_TOKEN) {
+        throw new Error("TMDB_READ_ACCESS_TOKEN not set");
+    }
     // first get the nfo file
     const nfo_path = file_path.replace(/\.\w+$/, ".nfo");
 
