@@ -1,24 +1,31 @@
-import fs from 'fs';
-import dayjs from './dayjs';
-import ffprobe from './ffprobe';
-import upsert_video from './upsert_video';
-import { trash } from './fs';
-import tmdb_api from './tmdb_api';
+import fs from "fs";
+import dayjs from "./dayjs";
+import ffprobe from "./ffprobe";
+import upsert_video from "./upsert_video";
+import { trash } from "./fs";
+import tmdb_api from "./tmdb_api";
 
-export default async function probe_and_upsert (file, record_id, opts = {}) {
-  file = file.replace(/\n+$/, '');
+export default async function probe_and_upsert(file, record_id, opts = {}) {
+  file = file.replace(/\n+$/, "");
   try {
     const current_time = dayjs();
 
     // check if the file exists
     if (!fs.existsSync(file)) {
-      throw new Error('File not found');
+      throw new Error("File not found");
     }
 
-    const ffprobe_data = await ffprobe(file);
-    const tmdb_data = await tmdb_api(file);
+    const video_record = await File.findOne({ path: file });
 
-    let languages = ['eng', 'und'];
+    const ffprobe_data = await ffprobe(file);
+    let tmdb_data = {};
+
+    // if the file has no audio language, fetch it from TMDB
+    if (!video_record?.audio_language?.length) {
+      tmdb_data = await tmdb_api(file);
+    }
+
+    let languages = ["eng", "und"];
 
     if (tmdb_data.spoken_languages) {
       languages = languages.concat(
@@ -27,7 +34,6 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
 
       languages = Array.from(new Set(languages));
     }
-    
 
     await upsert_video({
       record_id,
@@ -36,12 +42,12 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
       encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
       last_probe: current_time,
       sortFields: {
-        width: ffprobe_data.streams.find((s) => s.codec_type === 'video')
+        width: ffprobe_data.streams.find((s) => s.codec_type === "video")
           ?.width,
-        size: ffprobe_data.format.size
+        size: ffprobe_data.format.size,
       },
       audio_language: languages,
-      ...opts
+      ...opts,
     });
 
     return ffprobe_data;
