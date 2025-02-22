@@ -1,4 +1,5 @@
 import logger from './logger';
+import File from '../models/files';
 
 export default async function upsert_video (video) {
   try {
