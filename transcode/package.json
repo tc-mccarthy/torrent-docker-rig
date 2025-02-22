@@ -1,38 +1,49 @@
 {
   "name": "plex-transcoder",
-  "version": "1.0.0",
-  "description": "",
-  "main": "transcode.js",
-  "type": "module",
+  "version": "25.1.0",
+  "private": true,
   "scripts": {
-    "start": "node ./app.js",
-    "start:dev": "npx nodemon -L ./app.js",
-    "knex": "knex"
+    "dev": "npx eslint --fix '**/*.js,**/*.cjs,**/*.mjs'; npx webpack watch --mode development",
+    "build": "echo 'Building production pack'; npx eslint --fix --ext 'js' .; npx webpack --mode production",
+    "start": "node ./bin/server.js",
+    "lint:fix": "npx eslint --fix '**/*.js'"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/tc-mccarthy/plex-transcoder.git"
-  },
-  "author": "TC McCarthy",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/tc-mccarthy/plex-transcoder/issues"
-  },
-  "homepage": "https://github.com/tc-mccarthy/plex-transcoder#readme",
   "dependencies": {
     "amqplib": "^0.10.5",
     "async": "^3.2.6",
     "chokidar": "^4.0.3",
-    "dayjs": "^1.11.12",
-    "fast-copy": "^3.0.1",
-    "fluent-ffmpeg": "^2.1.2",
+    "dayjs": "^1.11.13",
+    "fast-copy": "^3.0.2",
+    "fluent-ffmpeg": "^2.1.3",
     "memcached": "^2.2.2",
     "memcached-promise": "^1.0.1",
-    "mongoose": "^7.6.2",
-    "node-cron": "^3.0.2",
-    "nodemon": "^2.0.20",
-    "redis": "^4.6.13",
-    "trash-cli": "^5.0.0",
-    "winston": "^3.11.0"
+    "mongoose": "^8.10.1",
+    "node-cron": "^3.0.3",
+    "redis": "^4.7.0",
+    "trash-cli": "^6.0.0",
+    "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/eslint-parser": "^7.26.5",
+    "@babel/preset-env": "^7.26.0",
+    "@eslint/compat": "^1.2.5",
+    "@eslint/eslintrc": "^3.2.0",
+    "@eslint/js": "^9.18.0",
+    "babel-loader": "^9.2.1",
+    "eslint": "^9.18.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^7.2.1",
+    "eslint-plugin-proposal": "^2.3.3",
+    "eslint-webpack-plugin": "^4.2.0",
+    "globals": "^15.14.0",
+    "nodemon": "^3.1.9",
+    "nodemon-webpack-plugin": "^4.8.2",
+    "terser-webpack-plugin": "^5.3.11",
+    "webpack": "^5.97.1",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.0"
   }
 }

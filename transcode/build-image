@@ -1,0 +1,23 @@
+#!/bin/bash
+set -e
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+cd $DIR
+
+## Set repo name and tag
+REPO_NAME="DOCKERHUBUSER/REPO_NAME"
+BRANCH=`git branch | grep '^*' | sed 's/* //'`
+TAG="build-$BRANCH-$(date '+%Y%m%d%H%M%S')"
+
+## Build the image using the repo name, tag and passing in the env var and build version
+docker build -t "$REPO_NAME:$TAG" --build-arg ENV=$ENV --build-arg TARGETENV=$ENV --build-arg BUILD_VERSION=$TAG .
+
+## wait 10 seconds
+sleep 10
+
+## push the image to docker hub
+docker push "$REPO_NAME:$TAG"
+
+## Let us know we're good
+echo "BUILD COMPLETE: $REPO_NAME:$TAG"
