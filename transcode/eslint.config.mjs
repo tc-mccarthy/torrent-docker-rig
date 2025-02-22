@@ -18,7 +18,7 @@ const compat = new FlatCompat({
 });
 
 export default [{
-    ignores: ["**/public/", "**/node_modules/", "**/bin/"],
+    ignores: ["**/public/", "**/node_modules/", "**/bin/", "**/output/"],
 }, ...compat.extends("eslint:recommended", "plugin:proposal/recommended", "airbnb-base"), {
     plugins: {
         node: fixupPluginRules(node),
