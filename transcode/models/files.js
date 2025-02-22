@@ -47,7 +47,7 @@ const schema = new Schema(
       required: true
     },
     audio_language: {
-      type: String,
+      type: Array,
       required: false
     },
     error: {

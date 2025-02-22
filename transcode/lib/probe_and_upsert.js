@@ -15,6 +15,10 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
     }
 
     const ffprobe_data = await ffprobe(file);
+    const tmdb_data = await tmdb_api(file);
+
+    // preserve any english tracks, undefined tracks or tracks of the languages spoken in the video. Keep the list distinct
+    const languages = new Set(['eng', 'und'].concat(tmdb_data.spoken_languages.map((l) => l.iso_639_1)));
 
     await upsert_video({
       record_id,
@@ -27,6 +31,7 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
           ?.width,
         size: ffprobe_data.format.size
       },
+      audio_language: Array.from(languages),
       ...opts
     });
 
