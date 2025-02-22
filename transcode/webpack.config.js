@@ -2,6 +2,7 @@ const path = require('path');
 const ESLintLoader = require('eslint-webpack-plugin');
 const NodemonPlugin = require('nodemon-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
+const NodeExternals = require('webpack-node-externals');
 
 const pure_funcs = [];
 
@@ -17,7 +18,7 @@ module.exports = {
     path: path.resolve(__dirname, 'bin'),
     publicPath: '/bin/'
   },
-  externals: [{ express: "require('express')" }],
+  externals: [NodeExternals()],
   devtool: 'inline-source-map',
   devServer: {
     port: 3888, // default: 8080

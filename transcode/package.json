@@ -21,6 +21,7 @@
     "node-cron": "^3.0.3",
     "redis": "^4.7.0",
     "trash-cli": "^6.0.0",
+    "webpack-node-externals": "^3.0.0",
     "winston": "^3.17.0"
   },
   "devDependencies": {
