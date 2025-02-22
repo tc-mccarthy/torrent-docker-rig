@@ -158,7 +158,7 @@ export default [{
 
         "new-parens": "error",
         "no-array-constructor": "error",
-        "no-async-promise-executor": "error",
+        "no-async-promise-executor": 0,
         "no-caller": "error",
         "no-case-declarations": "error",
         "no-class-assign": "error",
@@ -203,6 +203,7 @@ export default [{
 
         "no-lone-blocks": "error",
         "no-misleading-character-class": "error",
+        "no-promise-executor-return": 0,
         "no-prototype-builtins": "error",
         "no-useless-catch": "error",
 
