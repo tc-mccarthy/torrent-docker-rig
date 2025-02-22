@@ -5,6 +5,7 @@ import Box from '@mui/material/Box';
 import dayjs from '../../dayjs';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
 // import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
+import Nav from '../Navigation/Nav';
 
 async function getData (setData, setFileList, setDisks, setUtilization, setStatus) {
   try {
@@ -71,13 +72,14 @@ function make_human_readable (size) {
 }
 
 function Home () {
-  const [data, setData] = useState(false);
+  const [dataSource, setData] = useState(false);
   const [filelist, setFileList] = useState([]);
   const [disks, setDisks] = useState(false);
   const [utilization, setUtilization] = useState(false);
   const [status, setStatus] = useState(false);
+  const [dataSelection, setDataSelection] = useState(0);
 
-  const mvp = [data, filelist, disks, utilization, status].filter((d) => !d);
+  const mvp = [dataSource, filelist, disks, utilization, status].filter((d) => !d);
 
   // interface waits for all data to be loaded
   if (mvp.length > 0) {
@@ -89,10 +91,21 @@ function Home () {
     );
   }
 
+  if (dataSource.length === 0) {
+    return (
+      <Box sx={{ display: 'flex' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  const data = dataSource[dataSelection];
+
   return (
     <div className="container image">
       <div className="overline" />
       <h1>Optimized video encoding</h1>
+      <Nav data={dataSource} dataSelection={dataSelection} setDataSelection={setDataSelection} />
       <div className="widget center">
         <strong>{data.file}</strong>
         {' '}
@@ -179,14 +192,14 @@ function Home () {
         {data.ffmpeg_cmd}
       </div>
 
-      <div className="flex quarter">
+      <div className="flex quarter disks">
         {!disks?.map && <div className="widget center">Loading...</div>}
         {disks?.map &&
           disks?.map((disk) => (
-            <div className="widget">
+            <div className={['widget', disk.above_threshold && 'danger'].filter((c) => c).join(' ')}>
               <strong>{disk.mounted}</strong>
               <em>{[disk.used, 'of', disk.size].join(' ')}</em>
-              <LinearProgressWithLabel value={parseFloat(disk.use.replace('%', ''))} />
+              <LinearProgressWithLabel value={disk.percent_used} className={[disk.above_threshold && 'danger'].filter((c) => c).join(' ')} />
             </div>
           ))}
       </div>
@@ -195,6 +208,7 @@ function Home () {
         {!filelist?.map && <em>Loading...</em>}
         <strong>
           Next
+          {' '}
           {filelist.length.toLocaleString()}
           {' '}
           queued files

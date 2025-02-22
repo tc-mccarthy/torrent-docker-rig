@@ -40,6 +40,11 @@ services:
       start_period: 30s
     networks:
       - default
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   torrent:
     image: linuxserver/qbittorrent
@@ -68,6 +73,11 @@ services:
       retries: 0
       timeout: 5s
       start_period: 30s
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   autoheal:
     image: willfarrell/autoheal:latest
@@ -76,6 +86,11 @@ services:
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   proxy:
     image: nginx:1.23.3-alpine
@@ -99,6 +114,11 @@ services:
       - torrent
     networks:
       - default
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   certbot:
     container_name: certbot
@@ -107,6 +127,11 @@ services:
     volumes:
       - ./certbot/etc:/etc/letsencrypt
       - ./certbot/cloudflare.ini:/root/cloudflare.ini
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
     command: >-
       certonly --dns-cloudflare
       --dns-cloudflare-credentials /root/cloudflare.ini
@@ -126,6 +151,11 @@ services:
       - API_KEY=${CLOUDFLARE_API_KEY}
       - ZONE=${DDNS_ZONE}
       - SUBDOMAIN=${TORRENT_DDNS_SUBDOMAIN}
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
   
   ddns_overseerr:
     container_name: ddns_overseerr
@@ -135,6 +165,11 @@ services:
       - API_KEY=${CLOUDFLARE_API_KEY}
       - ZONE=${DDNS_ZONE}
       - SUBDOMAIN=${OVERSEERR_DDNS_SUBDOMAIN}
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   ddns_backup:
     container_name: ddns_backup
@@ -144,6 +179,11 @@ services:
       - API_KEY=${CLOUDFLARE_API_KEY}
       - ZONE=${DDNS_ZONE}
       - SUBDOMAIN=${BACKUP_DDNS_SUBDOMAIN}
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   duplicati:
     image: lscr.io/linuxserver/duplicati:latest
@@ -161,6 +201,11 @@ services:
     ports:
       - 8200:8200
     restart: unless-stopped
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   transcode:
     container_name: transcode
@@ -175,6 +220,8 @@ services:
       - LOG_LEVEL=info # make debug when debugging
       - CHOKIDAR_USEPOLLING=1
       - NODE_OPTIONS=--max-old-space-size=57344
+      - CONCURRENT_TRANSCODES
+      - CONCURRENT_FILE_CHECKS
     volumes:
       - ${TRANSCODE_STORAGE}:/source_media # path to my volumes for download storage
       - ./transcode:/usr/app
@@ -187,7 +234,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '12' # 12 cores
+          cpus: '12' # 16 cores
           memory: 56G # 56GB
     logging: 
       driver: "json-file"
@@ -210,6 +257,11 @@ services:
       - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE} # path to my volumes for download storage
       - ./plex:/config
     restart: unless-stopped
+    logging: 
+        driver: "json-file"
+        options: 
+          max-size: "200k"
+          max-file: "10"
 
   mongo:
     container_name: torrent-mongo-local
@@ -220,6 +272,11 @@ services:
     volumes:
       - mongo_db_8:/data/db
     restart: always
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   sonarr:
     container_name: sonarr
@@ -252,6 +309,11 @@ services:
         condition: service_healthy
       torrent: # wait for download client to start before starting
         condition: service_healthy
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   radarr:
     container_name: radarr
@@ -284,6 +346,11 @@ services:
         condition: service_healthy
       torrent: # wait for download client to start before starting
         condition: service_healthy
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   bazarr:
     container_name: bazarr
@@ -316,6 +383,11 @@ services:
         condition: service_healthy
       sonarr: # wait for download client to start before starting
         condition: service_healthy
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   overseerr:
     container_name: overseerr
@@ -347,6 +419,11 @@ services:
         condition: service_healthy
       sonarr: # wait for download client to start before starting
         condition: service_healthy
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   prowlarr:
     container_name: prowlarr
@@ -377,6 +454,11 @@ services:
         condition: service_healthy
       torrent: # wait for vpn to start before starting
         condition: service_healthy
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   tautulli:
     container_name: tautulli
@@ -389,6 +471,11 @@ services:
     volumes:
       - ./tautulli/config:/config
     restart: unless-stopped
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   tmm:
     container_name: tinymediamanager
@@ -416,6 +503,11 @@ services:
     depends_on:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   portainer:
     container_name: portainer
@@ -428,6 +520,11 @@ services:
       vpn: # wait for vpn to start before starting
         condition: service_healthy
     restart: unless-stopped
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   redis:
     container_name: torrent-redis-local
@@ -439,6 +536,11 @@ services:
       - redis_data:/data
     restart: always
     entrypoint: redis-server --appendonly yes
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
     
   samba:
     container_name: samba
@@ -453,6 +555,11 @@ services:
       - ${SAMBA_STORAGE}:/samba/public # path to my volumes for download storage
       - ./samba:/data
     restart: always
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   usenet:
     image: linuxserver/sabnzbd
@@ -473,12 +580,11 @@ services:
     labels:
       - "autoheal=true" # include in autoheal check
     restart: unless-stopped
-    # healthcheck:
-    #   test: bash ./scripts/torrent-health-check # health check script confirms protected vpn connection and a connected qbittorrent
-    #   interval: 10s
-    #   retries: 0
-    #   timeout: 5s
-    #   start_period: 30s
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   monitoring:
     image: nicolargo/glances:latest-full
@@ -493,6 +599,11 @@ services:
     ports:
       - 61208:61208
     restart: unless-stopped
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
   
   rabbitmq:
     hostname: rabbitmq
@@ -504,6 +615,23 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq/mnesia/
     restart: always
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
+  
+  memcached:
+    container_name: memcached
+    image: memcached:latest
+    ports:
+      - "11211:11211"
+    restart: always
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
 volumes:
   mongo_db_8:

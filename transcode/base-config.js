@@ -6,8 +6,8 @@ export function aspect_round(val) {
 
 const config = {
   encode_version: "20250108a",
-  concurrent_file_checks: 50,
-  concurrent_transcodes: 1,
+  concurrent_file_checks: process.env.CONCURRENT_FILE_CHECKS || 50,
+  concurrent_transcodes: process.env.CONCURRENT_TRANSCODES || 1,
   profiles: [
     {
       name: "uhd",
@@ -52,7 +52,7 @@ const config = {
       height: 480,
       aspect: 4 / 3,
       bitrate: 3.5,
-      crf: 50,
+      crf: 28,
       output: "av1",
       default: true
     },
