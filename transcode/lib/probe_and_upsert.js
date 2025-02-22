@@ -3,6 +3,7 @@ import dayjs from './dayjs';
 import ffprobe from './ffprobe';
 import upsert_video from './upsert_video';
 import { trash } from './fs';
+import tmdb_api from './tmdb_api';
 
 export default async function probe_and_upsert (file, record_id, opts = {}) {
   file = file.replace(/\n+$/, '');
