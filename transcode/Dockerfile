@@ -16,7 +16,7 @@ RUN npm i -g yarn
 
 
 # Set up directories in advance so we can control the permissions
-RUN mkdir -p /usr/app/bin && mkdir -p /usr/app/node_modules && chown -R node:node /usr/app
+RUN mkdir -p /usr/app/bin && mkdir -p /usr/app/node_modules
 
 # Set the work directory
 WORKDIR /usr/app
