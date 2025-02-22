@@ -3,6 +3,7 @@ import fs from 'fs';
 import logger from './logger';
 import config from './config';
 import memcached from './memcached';
+import File from '../models/files';
 
 const { encode_version } = config;
 
