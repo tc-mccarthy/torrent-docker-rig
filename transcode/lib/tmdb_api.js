@@ -50,7 +50,7 @@ export default async function tmdb_api(file_path) {
         throw new Error("No series found in TMDB");
       }
 
-      const tmdb_url = `https://api.themoviedb.org/3/tv/${external_id_data.tv_results[0].show_id}?language=en-US`;
+      const tmdb_url = `https://api.themoviedb.org/3/tv/${external_id_data.tv_episode_results[0].show_id}?language=en-US`;
       const tmdb_data = await query_tmdb(tmdb_url);
 
       return tmdb_data;
