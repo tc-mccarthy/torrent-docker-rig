@@ -14,7 +14,7 @@ function query_tmdb(url) {
 export default async function tmdb_api(file_path) {
   try {
     if(!process.env.TMDB_READ_ACCESS_TOKEN) {
-        throw new Error("TMDB_READ_ACCESS_TOKEN not set");
+        return {};
     }
     // first get the nfo file
     const nfo_path = file_path.replace(/\.\w+$/, ".nfo");
@@ -45,7 +45,7 @@ export default async function tmdb_api(file_path) {
       const external_id_url = `https://api.themoviedb.org/3/find/${tvdb_id}?external_source=tvdb_id`;
       const external_id_data = await query_tmdb(external_id_url);
 
-      if (!external_id_data.tv_results?.length) {
+      if (!external_id_data.tv_episode_results?.length) {
         console.error(`https://api.themoviedb.org/3/find/${tvdb_id}?external_source=tvdb_id`, external_id_data);
         throw new Error("No series found in TMDB");
       }
@@ -57,6 +57,6 @@ export default async function tmdb_api(file_path) {
     }
   } catch (e) {
     logger.error(e, { label: "TMDB API FAILURE" });
-    return false;
+    return {};
   }
 }
