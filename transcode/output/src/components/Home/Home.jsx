@@ -112,7 +112,7 @@ function Home () {
         (
         {data.video_stream.codec_name}
         /
-        {data.audio_stream[0].codec_name}
+        {data.audio_streams[0].codec_name}
         )
       </div>
       <div className="flex">
