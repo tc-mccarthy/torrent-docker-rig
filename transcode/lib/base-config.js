@@ -19,10 +19,28 @@ const config = {
       output: 'av1'
     },
     {
+      name: 'uhd (academy)',
+      width: 2960,
+      height: 2160,
+      aspect: 1.37 / 1,
+      bitrate: 10,
+      crf: 28,
+      output: 'av1'
+    },
+    {
       name: '1080p',
       width: 1920,
       height: 1080,
       aspect: 16 / 9,
+      bitrate: 7,
+      crf: 28,
+      output: 'av1'
+    },
+    {
+      name: '1080p academy',
+      width: 1920,
+      height: 1396,
+      aspect: 1.37 / 1,
       bitrate: 7,
       crf: 28,
       output: 'av1'
