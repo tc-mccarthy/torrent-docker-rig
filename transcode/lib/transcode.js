@@ -317,7 +317,7 @@ export default async function transcode (file) {
           true,
           4
         );
-        console.clear();
+        
         logger.debug(
           {
             ...conversion_profile,
