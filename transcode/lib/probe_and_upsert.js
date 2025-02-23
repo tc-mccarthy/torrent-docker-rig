@@ -20,7 +20,6 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
     const video_record = await File.findOne({ path: file });
 
     const ffprobe_data = await ffprobe(file);
-    let tmdb_data = {};
 
     let languages = ['en', 'und'];
 
@@ -28,10 +27,7 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
       languages = languages.concat(video_record.audio_language);
     }
 
-    // if the file has no audio language, fetch it from TMDB
-    if (!video_record?.audio_language?.length) {
-      tmdb_data = await tmdb_api(file);
-    }
+    const tmdb_data = await tmdb_api(file);
 
     if (tmdb_data.spoken_languages) {
       languages = languages.concat(
