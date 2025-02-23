@@ -17,7 +17,7 @@ const { concurrent_transcodes, application_version } = config;
 
 async function run () {
   try {
-    logger.info('Starting transcode service...', {label: 'STARTUP', application_version});
+    logger.info('Starting transcode service...', { label: 'STARTUP', application_version });
     // connect to mongo
     await mongo_connect();
 
