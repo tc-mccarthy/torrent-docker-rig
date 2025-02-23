@@ -140,7 +140,7 @@ function Home () {
         </div>
         <div className="widget">
           <strong>Audio Languages</strong>
-          {data.output.audio_languages?.join(', ') || 'en, eng, und'}
+          {data.audio_streams.map((stream) => stream.tags?.language).join(', ')}
         </div>
       </div>
       <div className="flex">
