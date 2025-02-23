@@ -33,7 +33,7 @@ export default async function update_queue () {
     // get current date
     const current_date = dayjs().format('MMDDYYYY');
     // Get the list of files to be converted
-    const last_probe_cache_key = `last_probe_${encode_version}_${current_date}_${application_version}_a`;
+    const last_probe_cache_key = `last_probe_${encode_version}_${current_date}_${application_version}_b`;
 
     // get the last probe time from redis
     const last_probe =
