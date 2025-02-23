@@ -60,10 +60,10 @@ export default async function tmdb_api (file_path) {
 
     if (video_type === 'tv') {
       // find the series ID in tmdb but querying the external ID
-      const { id: tvdb_id } = nfo_data.episodedetails;
+      const { id: tvdb_id, showtitle } = nfo_data.episodedetails;
 
       // check redis for the series details
-      const redis_key = `tvdb:${tvdb_id}`;
+      const redis_key = `tvdb:${showtitle.toLowerCase().replace(/[^0-9A-Za-z]+/g, '')}`;
       const redis_data = await redisClient.get(redis_key);
 
       // if the series details are in redis, return them
