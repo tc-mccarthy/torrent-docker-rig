@@ -138,6 +138,10 @@ function Home () {
           <strong>Profile</strong>
           {data.name}
         </div>
+        <div className="widget">
+          <strong>Audio Languages</strong>
+          {data.output.audio_languages?.join(', ') || 'en, eng, und'}
+        </div>
       </div>
       <div className="flex">
         <div className="widget">

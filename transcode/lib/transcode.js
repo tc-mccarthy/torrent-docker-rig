@@ -89,8 +89,8 @@ export default function transcode (file) {
           (!s.tags?.language || audio_stream_test.test(s.tags.language))
       ).sort((a, b) => (a.channels > b.channels ? -1 : 1));
 
-      if (!audio_streams) {
-        throw new Error('No audio stream found');
+      if (!audio_streams?.length) {
+        throw new Error('No eligible audio stream found');
       }
 
       const subtitle_streams = ffprobe_data.streams.filter(
@@ -101,7 +101,7 @@ export default function transcode (file) {
       );
       let transcode_video = false;
       let transcode_audio = false;
-      let video_filters = [];
+      const video_filters = [];
       const audio_filters = [];
 
       const conversion_profile = config.get_profile(video_stream);
@@ -161,12 +161,6 @@ export default function transcode (file) {
         video_filters.push(
           `scale=${conversion_profile.width}:-2:flags=lanczos`
         );
-      }
-
-      // if the video was encoded in version 20231113a, don't re-encode it
-      if (/20231113a/i.test(ffprobe_data.format.tags?.ENCODE_VERSION)) {
-        transcode_video = false;
-        video_filters = [];
       }
 
       const input_maps = [
@@ -276,6 +270,7 @@ export default function transcode (file) {
               ...progress,
               video_stream,
               audio_streams,
+              audio_language: video_record.audio_language,
               run_time,
               pct_per_second,
               pct_remaining,
@@ -326,6 +321,7 @@ export default function transcode (file) {
               ffmpeg_cmd,
               audio_streams,
               video_stream,
+              audio_language: video_record.audio_language,
               file,
               output: JSON.parse(output)
             })

@@ -25,6 +25,13 @@ export default function Nav ({ data, setDataSelection, dataSelection }) {
                 {Math.round(item.output.percent)}
                 %)
               </strong>
+              <div>
+                {item.output.time_remaining}
+                {' '}
+                -
+                {' '}
+                {item.name}
+              </div>
             </button>
           </li>
         ))}
