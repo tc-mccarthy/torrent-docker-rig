@@ -62,6 +62,8 @@ export default async function tmdb_api (file_path) {
       // find the series ID in tmdb but querying the external ID
       const { id: tvdb_id, showtitle } = nfo_data.episodedetails;
 
+      logger.info(nfo_data.episodedetails, { label: 'TMDB API' });
+
       // check redis for the series details
       const redis_key = `tvdb:${showtitle.toLowerCase().replace(/[^0-9A-Za-z]+/g, '')}`;
       const redis_data = await redisClient.get(redis_key);
