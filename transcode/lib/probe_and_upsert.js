@@ -22,7 +22,11 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
     const ffprobe_data = await ffprobe(file);
     let tmdb_data = {};
 
-    let languages = video_record?.audio_language || ['en', 'und'];
+    let languages = ['en', 'und'];
+
+    if (video_record?.audio_language?.length) {
+      languages = languages.concat(video_record.audio_language);
+    }
 
     // if the file has no audio language, fetch it from TMDB
     if (!video_record?.audio_language?.length) {
@@ -38,15 +42,17 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
     }
 
     // map the ISO 639-1 language codes to 639-2 but preserve the original as well
-    languages = languages.map((l) => {
-      const response = [l];
+    languages = languages
+      .map((l) => {
+        const response = [l];
 
-      if (language_map[l]) {
-        response.push(language_map[l]);
-      }
+        if (language_map[l]) {
+          response.push(language_map[l]);
+        }
 
-      return response;
-    }).reduce((acc, val) => acc.concat(val), []);
+        return response;
+      })
+      .reduce((acc, val) => acc.concat(val), []);
 
     await upsert_video({
       record_id,
