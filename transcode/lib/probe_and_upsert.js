@@ -22,12 +22,12 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
     const ffprobe_data = await ffprobe(file);
     let tmdb_data = {};
 
+    let languages = video_record?.audio_language || ['en', 'und'];
+
     // if the file has no audio language, fetch it from TMDB
     if (!video_record?.audio_language?.length) {
       tmdb_data = await tmdb_api(file);
     }
-
-    let languages = ['en', 'und'];
 
     if (tmdb_data.spoken_languages) {
       languages = languages.concat(
