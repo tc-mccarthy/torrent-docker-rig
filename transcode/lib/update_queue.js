@@ -10,7 +10,7 @@ import probe_and_upsert from './probe_and_upsert';
 import upsert_video from './upsert_video';
 import { trash } from './fs';
 
-const { encode_version, file_ext, concurrent_file_checks, get_paths } = config;
+const { encode_version, file_ext, concurrent_file_checks, get_paths, application_version } = config;
 const PATHS = get_paths(config);
 
 export default async function update_queue () {
@@ -33,7 +33,7 @@ export default async function update_queue () {
     // get current date
     const current_date = dayjs().format('MMDDYYYY');
     // Get the list of files to be converted
-    const last_probe_cache_key = `last_probe_${encode_version}_${current_date}_b`;
+    const last_probe_cache_key = `last_probe_${encode_version}_${current_date}_${application_version}_a`;
 
     // get the last probe time from redis
     const last_probe =

@@ -13,10 +13,11 @@ import db_cleanup from './lib/db_cleanup';
 import config from './lib/config';
 import generate_filelist from './lib/generate_filelist';
 
-const { concurrent_transcodes } = config;
+const { concurrent_transcodes, application_version } = config;
 
 async function run () {
   try {
+    logger.info('Starting transcode service...', {label: 'STARTUP', application_version});
     // connect to mongo
     await mongo_connect();
 

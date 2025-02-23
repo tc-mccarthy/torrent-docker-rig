@@ -1,7 +1,9 @@
 import base_config from './base-config';
+import packageInfo from '../package.json';
 
 const transcode_config = {
   ...base_config,
+  application_version: packageInfo.version,
   sources: [
     {
       path: '/source_media/Drax/Movies',
