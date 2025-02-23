@@ -45,6 +45,8 @@ export default async function tmdb_api (file_path) {
       if (redis_data) {
         logger.info('TMDB data found in redis');
         return JSON.parse(redis_data);
+      } else {
+        logger.info('Fetching data from TMDB');
       }
 
       // fetch the movie details from TMDB
@@ -69,6 +71,8 @@ export default async function tmdb_api (file_path) {
       if (redis_data) {
         logger.info('TMDB data found in redis');
         return JSON.parse(redis_data);
+      } else {
+        logger.info('Fetching data from TMDB');
       }
 
       const external_id_url = `https://api.themoviedb.org/3/find/${tvdb_id}?external_source=tvdb_id`;
