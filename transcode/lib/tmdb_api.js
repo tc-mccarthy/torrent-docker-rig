@@ -43,6 +43,7 @@ export default async function tmdb_api (file_path) {
 
       // if the movie details are in redis, return them
       if (redis_data) {
+        logger.info('TMDB data found in redis');
         return JSON.parse(redis_data);
       }
 
@@ -66,6 +67,7 @@ export default async function tmdb_api (file_path) {
 
       // if the series details are in redis, return them
       if (redis_data) {
+        logger.info('TMDB data found in redis');
         return JSON.parse(redis_data);
       }
 
