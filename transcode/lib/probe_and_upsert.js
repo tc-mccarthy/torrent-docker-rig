@@ -33,8 +33,6 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
       languages = languages.concat(
         tmdb_data.spoken_languages.map((l) => l.iso_639_1)
       );
-
-      languages = Array.from(new Set(languages));
     }
 
     // map the ISO 639-1 language codes to 639-2 but preserve the original as well
@@ -48,7 +46,8 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
 
         return response;
       })
-      .reduce((acc, val) => acc.concat(val), []);
+      .reduce((acc, val) => acc.concat(val), [])
+      .reduce((acc, val) => (acc.includes(val) ? acc : acc.concat(val)), []);
 
     await upsert_video({
       record_id,
