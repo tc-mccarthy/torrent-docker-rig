@@ -4,7 +4,7 @@ import update_active from './lib/update_active';
 import update_queue from './lib/update_queue';
 import transcode_loop from './lib/transcode_loop';
 import fs_monitor from './lib/fs_monitor';
-import redisClient from './lib/redis';
+// import redisClient from './lib/redis';
 import logger from './lib/logger';
 import { get_utilization, get_disk_space } from './lib/metrics';
 import pre_sanitize from './lib/pre_sanitize';
@@ -24,7 +24,7 @@ async function run () {
 
     logger.info('Connecting to Redis');
     // connect to redis
-    await redisClient.connect();
+    // await redisClient.connect();
 
     // update the active list
     update_active();
