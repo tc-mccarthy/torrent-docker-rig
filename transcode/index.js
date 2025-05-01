@@ -13,7 +13,7 @@ import logger from './lib/logger';
 import config from './lib/config';
 // import generate_filelist from './lib/generate_filelist';
 
-const { concurrent_transcodes, application_version } = config;
+const { application_version } = config;
 
 async function run () {
   try {
