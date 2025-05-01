@@ -273,7 +273,7 @@ services:
     ports:
       - 27017:27017
     volumes:
-      - mongo_db_8_2025a:/data/db
+      - mongo_db_8:/data/db
     restart: always
     logging: 
       driver: "json-file"
@@ -616,7 +616,7 @@ services:
       - "15672:15672"
       - "5672:5672"
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq/mnesia/
+      - rabbitmq_data_2025a:/var/lib/rabbitmq/mnesia/
     restart: always
     logging: 
       driver: "json-file"
@@ -637,10 +637,10 @@ services:
         max-file: "10"
 
 volumes:
-  mongo_db_8_2025a:
+  mongo_db_8:
   portainer_db:
   redis_data:
-  rabbitmq_data:
+  rabbitmq_data_2025a:
 
 networks:
   default:
