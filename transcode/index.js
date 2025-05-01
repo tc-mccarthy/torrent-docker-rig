@@ -18,9 +18,11 @@ const { concurrent_transcodes, application_version } = config;
 async function run () {
   try {
     logger.info('Starting transcode service...', { label: 'STARTUP', application_version });
+    logger.info('Connecting to MongoDB');
     // connect to mongo
     await mongo_connect();
 
+    logger.info('Connecting to Redis');
     // connect to redis
     await redisClient.connect();
 
@@ -71,7 +73,7 @@ async function run () {
       update_queue();
     });
   } catch (e) {
-    logger.error(e, { label: 'RUN ERROR' });
+    logger.error(e, { label: 'RUN ERROR', message: e.message });
   }
 }
 
