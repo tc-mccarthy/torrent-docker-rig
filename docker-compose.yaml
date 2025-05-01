@@ -611,12 +611,12 @@ services:
   rabbitmq:
     hostname: rabbitmq
     container_name: rabbitmq
-    image: rabbitmq:4-management-alpine
+    image: rabbitmq:4.0.9-management-alpine
     ports:
       - "15672:15672"
       - "5672:5672"
     volumes:
-      - rabbitmq_data_2025a:/var/lib/rabbitmq/mnesia/
+      - rabbitmq_data:/var/lib/rabbitmq/mnesia/
     restart: always
     logging: 
       driver: "json-file"
@@ -640,7 +640,7 @@ volumes:
   mongo_db_8:
   portainer_db:
   redis_data:
-  rabbitmq_data_2025a:
+  rabbitmq_data:
 
 networks:
   default:
