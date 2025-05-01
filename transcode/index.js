@@ -77,4 +77,5 @@ async function run () {
   }
 }
 
+logger.info('Starting transcode service...', { label: 'STARTUP', application_version });
 run();
