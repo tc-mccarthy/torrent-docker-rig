@@ -1,19 +1,24 @@
-import logger from './logger';
-import File from '../models/files';
+import logger from "./logger";
+import File from "../models/files";
 
-export function default_priority (video) {
-  // if the size is less than 1GB in kilobytes OR if it's more than 20GB, return 99
-  if (video.probe.format.size < 1048576 || video.probe.format.size > 20971520) {
+export function default_priority(video) {
+  // if the size is less than 1GB in kilobytes
+  if (video.probe.format.size <= 1048576) {
+    return 99;
+  }
+
+  // if the size is more than 20GB in kilobytes
+  if (video.probe.format.size >= 20971520) {
     return 99;
   }
 
   return 100;
 }
 
-export default async function upsert_video (video) {
+export default async function upsert_video(video) {
   try {
     let { path, record_id } = video;
-    path = path.replace(/\n+$/, '');
+    path = path.replace(/\n+$/, "");
     let file;
 
     if (record_id) {
@@ -29,8 +34,12 @@ export default async function upsert_video (video) {
     }
 
     // get the highest priority from the video or file sortfields and default priority
-    const priority =
-      Math.min(video.sortFields?.priority || file?.sortFields?.priority, default_priority(video));
+    const priority = Math.min(
+      video.sortFields?.priority ||
+        file?.sortFields?.priority ||
+        default_priority(video),
+      default_priority(video)
+    );
 
     // merge the sortFields object with the priority
     const sortFields = { ...(video.sortFields || file.sortFields), priority };
@@ -40,6 +49,6 @@ export default async function upsert_video (video) {
 
     await file.save();
   } catch (e) {
-    logger.error(e, { label: 'UPSERT FAILURE' });
+    logger.error(e, { label: "UPSERT FAILURE" });
   }
 }
