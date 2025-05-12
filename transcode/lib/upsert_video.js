@@ -2,6 +2,11 @@ import logger from "./logger";
 import File from "../models/files";
 
 export function default_priority(video) {
+  // if the size is more than 20GB in kilobytes
+  if (video.probe.format.size >= 20971520) {
+    return 97;
+  }
+  
   // if the size is less than 1GB in kilobytes
   if (video.probe.format.size <= 524288) {
     return 98;
@@ -9,11 +14,6 @@ export function default_priority(video) {
   
   // if the size is less than 1GB in kilobytes
   if (video.probe.format.size <= 1048576) {
-    return 99;
-  }
-
-  // if the size is more than 20GB in kilobytes
-  if (video.probe.format.size >= 20971520) {
     return 99;
   }
 
