@@ -3,6 +3,11 @@ import File from "../models/files";
 
 export function default_priority(video) {
   // if the size is less than 1GB in kilobytes
+  if (video.probe.format.size <= 512000) {
+    return 98;
+  }
+  
+  // if the size is less than 1GB in kilobytes
   if (video.probe.format.size <= 1048576) {
     return 99;
   }
