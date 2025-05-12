@@ -1,6 +1,15 @@
 import logger from './logger';
 import File from '../models/files';
 
+function default_priority (video) {
+  // if the size is less than 2GB in kilobytes, return 99
+  if(video.probe.format.size < 2097152){
+    return 99;
+  }
+
+  return 100;
+}
+
 export default async function upsert_video (video) {
   try {
     let { path, record_id } = video;
@@ -21,7 +30,7 @@ export default async function upsert_video (video) {
 
     // get priority from the video object, existing document or default to 100
     const priority =
-      video.sortFields?.priority || file?.sortFields?.priority || 100;
+      video.sortFields?.priority || file?.sortFields?.priority || default_priority(video);
 
     // merge the sortFields object with the priority
     const sortFields = { ...(video.sortFields || file.sortFields), priority };
