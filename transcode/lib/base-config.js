@@ -58,7 +58,6 @@ const config = {
       name: '720p',
       width: 1280,
       height: 720,
-      dest_width: 1920,
       aspect: 16 / 9,
       bitrate: 7,
       crf: 28,
