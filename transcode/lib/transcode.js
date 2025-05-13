@@ -118,7 +118,6 @@ export default function transcode (file) {
         conversion_profile.dest_width || conversion_profile.width;
 
       // if the video codec doesn't match the profile
-
       if (
         conversion_profile.output.video.codec_name !== video_stream.codec_name
       ) {
@@ -151,6 +150,17 @@ export default function transcode (file) {
           'Video stream bitrate higher than conversion profile. Transcoding'
         );
         transcode_video = true;
+      }
+
+      // if the video is 1gb or less in size and the codec is HEVC, don't transcode
+      if (
+        video_stream.codec_name === 'hevc' &&
+        ffprobe_data.format.size <= 1048576
+      ) {
+        logger.debug(
+          'Video stream codec is HEVC and size is less than 1GB. Not transcoding'
+        );
+        transcode_video = false;
       }
 
       // if the input stream width doesn't equal the conversion profile width
