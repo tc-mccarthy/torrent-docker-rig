@@ -164,12 +164,12 @@ export default function transcode (file) {
       }
 
       // if the input stream width doesn't equal the conversion profile width
-      if (video_stream.width !== conversion_profile.width) {
+      /* if (video_stream.width !== conversion_profile.width) {
         transcode_video = true;
         video_filters.push(
           `scale=${conversion_profile.width}:-2:flags=lanczos`
         );
-      }
+      } */
 
       const input_maps = [
         `-map 0:${video_stream.index}`
