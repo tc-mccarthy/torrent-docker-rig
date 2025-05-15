@@ -5,7 +5,7 @@ import exec_promise from './exec_promise';
 import config from './config';
 
 export function escape_file_path (file) {
-  return file.replace(/(['])/g, "\x27").replace(/\n+$/, '');
+  return file.replace(/(['])/g, "'\\''").replace(/\n+$/, '');
 }
 
 export async function trash (file) {
