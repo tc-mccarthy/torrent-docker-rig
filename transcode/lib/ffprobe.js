@@ -16,7 +16,7 @@ export function ffprobe_promise(file){
   });
 }
 
-export default async function ffprobe (file) {
+export default async function ffprobe_func (file) {
   try {
     // confirm the file exists 
     if(!fs.existsSync(file)){
