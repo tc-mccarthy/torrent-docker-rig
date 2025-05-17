@@ -6,7 +6,7 @@ import { ffprobe } from "fluent-ffmpeg";
 
 export function ffprobe_promise(file) {
   return new Promise((resolve, reject) => {
-    logger.info(file, {
+    logger.debug(file, {
       label: "Probing file using ffprobe method from fluent-ffmpeg wrapper",
     });
     ffprobe(file, (err, data) => {
@@ -28,7 +28,7 @@ export default async function ffprobe_func(file) {
 
     const data = await ffprobe_promise(file);
 
-    logger.info(data, { label: "FFProbe complete" });
+    logger.debug(data, { label: "FFProbe complete" });
 
     data.format.duration = +data.format.duration;
     data.format.size = +data.format.size;
