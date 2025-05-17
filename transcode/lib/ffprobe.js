@@ -9,19 +9,12 @@ export function ffprobe_promise(file) {
     logger.debug(file, {
       label: "Probing file using ffprobe method from fluent-ffmpeg wrapper",
     });
-    const probe_cmd = ffprobe(file, (err, data) => {
+    ffprobe(file, (err, data) => {
       if (err) {
         logger.error("FFPROBE FAILED", err);
         return reject(err);
       }
       resolve(data);
-    });
-
-    probe_cmd.on("start", (commandLine) => {
-      logger.info(
-        commandLine,
-        { label: "FFPROBE command" }
-      );
     });
   });
 }
