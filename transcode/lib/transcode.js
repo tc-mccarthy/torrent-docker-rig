@@ -329,34 +329,41 @@ export default function transcode(file) {
           );
         })
         .on("end", async (stdout, stderr) => {
-          logger.info("Transcoding succeeded!");
-          logger.info(`Confirming existence of ${scratch_file}`);
+          try {
+            logger.info("Transcoding succeeded!");
+            logger.info(`Confirming existence of ${scratch_file}`);
 
-          if (!fs.existsSync(scratch_file)) {
-            throw new Error("Scratch file not found after transcode complete.");
+            if (!fs.existsSync(scratch_file)) {
+              throw new Error(
+                "Scratch file not found after transcode complete."
+              );
+            }
+
+            logger.info(`${scratch_file} found by nodejs`);
+
+            // rename the scratch file to the destination file name
+            await fs.promises.rename(scratch_file, dest_file);
+
+            // update the timestamp on the destination file so that it's picked up scans
+            await fs.promises.utimes(dest_file, new Date(), new Date());
+
+            // delete the original file if the transcoded filename is different
+            if (scratch_file !== file) {
+              await trash(file);
+            }
+
+            await probe_and_upsert(dest_file, video_record._id, {
+              transcode_details: {
+                ...video_record.transcode_details,
+                end_time: dayjs().toDate(),
+                duration: dayjs().diff(start_time, "seconds"),
+              },
+            });
+          } catch (e) {
+            logger.error(e, { label: "POST TRANSCODE ERROR" });
+          } finally {
+            resolve();
           }
-
-          logger.info(`${scratch_file} found by nodejs`);
-
-          // rename the scratch file to the destination file name
-          await fs.promises.rename(scratch_file, dest_file);
-
-          // update the timestamp on the destination file so that it's picked up scans
-          await fs.promises.utimes(dest_file, new Date(), new Date());
-
-          // delete the original file if the transcoded filename is different
-          if (scratch_file !== file) {
-            await trash(file);
-          }
-
-          await probe_and_upsert(dest_file, video_record._id, {
-            transcode_details: {
-              ...video_record.transcode_details,
-              end_time: dayjs().toDate(),
-              duration: dayjs().diff(start_time, "seconds"),
-            },
-          });
-          resolve();
         })
         .on("error", async (err, stdout, stderr) => {
           logger.error(err, { label: "Cannot process video", stdout, stderr });
