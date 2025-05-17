@@ -5,7 +5,7 @@ import exec_promise from './exec_promise';
 import config from './config';
 
 export function escape_file_path (file) {
-  return file.replace(/(['])/g, "'\\''").replace(/\n+$/, '');
+  return file.replace(/(["])/g, '\\"').replace(/\n+$/, '');
 }
 
 export async function trash (file) {
@@ -19,7 +19,7 @@ export async function trash (file) {
   file = escape_file_path(file.replace(/\/$/g, '')).trim();
 
   if (fs.existsSync(file)) {
-    exec(`rm '${file}'`, (error, stdout, stderr) => {
+    exec(`rm "${file}"`, (error, stdout, stderr) => {
       if (error) {
         console.error(`exec error: ${error}`);
         return Promise.reject(error);

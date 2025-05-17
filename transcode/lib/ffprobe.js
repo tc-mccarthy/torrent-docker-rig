@@ -5,9 +5,9 @@ import logger from './logger';
 
 export default async function ffprobe (file) {
   try {
-    const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams '${escape_file_path(
+    const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams "${escape_file_path(
       file
-    )}'`;
+    )}"`;
     logger.info(ffprobeCMD, { label: 'FFPROBE COMMAND' });
     const { stdout, stderr } = await exec_promise(ffprobeCMD);
 

@@ -343,9 +343,9 @@ export default function transcode (file) {
 
           // move the transcoded file to the destination and touch it so it's picked up by scans
           await exec_promise(
-            `mv '${escape_file_path(scratch_file)}' '${escape_file_path(
+            `mv "${escape_file_path(scratch_file)}" "${escape_file_path(
               dest_file
-            )}' && touch '${escape_file_path(dest_file)}'`
+            )}" && touch "${escape_file_path(dest_file)}"`
           );
 
           await probe_and_upsert(dest_file, video_record._id, {
