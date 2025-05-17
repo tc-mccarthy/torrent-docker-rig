@@ -1,19 +1,29 @@
-import exec_promise from './exec_promise';
+import * as fs from 'fs';
 import { aspect_round } from './base-config';
-import { trash, escape_file_path } from './fs';
+import { trash } from './fs';
 import logger from './logger';
+import {ffprobe} from 'fluent-ffmpeg'
+
+export function ffprobe_promise(file){
+  return new Promise((resolve, reject) => {
+    ffprobe(file, (err, data) => {
+      if (err) {
+        logger.error('FFPROBE FAILED', err);
+        return reject(err);
+      }
+      resolve(data);
+    });
+  });
+}
 
 export default async function ffprobe (file) {
   try {
-    const ffprobeCMD = `ffprobe -v quiet -print_format json -show_format -show_chapters -show_streams "${escape_file_path(
-      file
-    )}"`;
-    logger.info(ffprobeCMD, { label: 'FFPROBE COMMAND' });
-    const { stdout, stderr } = await exec_promise(ffprobeCMD);
+    // confirm the file exists 
+    if(!fs.existsSync(file)){
+      return new Error(`File does not exist: ${file}`);
+    }
 
-    logger.debug({ stdout, stderr }, { label: 'FFPROBE OUTPUT' });
-
-    const data = JSON.parse(stdout);
+    const data = await ffprobe_promise(file);
 
     data.format.duration = +data.format.duration;
     data.format.size = +data.format.size;
