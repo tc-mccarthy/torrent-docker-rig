@@ -88,7 +88,7 @@ export default function transcode (file) {
       ).sort((a, b) => (a.channels > b.channels ? -1 : 1));
 
       if (!audio_streams?.length) {
-        throw new Error('No eligible audio stream found');
+        throw new Error('No audio stream found');
       }
 
       const subtitle_streams = ffprobe_data.streams.filter(
