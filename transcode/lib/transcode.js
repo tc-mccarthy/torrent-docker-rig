@@ -336,6 +336,9 @@ export default function transcode (file) {
           );
         })
         .on('end', async (stdout, stderr) => {
+          if(!fs.existsSync(scratch_file)){
+            throw new Error("Scratch file not found after transcode complete.");
+          }
           logger.info('Transcoding succeeded!');
 
           // delete the original file
