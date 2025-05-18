@@ -6,7 +6,7 @@ import ffprobe from "./ffprobe";
 import config from "./config";
 import logger from "./logger";
 import memcached from "./memcached";
-import { trash } from "./fs";
+import { trash, generate_file_paths } from "./fs";
 import upsert_video from "./upsert_video";
 import ErrorLog from "../models/error";
 import probe_and_upsert from "./probe_and_upsert";
@@ -33,7 +33,7 @@ export default function transcode(file) {
 
       const ffprobe_data = await ffprobe(file);
 
-      logger.debug(ffprobe_data, { label: "FFPROBE DATA >>" });
+      logger.debug(ffprobe_data, { label: ">> FFPROBE DATA >>" });
 
       const video_stream = ffprobe_data.streams.find(
         (s) => s.codec_type === "video"
@@ -43,22 +43,7 @@ export default function transcode(file) {
         throw new Error("No video stream found");
       }
 
-      // get the scratch path
-      const scratch_path = config.sources.find((p) =>
-        file.startsWith(p.path)
-      ).scratch;
-
-      // get the filename
-      const filename = file.match(/([^/]+)$/)[1];
-
-      // set the scratch file path and name
-      const scratch_file = `${scratch_path}/${filename}`.replace(
-        /\.[A-Za-z0-9]+$/,
-        "-optimized.tc.mkv"
-      );
-
-      // set the destination file path and name
-      const dest_file = file.replace(/\.[A-Za-z0-9]+$/, ".mkv");
+      const { scratch_file, dest_file } = generate_file_paths(file);
 
       // if this file has already been encoded, short circuit
       if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
