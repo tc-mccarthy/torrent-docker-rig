@@ -10,6 +10,7 @@ import { trash, generate_file_paths } from "./fs";
 import upsert_video from "./upsert_video";
 import ErrorLog from "../models/error";
 import probe_and_upsert from "./probe_and_upsert";
+import wait from "./wait";
 
 const { encode_version } = config;
 
@@ -318,6 +319,7 @@ export default function transcode(file) {
             logger.info("Transcoding succeeded!");
             logger.info(`Confirming existence of ${scratch_file}`);
 
+            await wait(5);
             if (!fs.existsSync(scratch_file)) {
               fs.writeFileSync(
                 `/usr/app/output/final-${video_record._id}.json`,
