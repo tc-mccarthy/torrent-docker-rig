@@ -318,6 +318,10 @@ export default function transcode(file) {
             logger.info(`Confirming existence of ${scratch_file}`);
 
             if (!fs.existsSync(scratch_file)) {
+              fs.writeFileSync(
+                `/usr/app/output/active-${video_record._id}.json`,
+                JSON.stringify({ stdout, stderr }, true, 4)
+              );
               throw new Error(
                 `Scratch file ${scratch_file} not found after transcode complete. View log /usr/app/output/active-${video_record._id}.json`
               );
