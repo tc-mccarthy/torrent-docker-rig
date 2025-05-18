@@ -1,5 +1,4 @@
 import fs from "fs";
-import { exec } from "child_process";
 import File from "../models/files";
 import exec_promise from "./exec_promise";
 import config from "./config";
