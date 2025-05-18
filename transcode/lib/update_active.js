@@ -27,5 +27,10 @@ export default async function update_active () {
     'mv /usr/app/output/pending-active.json /usr/app/output/active.json'
   );
 
+  // cleanup old active files
+  await exec_promise(
+    'find /usr/app/output/ -iname "active-*.json" -type f -mmin +300 -exec rm {} \\;'
+  );
+
   update_active();
 }
