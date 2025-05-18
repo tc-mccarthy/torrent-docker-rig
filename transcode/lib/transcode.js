@@ -31,6 +31,7 @@ export default function transcode(file) {
         return resolve();
       }
 
+      memcached.set(`transcode_lock_${video_record._id}`, "locked", 5);
       const ffprobe_data = await ffprobe(file);
 
       logger.debug(ffprobe_data, { label: ">> FFPROBE DATA >>" });
