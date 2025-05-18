@@ -334,7 +334,7 @@ export default function transcode(file) {
 
             if (!fs.existsSync(scratch_file)) {
               throw new Error(
-                "Scratch file not found after transcode complete."
+                `Scratch file ${scratch_file} not found after transcode complete. View log /usr/app/output/active-${video_record._id}.json`
               );
             }
 
