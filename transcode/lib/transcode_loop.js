@@ -23,20 +23,14 @@ export default async function transcode_loop (idx = 0) {
     const file = filelist[idx];
     await transcode(file);
     logger.info('TRANSCODE COMPLETE');
-
-    // if there are more files, run the loop again
-    if (filelist.length > 1) {
-      logger.info('MORE FILES TO TRANSCODE. RUNNING LOOP AGAIN');
-
-      // generate a random number between 0 and 2 seconds
-      const randomDelay = Math.floor(Math.random() * 2000);
-
-      await wait(randomDelay);
-      return transcode_loop();
-    }
   } catch (e) {
     logger.error('TRANSCODE LOOP ERROR. RESTARTING LOOP');
     console.error(e);
+  } finally {
+    // generate a random number between 0 and 2 seconds
+    const randomDelay = Math.floor(Math.random() * 2000);
+
+    await wait(randomDelay);
     return transcode_loop();
   }
 }
