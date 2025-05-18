@@ -17,22 +17,28 @@ const { encode_version } = config;
 export default function transcode(file) {
   return new Promise(async (resolve, reject) => {
     try {
+      const locked = await memcached.get(`transcode_lock_${video_record._id}`);
+      // if the file is locked, short circuit
+      if (locked) {
+        logger.info(
+          `File is locked. Skipping transcode: ${file} - ${video_record._id}`
+        );
+        return resolve();
+      }
+
+      await memcached.set(`transcode_lock_${video_record._id}`, "locked", 5);
+      
       const { profiles } = config;
       // mongo record of the video
       const video_record = await File.findOne({ path: file });
       const exists = fs.existsSync(file);
-      const locked = await memcached.get(`transcode_lock_${video_record._id}`);
 
       if (!exists) {
         throw new Error(`File not found: ${file}`);
       }
 
-      // if the file is locked, short circuit
-      if (locked) {
-        return resolve();
-      }
+      
 
-      memcached.set(`transcode_lock_${video_record._id}`, "locked", 5);
       const ffprobe_data = await ffprobe(file);
 
       logger.debug(ffprobe_data, { label: ">> FFPROBE DATA >>" });
