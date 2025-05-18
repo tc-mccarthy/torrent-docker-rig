@@ -28,7 +28,7 @@ export function generate_file_paths(file) {
 
   // set the scratch file path and name
   const scratch_file = `${scratch_path}/${name.replace(
-    /[^A-Za-z0-9]+/i,
+    /[^A-Za-z0-9]+/g,
     "-"
   ).toLowerCase()}.mkv`;
 
