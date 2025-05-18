@@ -319,11 +319,11 @@ export default function transcode(file) {
 
             if (!fs.existsSync(scratch_file)) {
               fs.writeFileSync(
-                `/usr/app/output/active-${video_record._id}.json`,
+                `/usr/app/output/final-${video_record._id}.json`,
                 JSON.stringify({ stdout, stderr }, true, 4)
               );
               throw new Error(
-                `Scratch file ${scratch_file} not found after transcode complete. View log /usr/app/output/active-${video_record._id}.json`
+                `Scratch file ${scratch_file} not found after transcode complete. View log /usr/app/output/final-${video_record._id}.json`
               );
             }
 
