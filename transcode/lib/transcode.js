@@ -24,7 +24,7 @@ export default function transcode(file) {
       const locked = await memcached.get(`transcode_lock_${video_record._id}`);
 
       if (!exists) {
-        throw new Error("File not found");
+        throw new Error(`File not found: ${file}`);
       }
 
       // if the file is locked, short circuit
