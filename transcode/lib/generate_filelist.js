@@ -37,6 +37,7 @@ export default async function generate_filelist () {
 
     return true;
   }));
+  logger.info(filelist.filter((f) => f.locked).length, 'LOCKED FILES FOUND');
   filelist = filelist.filter((f) => !f.locked);
 
   // remove first item from the list and write the rest to a file
