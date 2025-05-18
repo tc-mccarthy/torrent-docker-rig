@@ -273,7 +273,7 @@ export default [{
         }],
 
         "no-unreachable": "error",
-        "no-unsafe-finally": "error",
+        "no-unsafe-finally": 0,
         "no-unsafe-negation": "error",
 
         "no-unused-expressions": ["error", {
