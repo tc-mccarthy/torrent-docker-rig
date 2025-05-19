@@ -28,7 +28,7 @@ export default async function transcode_loop(idx = 0) {
     console.error(e);
   } finally {
     // generate a random number between 0 and 2 seconds
-    const randomDelay = getRandomDelay(0, 2);
+    const randomDelay = getRandomDelay(5, 10);
 
     await wait(randomDelay);
     return transcode_loop();
