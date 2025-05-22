@@ -157,6 +157,17 @@ export default function transcode(file) {
         );
         transcode_video = false;
       }
+      
+      // if the video is 350mb or less in size and the codec is h264, don't transcode
+      if (
+        video_stream.codec_name === "h264" &&
+        ffprobe_data.format.size <= 350000
+      ) {
+        logger.debug(
+          "Video stream codec is HEVC and size is less than 1GB. Not transcoding"
+        );
+        transcode_video = false;
+      }
 
       const input_maps = [`-map 0:${video_stream.index}`].concat(
         audio_streams.map((s) => `-map 0:${s.index}`)
