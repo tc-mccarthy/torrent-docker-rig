@@ -81,14 +81,13 @@ export default function integrityCheck(file) {
       }
 
       let start_time;
-      let ffmpeg_cmd;
+
       ffmpeg(file)
         .inputOptions("-v error")
         .outputOptions(["-f null"])
         .on("start", async (commandLine) => {
           logger.info(`Spawned Ffmpeg with command: ${commandLine}`);
           start_time = dayjs();
-          ffmpeg_cmd = commandLine;
 
           if (video_record) {
             logger.debug(">> VIDEO FOUND -- REMOVING ERROR >>", video_record);
