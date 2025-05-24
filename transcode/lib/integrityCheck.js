@@ -25,7 +25,7 @@ export default function integrityCheck(file) {
         return resolve();
       }
 
-      await memcached.set(`integrity_lock_${video_record._id}`, "locked", 5);
+      await memcached.set(`integrity_lock_${video_record._id}`, "locked", 300);
 
       const exists = fs.existsSync(file);
 
