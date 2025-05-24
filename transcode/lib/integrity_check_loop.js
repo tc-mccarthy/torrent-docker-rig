@@ -29,6 +29,6 @@ export default async function integrity_loop(idx = 0) {
     const randomDelay = getRandomDelay(5, 10);
 
     await wait(randomDelay);
-    return integrity_loop(idx);
+    return integrity_loop();
   }
 }

@@ -13,7 +13,7 @@ export default async function generate_integrity_filelist() {
     $or: [
       { integrityCheck: { $exists: false } },
       { integrityCheck: { $ne: true } },
-    ]
+    ],
   })
     .sort({
       "sortFields.priority": 1,
@@ -24,7 +24,9 @@ export default async function generate_integrity_filelist() {
 
   logger.info("FILTERING FILELIST");
   // filter out files that are missing paths
-  filelist = filelist.filter((f) => f.path);
+  filelist = filelist
+    .filter((f) => f.path)
+    .map((f) => ({ _id: f._id, path: f.path }));
 
   logger.info("REMOVING LOCKED FILES FROM FILELIST");
   // now filter out files that have locks
