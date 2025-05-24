@@ -12,8 +12,9 @@ import { create_scratch_disks } from './lib/fs';
 import db_cleanup from './lib/db_cleanup';
 import config from './lib/config';
 import generate_filelist from './lib/generate_filelist';
+import integrity_loop from './lib/integrity_loop';
 
-const { concurrent_transcodes, application_version } = config;
+const { concurrent_transcodes, concurrent_integrity_checks, application_version } = config;
 
 async function run () {
   try {
@@ -56,6 +57,10 @@ async function run () {
 
     Array.from({ length: concurrent_transcodes }).forEach((val, idx) => {
       transcode_loop(idx);
+    });
+
+    Array.from({ length: concurrent_integrity_checks }).forEach((val, idx) => {
+      integrity_loop(idx);
     });
 
     // generate the filelist every 10 minutes
