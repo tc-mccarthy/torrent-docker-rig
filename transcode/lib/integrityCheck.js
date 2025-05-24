@@ -14,7 +14,7 @@ export default function integrityCheck(file) {
   return new Promise(async (resolve, reject) => {
     try {
       // mongo record of the video
-      logger.info("INTEGRITY CHECKING FILE", file);
+      logger.info(file, {label: "INTEGRITY CHECKING FILE"});
       const video_record = await File.findOne({ path: file });
       const locked = await memcached.get(`integrity_lock_${video_record._id}`);
       // if the file is locked, short circuit
