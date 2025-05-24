@@ -24,6 +24,7 @@ services:
       - 8090:8080 ## usenet
       - 5055:5055 ## overseerr
       - 8181:8181 ## tautulli
+      - 9705:9705 ## huntarr
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1 # Recommended if using ipv4 only
       - net.ipv4.conf.all.rp_filter=2
@@ -473,6 +474,23 @@ services:
       - PGID=1000
     volumes:
       - ./tautulli/config:/config
+    restart: unless-stopped
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
+  
+  huntarr:
+    container_name: huntarr
+    image: huntarr/huntarr:latest
+    network_mode: service:vpn # all traffic goes through vpn
+    environment:
+      - TZ
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ./huntarr/config:/config
     restart: unless-stopped
     logging: 
       driver: "json-file"

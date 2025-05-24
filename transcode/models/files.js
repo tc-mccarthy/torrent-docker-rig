@@ -57,6 +57,11 @@ const schema = new Schema(
     hasError: {
       type: Boolean,
       required: false
+    },
+    integrityCheck: {
+      type: Boolean,
+      required: false,
+      default: false
     }
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
@@ -76,6 +81,7 @@ schema.index({ updated_at: -1 });
 schema.index({ last_probe: -1 });
 schema.index({ hasError: 1 });
 schema.index({ encode_version: 1, status: 1 });
+schema.index({ integrityCheck: 1, status: 1 });
 
 // create a model object that uses the above schema
 export default model(model_name, schema);
