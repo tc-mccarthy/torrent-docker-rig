@@ -10,7 +10,10 @@ export default async function generate_integrity_filelist() {
   // sort by priority, then size, then width
   let filelist = await File.find({
     status: "pending",
-    integrityCheck: { $or: [false, null] },
+    $or: [
+      { integrityCheck: { $exists: false } },
+      { integrityCheck: { $ne: true } },
+    ]
   })
     .sort({
       "sortFields.priority": 1,
