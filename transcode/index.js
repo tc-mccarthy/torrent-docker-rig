@@ -59,6 +59,7 @@ async function run () {
       transcode_loop(idx);
     });
 
+    logger.info(`Starting ${concurrent_integrity_checks} integrity check loops...`);
     Array.from({ length: concurrent_integrity_checks }).forEach((val, idx) => {
       integrity_loop(idx);
     });
