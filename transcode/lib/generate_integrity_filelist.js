@@ -23,18 +23,25 @@ export default async function generate_integrity_filelist() {
     .limit(1000);
 
   logger.info("FILTERING FILELIST");
+  
   // filter out files that are missing paths
   filelist = filelist
     .filter((f) => f.path)
     .map((f) => ({ _id: f._id, path: f.path }));
 
   logger.info("REMOVING LOCKED FILES FROM FILELIST");
+
   // now filter out files that have locks
   await async.eachLimit(
     filelist,
     25,
     asyncify(async (video_record) => {
       const lock = await memcached.get(`integrity_lock_${video_record._id}`);
+
+      logger.info(`integrity_lock_${video_record._id}`, {
+        label: "INTEGRITY LOCK CHECK",
+        lock: !!lock
+      });
 
       // find the file in the filelist
       const idx = filelist.findIndex((v) => v._id === video_record._id);
@@ -44,6 +51,7 @@ export default async function generate_integrity_filelist() {
       return true;
     })
   );
+
   logger.info(filelist.filter((f) => f.locked).length, {
     label: "LOCKED INTEGRITY FILES FOUND",
   });
