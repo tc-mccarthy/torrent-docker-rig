@@ -14,6 +14,7 @@ export default function integrityCheck(file) {
   return new Promise(async (resolve, reject) => {
     try {
       // mongo record of the video
+      logger.info("INTEGRITY CHECKING FILE", file);
       const video_record = await File.findOne({ path: file });
       const locked = await memcached.get(`integrity_lock_${video_record._id}`);
       // if the file is locked, short circuit
@@ -33,8 +34,6 @@ export default function integrityCheck(file) {
       }
 
       const ffprobe_data = await ffprobe(file);
-
-      logger.debug(ffprobe_data, { label: ">> FFPROBE DATA >>" });
 
       const video_stream = ffprobe_data.streams.find(
         (s) => s.codec_type === "video"
@@ -86,7 +85,7 @@ export default function integrityCheck(file) {
         .inputOptions("-v error")
         .outputOptions(["-f null"])
         .on("start", async (commandLine) => {
-          logger.info(`Spawned Ffmpeg with command: ${commandLine}`);
+          logger.info(`Spawned integrity check with command: ${commandLine}`);
           start_time = dayjs();
 
           if (video_record) {
@@ -127,7 +126,7 @@ export default function integrityCheck(file) {
           }
         })
         .on("error", async (err, stdout, stderr) => {
-          logger.error(err, { label: "Cannot process video", stdout, stderr });
+          logger.error(err, { label: "Cannot process video during integrity check", stdout, stderr });
           
           const corrupt_video_tests = [
             {
