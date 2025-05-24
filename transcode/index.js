@@ -12,7 +12,7 @@ import { create_scratch_disks } from './lib/fs';
 import db_cleanup from './lib/db_cleanup';
 import config from './lib/config';
 import generate_filelist from './lib/generate_filelist';
-import integrity_loop from './lib/integrity_loop';
+import integrity_loop from './lib/integrity_check_loop';
 
 const { concurrent_transcodes, concurrent_integrity_checks, application_version } = config;
 
