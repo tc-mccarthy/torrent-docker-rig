@@ -31,11 +31,13 @@ export default async function generate_integrity_filelist() {
   await async.eachLimit(
     filelist,
     25,
-    asyncify(async (f) => {
-      const lock = await memcached.get(`integrity_lock_${f._id}`);
+    asyncify(async (video_record) => {
+      const lock = await memcached.get(`integrity_lock_${video_record._id}`);
 
       // find the file in the filelist
-      filelist.find((v) => v._id === f._id).locked = !!lock;
+      const idx = filelist.findIndex((v) => v._id === video_record._id);
+
+      filelist[idx].locked = !!lock;
 
       return true;
     })
