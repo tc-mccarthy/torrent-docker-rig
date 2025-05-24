@@ -1,12 +1,12 @@
 import logger from "./logger";
-import generate_filelist from "./generate_integrity_filelist";
+import generate_integrity_filelist from "./generate_integrity_filelist";
 import integrity_check from "./integrityCheck";
 import wait, { getRandomDelay } from "./wait";
 
 export default async function integrity_loop(idx = 0) {
   try {
     logger.info("STARTING TRANSCODE LOOP");
-    const filelist = await generate_filelist();
+    const filelist = await generate_integrity_filelist();
     logger.info(
       `PRIMARY FILE LIST ACQUIRED. THERE ARE ${filelist.length} FILES TO INTEGRITY_CHECK.`
     );
