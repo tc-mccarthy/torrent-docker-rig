@@ -6,7 +6,7 @@ import ffprobe from "./ffprobe";
 import config from "./config";
 import logger from "./logger";
 import memcached from "./memcached";
-import { trash, generate_file_paths } from "./fs";
+import { trash } from "./fs";
 
 const { encode_version } = config;
 
@@ -80,7 +80,9 @@ export default function integrityCheck(file) {
         throw new Error("No audio stream found");
       }
 
-      const cmd = ffmpeg(file)
+      let start_time;
+      let ffmpeg_cmd;
+      ffmpeg(file)
         .inputOptions("-v error")
         .outputOptions(["-f null"])
         .on("start", async (commandLine) => {
