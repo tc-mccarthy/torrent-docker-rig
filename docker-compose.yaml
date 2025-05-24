@@ -223,6 +223,7 @@ services:
       - NODE_OPTIONS=--max-old-space-size=57344 --enable-source-maps
       - CONCURRENT_TRANSCODES
       - CONCURRENT_FILE_CHECKS
+      - CONCURRENT_INTEGRITY_CHECKS
       - ENV=${ENV:-prod}
       - TMDB_READ_ACCESS_TOKEN
     volumes:
