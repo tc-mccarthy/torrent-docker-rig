@@ -112,7 +112,7 @@ function Home () {
         (
         {data.video_stream.codec_name}
         /
-        {data.audio_stream.codec_name}
+        {data.audio_streams[0].codec_name}
         )
       </div>
       <div className="flex">
@@ -137,6 +137,15 @@ function Home () {
         <div className="widget">
           <strong>Profile</strong>
           {data.name}
+        </div>
+        <div className="widget">
+          <strong>Audio Languages</strong>
+          {data.audio_streams.map((stream) => stream.tags?.language).reduce((a, c) => {
+            if (!a.includes(c)) {
+              a.push(c);
+            }
+            return a;
+          }, []).join(', ')}
         </div>
       </div>
       <div className="flex">

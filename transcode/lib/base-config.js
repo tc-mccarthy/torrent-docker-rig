@@ -1,103 +1,132 @@
-import copy from "fast-copy";
+import copy from 'fast-copy';
 
-export function aspect_round(val) {
+export function aspect_round (val) {
   return Math.round(val * 10) / 10;
 }
 
 const config = {
-  encode_version: "20250108a",
+  encode_version: '20250108a',
   concurrent_file_checks: process.env.CONCURRENT_FILE_CHECKS || 50,
   concurrent_transcodes: process.env.CONCURRENT_TRANSCODES || 1,
   profiles: [
     {
-      name: "uhd",
+      name: 'uhd',
       width: 3840,
       height: 2160,
       aspect: 16 / 9,
       bitrate: 10,
       crf: 28,
-      output: "av1",
+      output: 'av1'
     },
     {
-      name: "1080p",
+      name: 'uhd (academy)',
+      width: 2960,
+      height: 2160,
+      aspect: 1.37 / 1,
+      bitrate: 10,
+      crf: 28,
+      output: 'av1'
+    },
+    {
+      name: '1080p',
       width: 1920,
       height: 1080,
       aspect: 16 / 9,
       bitrate: 7,
       crf: 28,
-      output: "av1",
+      output: 'av1'
     },
     {
-      name: "hdv (1440p)",
+      name: '1080p academy',
+      width: 1920,
+      height: 1396,
+      aspect: 1.37 / 1,
+      bitrate: 7,
+      crf: 28,
+      output: 'av1'
+    },
+    {
+      name: 'hdv (1440p)',
       width: 1440,
       height: 1080,
       aspect: 4 / 3,
       bitrate: 7,
       crf: 28,
-      output: "av1",
+      output: 'av1'
     },
     {
-      name: "720p",
+      name: '720p',
       width: 1280,
       height: 720,
-      dest_width: 1920,
       aspect: 16 / 9,
       bitrate: 7,
       crf: 28,
-      output: "av1"
+      output: 'av1'
     },
     {
-      name: "sd",
+      name: 'sd',
       width: 720,
       height: 480,
       aspect: 4 / 3,
       bitrate: 3.5,
       crf: 28,
-      output: "av1",
+      output: 'av1',
       default: true
     },
     {
-      name: "vertical",
+      name: 'vertical',
       width: 1080,
       height: 1920,
       aspect: 9 / 16,
       bitrate: 12,
       crf: 28,
-      output: "av1",
-    },
+      output: 'av1'
+    }
   ],
-
+  file_ext: [
+    'avi',
+    'mkv',
+    'm4v',
+    'flv',
+    'mov',
+    'wmv',
+    'webm',
+    'gif',
+    'mpg',
+    'mp4',
+    'm2ts'
+  ],
   dest_formats: {
     av1: {
       video: {
-        codec: "libsvtav1",
-        codec_name: "av1",
+        codec: 'libsvtav1',
+        codec_name: 'av1',
         flags: {
           crf: 28,
           preset: 7
-        },
+        }
       },
       audio: {
-        codec: "libfdk_aac",
-        codec_name: "aac",
+        codec: 'libfdk_aac',
+        codec_name: 'aac',
         per_channel_bitrate: 96,
-        downmix: true, // downmix to stereo in a duplicate channel
-      },
-    },
+        downmix: true // downmix to stereo in a duplicate channel
+      }
+    }
   },
-  build_profiles: function (config) {
+  build_profiles (config) {
     config.profiles = config.profiles
       .map((x) => ({
         ...x,
         output: config.dest_formats[x.output] || config.dest_formats.av1, // merge in the defaults for the output profile specified
-        aspect: aspect_round(x.aspect),
+        aspect: aspect_round(x.aspect)
       }))
       .map((x) => {
         x.output.video.bitrate = x.bitrate;
         return x;
       });
   },
-  get_profile: function (video_stream) {
+  get_profile (video_stream) {
     // locate the conversion profile that's best suited for this source media and duplicate it so changes don't propagate to the next use of the profile
     let conversion_profile = config.profiles.find(
       (x) =>
@@ -105,8 +134,8 @@ const config = {
     );
 
     // if no profile was found, use the default profile
-    if(!conversion_profile) {
-      conversion_profile = config.profiles.find(p => p.default);
+    if (!conversion_profile) {
+      conversion_profile = config.profiles.find((p) => p.default);
     }
 
     // copy the profile so changes don't propagate to the next use of the profile
@@ -120,8 +149,12 @@ const config = {
     conversion_profile.output.video.addFlags = function (flags) {
       Object.assign(conversion_profile.output.video.flags, flags);
     };
-    
-    return conversion_profile;    
+
+    return conversion_profile;
+  },
+
+  get_paths (config) {
+    return config.sources.map((p) => p.path);
   }
 };
 

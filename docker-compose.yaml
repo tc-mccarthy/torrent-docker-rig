@@ -219,13 +219,16 @@ services:
       - LOG_PRETTY=on
       - LOG_LEVEL=info # make debug when debugging
       - CHOKIDAR_USEPOLLING=1
-      - NODE_OPTIONS=--max-old-space-size=57344
+      - NODE_OPTIONS=--max-old-space-size=57344 --enable-source-maps
       - CONCURRENT_TRANSCODES
       - CONCURRENT_FILE_CHECKS
+      - ENV=${ENV:-prod}
+      - TMDB_READ_ACCESS_TOKEN
     volumes:
       - ${TRANSCODE_STORAGE}:/source_media # path to my volumes for download storage
       - ./transcode:/usr/app
       - /usr/app/node_modules
+      - /usr/app/bin
     restart: unless-stopped
     depends_on:
       - redis
@@ -234,7 +237,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '12' # 16 cores
+          cpus: '16' # 16 cores
           memory: 56G # 56GB
     logging: 
       driver: "json-file"
@@ -608,7 +611,7 @@ services:
   rabbitmq:
     hostname: rabbitmq
     container_name: rabbitmq
-    image: rabbitmq:4-management-alpine
+    image: rabbitmq:4.0.9-management-alpine
     ports:
       - "15672:15672"
       - "5672:5672"

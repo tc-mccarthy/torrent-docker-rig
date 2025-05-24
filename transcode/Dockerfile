@@ -2,7 +2,7 @@
 FROM linuxserver/ffmpeg:latest
 
 # Install NodeJS Dependencies and set up DEB repo
-ENV NODE_MAJOR=20
+ENV NODE_MAJOR=22
 RUN apt-get -y update
 RUN apt-get -y install sqlite3 ca-certificates curl gnupg
 RUN mkdir -p /etc/apt/keyrings
@@ -14,25 +14,37 @@ RUN apt-get -y update
 RUN apt-get -y install nodejs
 RUN npm i -g yarn
 
-# Create a non-root user
-RUN adduser --disabled-password --gecos "" node
 
 # Set up directories in advance so we can control the permissions
-RUN mkdir -p /usr/app && chown -R node:node /usr/app
+RUN mkdir -p /usr/app/bin && mkdir -p /usr/app/node_modules
 
 # Set the work directory
 WORKDIR /usr/app
 
+
+## Dependencies are handled in their own layer so that we can leverage layer cache and save time on rebuild
+
 # Copy over the dependencies
-COPY --chown=node:node package.json .
-COPY --chown=node:node yarn.lock .
+COPY package.json .
+COPY yarn.lock .
 
 # Install the dependencies
 RUN yarn install
 
 # Copy over application files
-COPY --chown=node:node . .
+COPY . .
 RUN chmod +x /usr/app/start-service
+
+# Set ARGs and ENV vars
+ARG BUILD_VERSION
+ARG ENV
+
+ENV ENV=${ENV}
+ENV BUILD_VERSION=${BUILD_VERSION}
+ENV NODE_ENV=${ENV}
+
+# If this is a prod environment, package the code
+RUN if [ "$ENV" != "local" ]; then yarn build; fi
 
 # Start the service
 ENTRYPOINT [ "/bin/bash", "/usr/app/start-service" ]
