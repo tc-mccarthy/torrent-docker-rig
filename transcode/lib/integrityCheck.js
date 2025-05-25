@@ -11,13 +11,18 @@ import IntegrityError from "../models/integrityError";
 
 const { encode_version } = config;
 
-function integrity_check_pass({ stderr, stdout }) {
+function get_error_list(stderr) {
   const exceptions = ["non monotonically increasing dts"];
-  const errors = stderr
+  const errors = stderr.toLowerCase()
     .split("\n")
-    .filter((e) => e.trim())
-    .filter((e) => !exceptions.some((ex) => e.includes(ex)));
+    .filter((e) => e.trim()) // eliminates empty lines
+    .filter((e) => !exceptions.some((ex) => e.includes(ex))); // narrow the list to errors that are not in the exceptions list
+    
+    return errors;
+}
 
+function integrity_check_pass({ stderr, stdout }) {
+  const errors = get_error_list(stderr);
   return !stderr.trim() && !stdout.trim() && !errors.length;
 }
 
@@ -140,7 +145,7 @@ export default function integrityCheck(file) {
                 path: file,
                 stdout,
                 stderr,
-                errors: stderr.split("\n"),
+                errors: get_error_list(stderr)
               });
               await trash(file);
             }
