@@ -7,6 +7,7 @@ import config from "./config";
 import logger from "./logger";
 import memcached from "./memcached";
 import { trash } from "./fs";
+import IntegrityError from "../models/integrityError";
 
 const { encode_version } = config;
 
@@ -125,6 +126,11 @@ export default function integrityCheck(file) {
                 `${file}.integrity_check.log`,
                 `Integrity check failed for ${file}:\n${stdout}\n${stderr}`
               );
+              IntegrityError.create({
+                file,
+                stdout,
+                stderr
+              });
               await trash(file);
             }
           } catch (e) {
@@ -200,6 +206,15 @@ export default function integrityCheck(file) {
             // don't await the delete in case the problem is a missing file
             trash(file);
             await File.deleteOne({ path: file });
+            fs.writeFileSync(
+              `${file}.integrity_check.log`,
+              `Integrity check failed for ${file}:\n${stdout}\n${stderr}`
+            );
+            IntegrityError.create({
+              file,
+              stdout,
+              stderr
+            });
           }
           resolve();
         })
