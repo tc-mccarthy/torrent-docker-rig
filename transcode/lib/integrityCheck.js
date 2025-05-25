@@ -11,6 +11,15 @@ import IntegrityError from "../models/integrityError";
 
 const { encode_version } = config;
 
+function integrity_check_pass({stderr, stdout}) {
+  const exceptions = ["non monotonically increasing dts"]
+  return (
+    !stderr.trim() &&
+    !stdout.trim() &&
+    !exceptions.some((e) => stderr.includes(e))
+  );
+}
+
 export default function integrityCheck(file) {
   return new Promise(async (resolve, reject) => {
     try {
@@ -116,7 +125,7 @@ export default function integrityCheck(file) {
         .on("end", async (stdout, stderr) => {
           try {
             logger.info("FFMPEG INTEGRITY CHECK COMPLETE", { stdout, stderr });
-            if (!stdout.trim() && !stderr.trim()) {
+            if (integrity_check_pass({ stdout, stderr })) {
               logger.info("No output from ffmpeg, so no errors found");
               video_record.integrityCheck = true;
               await video_record.save();
