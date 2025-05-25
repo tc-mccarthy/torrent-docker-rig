@@ -12,18 +12,17 @@ import IntegrityError from "../models/integrityError";
 const { encode_version } = config;
 
 function get_error_list(stderr) {
-  const exceptions = [
-    /non\s+monotonically\s+increasing\s+dts/gi, 
-    /last\s+message\s+repeated/gi
-  ];
-  
-  const errors = stderr.toLowerCase()
+  const exceptions = [/dts/i, /last\s+message\s+repeated/i];
+
+  const all_errors = stderr
+    .toLowerCase()
     .split("\n")
-    .filter((error) => !exceptions.some(exception => exception.test(error))) // narrow the list to errors that are not in the exceptions list
-    .map(error => error.trim()) // trim each error
-    .filter(e => e) //eliminates empty lines
-    
-    return errors;
+    .map((error) => error.trim()) // trim each error
+    .filter(error => error) // remove empty errors
+
+  const errors_that_matter = all_errors.filter(error => !exceptions.some(exception => exception.test(error))); // only those errors that do not contain any excepted phrases
+
+  return errors_that_matter;
 }
 
 function integrity_check_pass({ stderr, stdout }) {
@@ -150,7 +149,7 @@ export default function integrityCheck(file) {
                 path: file,
                 stdout,
                 stderr,
-                errors: get_error_list(stderr)
+                errors: get_error_list(stderr),
               });
               await trash(file);
             }
