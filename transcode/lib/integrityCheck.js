@@ -138,7 +138,7 @@ export default function integrityCheck(file) {
           try {
             logger.info("FFMPEG INTEGRITY CHECK COMPLETE", { stdout, stderr });
             if (integrity_check_pass({ stderr })) {
-              logger.info("No blocking errors found");
+              logger.info("No disqualifying errors found");
               video_record.integrityCheck = true;
               await video_record.save();
             } else {
