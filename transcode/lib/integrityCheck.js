@@ -38,7 +38,7 @@ export default function integrityCheck(file) {
       // mongo record of the video
       logger.info(file, { label: "INTEGRITY CHECKING FILE" });
       const video_record = await File.findOne({ path: file });
-      const locked = await memcached.get(`integrity_lock_${video_record._id}`);
+      const locked = !!(await memcached.get(`integrity_lock_${video_record._id}`)) || !!(await memcached.get(`transcode_lock_${video_record._id}`));
       // if the file is locked, short circuit
       if (locked) {
         logger.info(

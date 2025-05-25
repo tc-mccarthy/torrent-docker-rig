@@ -36,7 +36,7 @@ export default async function generate_integrity_filelist() {
     filelist,
     25,
     asyncify(async (video_record) => {
-      const lock = !!(await memcached.get(`integrity_lock_${video_record._id}`));
+      const lock = !!(await memcached.get(`integrity_lock_${video_record._id}`)) || !!(await memcached.get(`transcode_lock_${video_record._id}`));
 
       logger.debug(`integrity_lock_${video_record._id}`, {
         label: "INTEGRITY LOCK CHECK",
