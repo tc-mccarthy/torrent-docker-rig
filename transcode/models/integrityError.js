@@ -25,6 +25,10 @@ const schema = new Schema(
     stderr: {
       type: String,
       required: false
+    },
+    errors: {
+      type: Array,
+      required: false
     }
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }

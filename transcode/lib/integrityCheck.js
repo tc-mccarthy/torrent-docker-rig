@@ -13,10 +13,12 @@ const { encode_version } = config;
 
 function integrity_check_pass({stderr, stdout}) {
   const exceptions = ["non monotonically increasing dts"]
+  const errors = stderr.split("\n").filter((e) => e.trim()).filter(e => !exceptions.some((ex) => e.includes(ex)));
+
   return (
     !stderr.trim() &&
     !stdout.trim() &&
-    !exceptions.some((e) => stderr.includes(e))
+    !errors.length
   );
 }
 
@@ -138,7 +140,8 @@ export default function integrityCheck(file) {
               IntegrityError.create({
                 path: file,
                 stdout,
-                stderr
+                stderr,
+                errors: stderr.split("\n"),
               });
               await trash(file);
             }
