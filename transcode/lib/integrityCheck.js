@@ -107,7 +107,7 @@ export default function integrityCheck(file) {
         .on("progress", (progress) => {
           // set a 5 second lock on the video record
           memcached.set(`integrity_lock_${video_record._id}`, "locked", 5);
-          logger.info(progress.percent, {
+          logger.info(Math.floor(progress.percent), {
             label: "INTEGRITY CHECK PROGRESS",
             file,
           });
@@ -121,6 +121,10 @@ export default function integrityCheck(file) {
               await video_record.save();
             } else {
               logger.info("OUTPUT DETECTED, ERRORS MUST HAVE BEEN FOUND");
+              fs.writeFileSync(
+                `${file}.integrity_check.log`,
+                `Integrity check failed for ${file}:\n${stdout}\n${stderr}`
+              );
               await trash(file);
             }
           } catch (e) {
