@@ -23,11 +23,9 @@ export default async function generate_filelist() {
     })
     .limit(1000);
 
-  logger.info("FILTERING FILELIST");
   // filter out files that are missing paths
   filelist = filelist.filter((f) => f.path);
 
-  logger.info("REMOVING LOCKED FILES FROM FILELIST");
   // now filter out files that have locks
   await async.eachLimit(
     filelist,
@@ -48,9 +46,7 @@ export default async function generate_filelist() {
       return true;
     })
   );
-  logger.info(filelist.filter((f) => f.locked).length, {
-    label: "LOCKED FILES FOUND",
-  });
+  
   filelist = filelist.filter((f) => !f.locked);
 
   // remove first item from the list and write the rest to a file
