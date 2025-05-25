@@ -127,7 +127,7 @@ export default function integrityCheck(file) {
                 `Integrity check failed for ${file}:\n${stdout}\n${stderr}`
               );
               IntegrityError.create({
-                file,
+                path: file,
                 stdout,
                 stderr
               });
@@ -211,7 +211,7 @@ export default function integrityCheck(file) {
               `Integrity check failed for ${file}:\n${stdout}\n${stderr}`
             );
             IntegrityError.create({
-              file,
+              path: file,
               stdout,
               stderr
             });
