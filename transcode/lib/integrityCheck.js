@@ -14,7 +14,7 @@ export default function integrityCheck(file) {
   return new Promise(async (resolve, reject) => {
     try {
       // mongo record of the video
-      logger.info(file, {label: "INTEGRITY CHECKING FILE"});
+      logger.info(file, { label: "INTEGRITY CHECKING FILE" });
       const video_record = await File.findOne({ path: file });
       const locked = await memcached.get(`integrity_lock_${video_record._id}`);
       // if the file is locked, short circuit
@@ -107,6 +107,10 @@ export default function integrityCheck(file) {
         .on("progress", (progress) => {
           // set a 5 second lock on the video record
           memcached.set(`integrity_lock_${video_record._id}`, "locked", 5);
+          logger.info(progress.percent, {
+            label: "INTEGRITY CHECK PROGRESS",
+            file,
+          });
         })
         .on("end", async (stdout, stderr) => {
           try {
@@ -126,8 +130,12 @@ export default function integrityCheck(file) {
           }
         })
         .on("error", async (err, stdout, stderr) => {
-          logger.error(err, { label: "Cannot process video during integrity check", stdout, stderr });
-          
+          logger.error(err, {
+            label: "Cannot process video during integrity check",
+            stdout,
+            stderr,
+          });
+
           const corrupt_video_tests = [
             {
               test: /Invalid\s+NAL\s+unit\s+size/gi,
@@ -190,7 +198,8 @@ export default function integrityCheck(file) {
             await File.deleteOne({ path: file });
           }
           resolve();
-        }).save("-")
+        })
+        .save("-");
     } catch (e) {
       logger.error(e, { label: "INTEGRITY CHECK ERROR" });
 

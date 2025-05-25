@@ -35,7 +35,7 @@ export default async function generate_filelist() {
     asyncify(async (video_record) => {
       const lock = !!(await memcached.get(`transcode_lock_${video_record._id}`));
 
-      logger.info(`transcode_lock_${video_record._id}`, {
+      logger.debug(`transcode_lock_${video_record._id}`, {
         label: "TRANSCODE LOCK CHECK",
         lock
       });
