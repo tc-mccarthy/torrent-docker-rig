@@ -141,10 +141,6 @@ export default function integrityCheck(file) {
               await video_record.save();
             } else {
               logger.info("OUTPUT DETECTED, ERRORS MUST HAVE BEEN FOUND");
-              fs.writeFileSync(
-                `${file}.integrity_check.log`,
-                `Integrity check failed for ${file}:\n${stdout}\n${stderr}`
-              );
               IntegrityError.create({
                 path: file,
                 stdout,
