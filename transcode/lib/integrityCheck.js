@@ -18,16 +18,18 @@ function get_error_list(stderr) {
     .toLowerCase()
     .split("\n")
     .map((error) => error.trim()) // trim each error
-    .filter(error => error) // remove empty errors
+    .filter((error) => error); // remove empty errors
 
-  const errors_that_matter = all_errors.filter(error => !exceptions.some(exception => exception.test(error))); // only those errors that do not contain any excepted phrases
+  const errors_that_matter = all_errors.filter(
+    (error) => !exceptions.some((exception) => exception.test(error))
+  ); // only those errors that do not contain any excepted phrases
 
   return errors_that_matter;
 }
 
-function integrity_check_pass({ stderr, stdout }) {
+function integrity_check_pass({ stderr }) {
   const errors = get_error_list(stderr);
-  return !stderr.trim() && !stdout.trim() && !errors.length;
+  return errors.length === 0;
 }
 
 export default function integrityCheck(file) {
@@ -135,7 +137,7 @@ export default function integrityCheck(file) {
         .on("end", async (stdout, stderr) => {
           try {
             logger.info("FFMPEG INTEGRITY CHECK COMPLETE", { stdout, stderr });
-            if (integrity_check_pass({ stdout, stderr })) {
+            if (integrity_check_pass({ stderr })) {
               logger.info("No output from ffmpeg, so no errors found");
               video_record.integrityCheck = true;
               await video_record.save();
@@ -149,7 +151,6 @@ export default function integrityCheck(file) {
               });
               trash(file);
               await File.deleteOne({ path: file });
-              
             }
           } catch (e) {
             logger.error(e, { label: "POST INTEGRITY CHECK ERROR" });
@@ -224,7 +225,7 @@ export default function integrityCheck(file) {
             // don't await the delete in case the problem is a missing file
             trash(file);
             await File.deleteOne({ path: file });
-            
+
             IntegrityError.create({
               path: file,
               stdout,
