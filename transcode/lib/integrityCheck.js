@@ -147,7 +147,9 @@ export default function integrityCheck(file) {
                 stderr,
                 errors: get_error_list(stderr),
               });
-              await trash(file);
+              trash(file);
+              await File.deleteOne({ path: file });
+              
             }
           } catch (e) {
             logger.error(e, { label: "POST INTEGRITY CHECK ERROR" });
@@ -222,10 +224,7 @@ export default function integrityCheck(file) {
             // don't await the delete in case the problem is a missing file
             trash(file);
             await File.deleteOne({ path: file });
-            fs.writeFileSync(
-              `${file}.integrity_check.log`,
-              `Integrity check failed for ${file}:\n${stdout}\n${stderr}`
-            );
+            
             IntegrityError.create({
               path: file,
               stdout,
