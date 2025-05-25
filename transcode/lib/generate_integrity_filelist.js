@@ -57,10 +57,6 @@ export default async function generate_integrity_filelist() {
   });
   filelist = filelist.filter((f) => !f.locked);
 
-  logger.info(filelist, {
-    label: "INTEGRITY CHECK FILELIST",
-  });
-
   // send back full list
   return filelist.map((f) => f.path);
 }
