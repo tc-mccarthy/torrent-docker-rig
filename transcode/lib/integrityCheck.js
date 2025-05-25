@@ -138,7 +138,7 @@ export default function integrityCheck(file) {
           try {
             logger.info("FFMPEG INTEGRITY CHECK COMPLETE", { stdout, stderr });
             if (integrity_check_pass({ stderr })) {
-              logger.info("No output from ffmpeg, so no errors found");
+              logger.info("No blocking errors found");
               video_record.integrityCheck = true;
               await video_record.save();
             } else {
@@ -147,7 +147,7 @@ export default function integrityCheck(file) {
                 path: file,
                 stdout,
                 stderr,
-                errors: get_error_list(stderr),
+                errors: get_error_list(stderr)
               });
               trash(file);
               await File.deleteOne({ path: file });

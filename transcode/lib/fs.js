@@ -39,7 +39,7 @@ export function generate_file_paths(file) {
   };
 }
 
-export async function trash(file) {
+export async function trash(file, record = true) {
   if (!file) {
     return true;
   }
@@ -51,6 +51,10 @@ export async function trash(file) {
 
   if (fs.existsSync(file)) {
     await fs.promises.unlink(file);
+  }
+
+  if (record) {
+    await File.deleteOne({ path: file });
   }
 
   return true;

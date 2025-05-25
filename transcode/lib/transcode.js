@@ -357,7 +357,7 @@ export default function transcode(file) {
 
             // delete the original file if the transcoded filename is different
             if (scratch_file !== file) {
-              await trash(file);
+              await trash(file, false);
             }
 
             await probe_and_upsert(dest_file, video_record._id, {
@@ -389,7 +389,7 @@ export default function transcode(file) {
               4
             )
           );
-          await trash(scratch_file);
+          await trash(scratch_file, false);
           await upsert_video({
             path: file,
             error: {
