@@ -12,11 +12,16 @@ import IntegrityError from "../models/integrityError";
 const { encode_version } = config;
 
 function get_error_list(stderr) {
-  const exceptions = ["non monotonically increasing dts"];
+  const exceptions = [
+    /non\s+monotonically\s+increasing\s+dts/gi, 
+    /last\s+message\s+repeated/gi
+  ];
+  
   const errors = stderr.toLowerCase()
     .split("\n")
-    .filter((e) => e.trim()) // eliminates empty lines
-    .filter((e) => !exceptions.some((ex) => e.includes(ex))); // narrow the list to errors that are not in the exceptions list
+    .filter((error) => !exceptions.some(exception => exception.test(error))) // narrow the list to errors that are not in the exceptions list
+    .map(error => error.trim()) // trim each error
+    .filter(e => e) //eliminates empty lines
     
     return errors;
 }
