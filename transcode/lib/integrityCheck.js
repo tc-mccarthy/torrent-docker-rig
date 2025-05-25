@@ -11,15 +11,14 @@ import IntegrityError from "../models/integrityError";
 
 const { encode_version } = config;
 
-function integrity_check_pass({stderr, stdout}) {
-  const exceptions = ["non monotonically increasing dts"]
-  const errors = stderr.split("\n").filter((e) => e.trim()).filter(e => !exceptions.some((ex) => e.includes(ex)));
+function integrity_check_pass({ stderr, stdout }) {
+  const exceptions = ["non monotonically increasing dts"];
+  const errors = stderr
+    .split("\n")
+    .filter((e) => e.trim())
+    .filter((e) => !exceptions.some((ex) => e.includes(ex)));
 
-  return (
-    !stderr.trim() &&
-    !stdout.trim() &&
-    !errors.length
-  );
+  return !stderr.trim() && !stdout.trim() && !errors.length;
 }
 
 export default function integrityCheck(file) {
@@ -225,7 +224,7 @@ export default function integrityCheck(file) {
             IntegrityError.create({
               path: file,
               stdout,
-              stderr
+              stderr,
             });
           }
           resolve();
