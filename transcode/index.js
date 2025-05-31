@@ -63,6 +63,9 @@ async function run () {
     });
 
     const currentHourLocalTime = dayjs().tz(process.env.TZ).hour();
+    logger.info(
+      `Current local time is ${currentHourLocalTime}`
+    );
     if (currentHourLocalTime >= 0 && currentHourLocalTime) {
       logger.info(
         'Starting integrity check loop immediately since it is before 9 AM'
