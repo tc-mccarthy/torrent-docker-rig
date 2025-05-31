@@ -105,7 +105,11 @@ export default function integrityCheck (file) {
 
       ffmpeg(file)
         .inputOptions('-v error')
-        .outputOptions(['-c:v copy', '-c:a copy', '-f null'])
+        .outputOptions([
+          // "-c:v copy",
+          // "-c:a copy",
+          '-f null'
+        ])
         .on('start', async (commandLine) => {
           logger.info(`Spawned integrity check with command: ${commandLine}`);
           start_time = dayjs();
