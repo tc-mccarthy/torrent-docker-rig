@@ -66,7 +66,7 @@ async function run () {
     logger.info(
       `Current local time is ${currentHourLocalTime}`
     );
-    if (currentHourLocalTime >= 0 && currentHourLocalTime) {
+    if (currentHourLocalTime >= 0 && currentHourLocalTime < 9) {
       logger.info(
         'Starting integrity check loop immediately since it is before 9 AM'
       );
