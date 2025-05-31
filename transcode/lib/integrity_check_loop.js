@@ -30,7 +30,8 @@ export default async function integrity_loop (idx = 0) {
     const randomDelay = getRandomDelay(5, 10);
 
     // if the current time is before 9am, run again after a random delay
-    if (dayjs().hour() < 9) {
+    const currentHourLocalTime = dayjs().tz(process.env.TZ).hour();
+    if (currentHourLocalTime < 9) {
       logger.info(`Waiting for ${randomDelay} seconds before next integrity check`);
       await wait(randomDelay);
       return integrity_loop();

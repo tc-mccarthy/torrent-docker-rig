@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import dayjs from 'dayjs';
 import mongo_connect from './lib/mongo_connection';
 import update_active from './lib/update_active';
 import update_queue from './lib/update_queue';
@@ -60,6 +61,14 @@ async function run () {
     Array.from({ length: concurrent_transcodes }).forEach((val, idx) => {
       transcode_loop(idx);
     });
+
+    const currentHourLocalTime = dayjs().tz(process.env.TZ).hour();
+    if (currentHourLocalTime >= 0 && currentHourLocalTime) {
+      logger.info(
+        'Starting integrity check loop immediately since it is before 9 AM'
+      );
+      integrity_loop();
+    }
 
     // start the integrity check loops every day at midnight
     cron.schedule('0 0 * * *', () => {
