@@ -14,11 +14,18 @@ import config from './lib/config';
 import generate_filelist from './lib/generate_filelist';
 import integrity_loop from './lib/integrity_check_loop';
 
-const { concurrent_transcodes, concurrent_integrity_checks, application_version } = config;
+const {
+  concurrent_transcodes,
+  concurrent_integrity_checks,
+  application_version
+} = config;
 
 async function run () {
   try {
-    logger.info('Starting transcode service...', { label: 'STARTUP', application_version });
+    logger.info('Starting transcode service...', {
+      label: 'STARTUP',
+      application_version
+    });
     logger.info('Connecting to MongoDB');
     // connect to mongo
     await mongo_connect();
@@ -59,9 +66,16 @@ async function run () {
       transcode_loop(idx);
     });
 
-    logger.info(`Starting ${concurrent_integrity_checks} integrity check loops...`);
-    Array.from({ length: concurrent_integrity_checks }).forEach((val, idx) => {
-      integrity_loop(idx);
+    // start the integrity check loops every day at midnight
+    cron.schedule('0 0 * * *', () => {
+      logger.info(
+        `Starting ${concurrent_integrity_checks} integrity check loops...`
+      );
+      Array.from({ length: concurrent_integrity_checks }).forEach(
+        (val, idx) => {
+          integrity_loop(idx);
+        }
+      );
     });
 
     // generate the filelist every 10 minutes
@@ -83,5 +97,8 @@ async function run () {
   }
 }
 
-logger.info('Starting transcode service...', { label: 'STARTUP', application_version });
+logger.info('Starting transcode service...', {
+  label: 'STARTUP',
+  application_version
+});
 run();

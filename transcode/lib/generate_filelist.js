@@ -1,25 +1,25 @@
-import async, { asyncify } from "async";
-import fs from "fs";
-import logger from "./logger";
-import config from "./config";
-import memcached from "./memcached";
-import File from "../models/files";
+import async, { asyncify } from 'async';
+import fs from 'fs';
+import logger from './logger';
+import config from './config';
+import memcached from './memcached';
+import File from '../models/files';
 
 const { encode_version } = config;
 
-export default async function generate_filelist() {
-  logger.info("GENERATING PRIMARY FILE LIST");
+export default async function generate_filelist () {
+  logger.info('GENERATING PRIMARY FILE LIST');
   // query for any files that have an encode version that doesn't match the current encode version
   // do not hydrate results into models
   // sort by priority, then size, then width
   let filelist = await File.find({
     encode_version: { $ne: encode_version },
-    status: "pending",
+    status: 'pending'
   })
     .sort({
-      "sortFields.priority": 1,
-      "sortFields.size": -1,
-      "sortFields.width": -1,
+      'sortFields.priority': 1,
+      'sortFields.size': -1,
+      'sortFields.width': -1
     })
     .limit(1000);
 
@@ -34,7 +34,7 @@ export default async function generate_filelist() {
       const lock = !!(await memcached.get(`transcode_lock_${video_record._id}`));
 
       logger.debug(`transcode_lock_${video_record._id}`, {
-        label: "TRANSCODE LOCK CHECK",
+        label: 'TRANSCODE LOCK CHECK',
         lock
       });
 
@@ -46,30 +46,30 @@ export default async function generate_filelist() {
       return true;
     })
   );
-  
+
   filelist = filelist.filter((f) => !f.locked);
 
   // remove first item from the list and write the rest to a file
   fs.writeFileSync(
-    "./filelist.txt",
+    './filelist.txt',
     filelist
       .slice(1)
       .map((f) => f.path)
-      .join("\n")
+      .join('\n')
   );
   fs.writeFileSync(
-    "./output/filelist.json",
+    './output/filelist.json',
     JSON.stringify(
       filelist.slice(1, 1001).map((f) => ({
         path: f.path.split(/\//).pop(),
         size: f.sortFields.size,
         priority: f.sortFields.priority,
         resolution:
-          f.probe.streams.find((v) => v.codec_type === "video").width * 0.5625, // use width at 56.25% to calculate resolution
+          f.probe.streams.find((v) => v.codec_type === 'video').width * 0.5625, // use width at 56.25% to calculate resolution
         codec: `${
-          f.probe.streams.find((v) => v.codec_type === "video")?.codec_name
-        }/${f.probe.streams.find((v) => v.codec_type === "audio")?.codec_name}`,
-        encode_version: f.encode_version,
+          f.probe.streams.find((v) => v.codec_type === 'video')?.codec_name
+        }/${f.probe.streams.find((v) => v.codec_type === 'audio')?.codec_name}`,
+        encode_version: f.encode_version
       }))
     )
   );

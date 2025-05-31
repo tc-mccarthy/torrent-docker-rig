@@ -1,35 +1,35 @@
-import async, { asyncify } from "async";
-import logger from "./logger";
-import memcached from "./memcached";
-import File from "../models/files";
+import async, { asyncify } from 'async';
+import logger from './logger';
+import memcached from './memcached';
+import File from '../models/files';
 
-export default async function generate_integrity_filelist() {
-  logger.info("GENERATING PRIMARY FILE LIST");
+export default async function generate_integrity_filelist () {
+  logger.info('GENERATING PRIMARY FILE LIST');
   // query for any files that have not been processed yet AND that have not yet had their integrity checked
   // do not hydrate results into models
   // sort by priority, then size, then width
   let filelist = await File.find({
-    status: "pending",
+    status: 'pending',
     $or: [
       { integrityCheck: { $exists: false } },
-      { integrityCheck: { $ne: true } },
-    ],
+      { integrityCheck: { $ne: true } }
+    ]
   })
     .sort({
-      "sortFields.priority": 1,
-      "sortFields.size": 1,
-      "sortFields.width": -1,
+      'sortFields.priority': 1,
+      'sortFields.size': 1,
+      'sortFields.width': -1
     })
     .limit(1000);
 
-  logger.info("FILTERING FILELIST");
-  
+  logger.info('FILTERING FILELIST');
+
   // filter out files that are missing paths
   filelist = filelist
     .filter((f) => f.path)
     .map((f) => ({ _id: f._id, path: f.path }));
 
-  logger.info("REMOVING LOCKED FILES FROM FILELIST");
+  logger.info('REMOVING LOCKED FILES FROM FILELIST');
 
   // now filter out files that have locks
   await async.eachLimit(
@@ -39,7 +39,7 @@ export default async function generate_integrity_filelist() {
       const lock = !!(await memcached.get(`integrity_lock_${video_record._id}`)) || !!(await memcached.get(`transcode_lock_${video_record._id}`));
 
       logger.debug(`integrity_lock_${video_record._id}`, {
-        label: "INTEGRITY LOCK CHECK",
+        label: 'INTEGRITY LOCK CHECK',
         lock
       });
 
@@ -53,7 +53,7 @@ export default async function generate_integrity_filelist() {
   );
 
   logger.info(filelist.filter((f) => f.locked).length, {
-    label: "LOCKED INTEGRITY FILES FOUND",
+    label: 'LOCKED INTEGRITY FILES FOUND'
   });
   filelist = filelist.filter((f) => !f.locked);
 

@@ -18,7 +18,7 @@
     "memcached": "^2.2.2",
     "memcached-promise": "^1.0.1",
     "mongoose": "^8.10.1",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.1.0",
     "redis": "^4.7.0",
     "trash-cli": "^6.0.0",
     "webpack-node-externals": "^3.0.0",
