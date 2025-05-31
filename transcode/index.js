@@ -49,10 +49,6 @@ async function run () {
     logger.info('Getting disk space');
     get_disk_space();
 
-    // cleaning up
-    logger.info('Cleaning up the FS before running the queue');
-    pre_sanitize();
-
     // start the file monitor
     fs_monitor();
 
@@ -85,7 +81,7 @@ async function run () {
 
     // schedule the cleanup tasks
     cron.schedule('0 */3 * * *', () => {
-      db_cleanup();
+      pre_sanitize();
     });
 
     // schedule the queue update
