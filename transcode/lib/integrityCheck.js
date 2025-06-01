@@ -12,7 +12,7 @@ import IntegrityError from '../models/integrityError';
 const { encode_version } = config;
 
 function get_error_list (stderr) {
-  const exceptions = [/dts/i, /last\s+message\s+repeated/i];
+  const exceptions = [/dts/i, /last\s+message\s+repeated/i, /referenced\s+qt\s+chapter\s+track\s+not\s+found/i];
 
   const all_errors = stderr
     .toLowerCase()
@@ -104,7 +104,7 @@ export default function integrityCheck (file) {
       let start_time;
 
       ffmpeg(file)
-        .inputOptions('-v error')
+        .inputOptions('-v fatal')
         .outputOptions([
           // "-c:v copy",
           // "-c:a copy",
