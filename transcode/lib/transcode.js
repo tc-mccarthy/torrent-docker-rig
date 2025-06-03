@@ -11,6 +11,7 @@ import upsert_video from './upsert_video';
 import ErrorLog from '../models/error';
 import probe_and_upsert from './probe_and_upsert';
 import wait from './wait';
+import integrityCheck from './integrityCheck';
 
 const { encode_version } = config;
 
@@ -181,6 +182,11 @@ export default function transcode (file) {
 
       if (ffprobe_data.chapters.length > 0) {
         input_maps.push(`-map_chapters 0`);
+      }
+
+      // if the file hasn't already been integrity checked, do so now
+      if (!video_record.integrityCheck) {
+        await integrityCheck(file);
       }
 
       let cmd = ffmpeg(file);

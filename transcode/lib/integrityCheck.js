@@ -104,7 +104,7 @@ export default function integrityCheck (file) {
       let start_time;
 
       ffmpeg(file)
-        .inputOptions('-v fatal')
+        .inputOptions(['-v fatal', '-stats'])
         .outputOptions([
           // "-c:v copy",
           // "-c:a copy",
