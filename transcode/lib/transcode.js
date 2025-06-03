@@ -34,8 +34,6 @@ export default function transcode (file) {
         return resolve();
       }
 
-      await memcached.set(`transcode_lock_${video_record._id}`, 'locked', 5);
-
       const { profiles } = config;
       const exists = fs.existsSync(file);
 
@@ -193,6 +191,8 @@ export default function transcode (file) {
       if (!video_record.integrityCheck) {
         await integrityCheck(file);
       }
+
+      await memcached.set(`transcode_lock_${video_record._id}`, 'locked', 5);
 
       let cmd = ffmpeg(file);
 
