@@ -21,7 +21,7 @@ export default function transcode (file) {
       // mongo record of the video
       const video_record = await File.findOne({ path: file });
 
-      if (!video_record) {
+      if (!video_record || !video_record?._id) {
         throw new Error(`Video record not found for file: ${file}`);
       }
       
