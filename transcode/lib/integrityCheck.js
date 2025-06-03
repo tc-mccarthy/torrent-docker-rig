@@ -12,7 +12,7 @@ import IntegrityError from '../models/integrityError';
 const { encode_version } = config;
 
 function get_error_list (stderr) {
-  const exceptions = [/dts/i, /last\s+message\s+repeated/i, /referenced\s+qt\s+chapter\s+track\s+not\s+found/i];
+  const exceptions = [/speed[=]/i, /dts/i, /last\s+message\s+repeated/i, /referenced\s+qt\s+chapter\s+track\s+not\s+found/i];
 
   const all_errors = stderr
     .toLowerCase()
