@@ -27,8 +27,8 @@ export default async function integrity_loop (idx = 0) {
     console.error(e);
   } finally {
     // generate a random number between 0 and 2 seconds
-    const randomDelay = getRandomDelay(5, 10);
-
+    let randomDelay = getRandomDelay(5, 10);
+    randomDelay = 1;
     // if the current time is before 9am, run again after a random delay
     const currentHourLocalTime = dayjs().tz(process.env.TZ).hour();
     if (currentHourLocalTime < 9) {
