@@ -106,8 +106,8 @@ export default function integrityCheck (file) {
       ffmpeg(file)
         .inputOptions(['-v fatal', '-stats'])
         .outputOptions([
-          // "-c:v copy",
-          // "-c:a copy",
+           "-c:v copy",
+           "-c:a copy",
           '-f null'
         ])
         .on('start', async (commandLine) => {
@@ -133,10 +133,10 @@ export default function integrityCheck (file) {
         .on('progress', (progress) => {
           // set a 5 second lock on the video record
           memcached.set(`integrity_lock_${video_record._id}`, 'locked', 5);
-          logger.info(Math.floor(progress.percent), {
+          /* logger.info(Math.floor(progress.percent), {
             label: 'INTEGRITY CHECK PROGRESS',
             file
-          });
+          }); */
         })
         .on('end', async (stdout, stderr) => {
           try {
