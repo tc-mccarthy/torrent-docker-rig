@@ -20,6 +20,11 @@ export default function transcode (file) {
     try {
       // mongo record of the video
       const video_record = await File.findOne({ path: file });
+
+      if (!video_record) {
+        throw new Error(`Video record not found for file: ${file}`);
+      }
+      
       const locked = await memcached.get(`transcode_lock_${video_record._id}`);
       // if the file is locked, short circuit
       if (locked) {
