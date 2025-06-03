@@ -191,6 +191,7 @@ export default function transcode (file) {
 
       // if the file hasn't already been integrity checked, do so now
       if (!video_record.integrityCheck) {
+        logger.info("File hasn't been integrity checked. Checking before transcode");
         await integrityCheck(file);
       }
 
