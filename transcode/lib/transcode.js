@@ -423,66 +423,7 @@ export default function transcode (file) {
             }
           });
 
-          const corrupt_video_tests = [
-            {
-              test: /Invalid\s+NAL\s+unit\s+size/gi,
-              message: 'Invalid NAL unit size',
-              obj: stderr
-            },
-            {
-              test: /unspecified\s+pixel\s+format/gi,
-              message: 'Unspecified pixel format',
-              obj: stderr
-            },
-            {
-              test: /unknown\s+codec/gi,
-              message: 'Unknown codec',
-              obj: stderr
-            },
-            {
-              test: /too\s+many\s+packets\s+buffered\s+for\s+output\s+stream/gi,
-              message: 'Too many packets buffered for output stream',
-              obj: stderr
-            },
-            {
-              test: /invalid\s+data\s+found\s+when\s+processing\s+input/gi,
-              message: 'Invalid data found when processing input',
-              obj: stderr
-            },
-            {
-              test: /could\s+not\s+open\s+encoder\s+before\s+eof/gi,
-              message: 'Could not open encoder before End of File',
-              obj: stderr
-            },
-            {
-              test: /command\s+failed/gi,
-              message: 'FFProbe command failed, video likely corrupt',
-              obj: stderr
-            },
-            {
-              test: /ffmpeg\s+was\s+killed\s+with\s+signal\s+SIGFPE/i,
-              message: 'FFMpeg processing failed, video likely corrupt',
-              obj: stderr
-            },
-            {
-              test: /[-]22/i,
-              message: 'Unrecoverable Errors were found in the source',
-              obj: stderr
-            }
-          ];
-
-          const is_corrupt = corrupt_video_tests.find((t) =>
-            t.test.test(t.obj));
-
-          // If this video is corrupted, trash it
-          if (is_corrupt) {
-            logger.info(is_corrupt, {
-              label: 'Source video is corrupt. Trashing'
-            });
-            // don't await the delete in case the problem is a missing file
-            trash(file);
-            await File.deleteOne({ path: file });
-          }
+ 
           resolve();
         });
       cmd.save(scratch_file);
