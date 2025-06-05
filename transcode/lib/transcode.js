@@ -367,7 +367,7 @@ export default function transcode (file) {
 
             // delete the original file if the transcoded filename is different
             if (dest_file !== file) {
-              logger.info("Destination filename and file name differ. Deleting original file");
+              logger.info("Destination filename and file name differ. Deleting original file", {dest_file, file});
               await trash(file, false);
             }
 
