@@ -16,7 +16,7 @@ const config = {
       height: 2160,
       aspect: 16 / 9,
       bitrate: 10,
-      crf: 28,
+      crf: 25,
       output: 'av1'
     },
     {
@@ -25,7 +25,7 @@ const config = {
       height: 2160,
       aspect: 1.37 / 1,
       bitrate: 10,
-      crf: 28,
+      crf: 25,
       output: 'av1'
     },
     {
@@ -61,7 +61,7 @@ const config = {
       height: 720,
       aspect: 16 / 9,
       bitrate: 7,
-      crf: 28,
+      crf: 30,
       output: 'av1'
     },
     {
@@ -70,7 +70,7 @@ const config = {
       height: 480,
       aspect: 4 / 3,
       bitrate: 3.5,
-      crf: 28,
+      crf: 32,
       output: 'av1',
       default: true
     },
