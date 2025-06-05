@@ -366,7 +366,8 @@ export default function transcode (file) {
             await fs.promises.utimes(dest_file, new Date(), new Date());
 
             // delete the original file if the transcoded filename is different
-            if (scratch_file !== file) {
+            if (dest_file !== file) {
+              logger.info("Destination filename and file name differ. Deleting original file");
               await trash(file, false);
             }
 
