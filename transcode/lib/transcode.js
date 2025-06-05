@@ -128,11 +128,12 @@ export default function transcode (file) {
         ) {
           transcode_audio = true;
           audio_filters.push(
-            `-c:a:${idx} ${conversion_profile.output.audio.codec}`,
+            `-c:a:${idx} ${conversion_profile.output.audio.codec}`, // specify the codec for this audio stream on the output
             `-b:a:${idx} ${
               audio_stream.channels *
               conversion_profile.output.audio.per_channel_bitrate
-            }k`
+            }k`, // set the bitrate for this audio stream
+            `-map_metadata:s:a:${idx} 0:a:${audio_stream.index}` // source the metadata from the original audio stream
           );
         }
       });
