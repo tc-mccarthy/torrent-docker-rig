@@ -24,7 +24,7 @@ export default function transcode (file) {
       if (!video_record || !video_record?._id) {
         throw new Error(`Video record not found for file: ${file}`);
       }
-      
+
       const locked = await memcached.get(`transcode_lock_${video_record._id}`);
       // if the file is locked, short circuit
       if (locked) {
@@ -367,7 +367,7 @@ export default function transcode (file) {
 
             // delete the original file if the transcoded filename is different
             if (dest_file !== file) {
-              logger.info("Destination filename and file name differ. Deleting original file", {dest_file, file});
+              logger.info('Destination filename and file name differ. Deleting original file', { dest_file, file });
               await trash(file, false);
             }
 
@@ -424,7 +424,6 @@ export default function transcode (file) {
             }
           });
 
- 
           resolve();
         });
       cmd.save(scratch_file);

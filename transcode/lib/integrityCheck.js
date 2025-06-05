@@ -106,8 +106,8 @@ export default function integrityCheck (file) {
       ffmpeg(file)
         .inputOptions(['-v fatal', '-stats'])
         .outputOptions([
-           "-c:v copy",
-           "-c:a copy",
+          '-c:v copy',
+          '-c:a copy',
           '-f null'
         ])
         .on('start', async (commandLine) => {
