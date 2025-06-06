@@ -133,7 +133,7 @@ export default function transcode (file) {
               audio_stream.channels *
               conversion_profile.output.audio.per_channel_bitrate
             }k`, // set the bitrate for this audio stream
-            `-map_metadata:s:a:${idx} 0:s:a:${audio_stream.index}` // source the metadata from the original audio stream
+            `-map_metadata:s:a:${idx} 0:s:a:${idx}` // source the metadata from the original audio stream
           );
         }
       });
