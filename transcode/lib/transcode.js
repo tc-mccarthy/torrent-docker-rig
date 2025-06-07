@@ -123,6 +123,8 @@ export default function transcode (file) {
 
       // add transcode instructions for any audio streams that don't match the profile
       audio_streams.forEach((audio_stream, idx) => {
+        cmd.outputOptions(`-map_metadata:s:a:${idx} 0:s:a:${idx}`); // source the metadata from the original audio stream
+
         if (
           conversion_profile.output.audio.codec_name !== audio_stream.codec_name
         ) {
@@ -132,8 +134,7 @@ export default function transcode (file) {
             `-b:a:${idx} ${
               audio_stream.channels *
               conversion_profile.output.audio.per_channel_bitrate
-            }k`, // set the bitrate for this audio stream
-            `-map_metadata:s:a:${idx} 0:s:a:${idx}` // source the metadata from the original audio stream
+            }k` // set the bitrate for this audio stream
           );
         }
       });
