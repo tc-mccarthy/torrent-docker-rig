@@ -278,7 +278,7 @@ export default function transcode (file) {
           const est_completed_seconds = pct_remaining * seconds_pct;
           const time_remaining = dayjs
             .utc(est_completed_seconds * 1000)
-            .format('HH:mm:ss');
+            .format([est_completed_seconds > 86400 && 'D:', 'HH:mm:ss'].filter((t) => t).join(''));
           const estimated_final_kb =
             (progress.targetSize / progress.percent) * 100;
           const output = JSON.stringify(
