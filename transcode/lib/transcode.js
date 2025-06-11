@@ -121,9 +121,11 @@ export default function transcode (file) {
         transcode_video = true;
       }
 
+      const map_metadata = [];
+
       // add transcode instructions for any audio streams that don't match the profile
       audio_streams.forEach((audio_stream, idx) => {
-        cmd.outputOptions(`-map_metadata:s:a:${idx} 0:s:a:${idx}`); // source the metadata from the original audio stream
+        map_metadata.push(`-map_metadata:s:a:${idx} 0:s:a:${idx}`); // source the metadata from the original audio stream
 
         if (
           conversion_profile.output.audio.codec_name !== audio_stream.codec_name
@@ -220,7 +222,8 @@ export default function transcode (file) {
           `-c:v ${conversion_profile.output.video.codec}`,
           ...Object.keys(conversion_profile.output.video.flags || {}).map(
             (k) => `-${k} ${conversion_profile.output.video.flags[k]}`
-          )
+          ),
+          ...map_metadata
         ]);
       } else {
         cmd = cmd.outputOptions('-c:v copy');
