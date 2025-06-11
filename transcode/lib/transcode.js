@@ -201,7 +201,7 @@ export default function transcode (file) {
 
       let cmd = ffmpeg(file);
 
-      cmd = cmd.inputOptions(['-v fatal', '-stats']).outputOptions(input_maps);
+      cmd = cmd.inputOptions(['-v fatal', '-stats', '-hwaccel auto']).outputOptions(input_maps);
 
       if (transcode_video) {
         const pix_fmt = 'yuv420p10le';
