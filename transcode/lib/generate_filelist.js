@@ -21,7 +21,7 @@ export default async function generate_filelist () {
       'sortFields.size': -1,
       'sortFields.width': -1
     })
-    .limit(1000);
+    .limit(1000 + config.concurrent_transcodes);
 
   // filter out files that are missing paths
   filelist = filelist.filter((f) => f.path);
