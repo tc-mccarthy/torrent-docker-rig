@@ -1,20 +1,20 @@
-import fs from "fs";
-import ffmpeg from "fluent-ffmpeg";
-import dayjs from "dayjs";
-import File from "../models/files";
-import ffprobe from "./ffprobe";
-import config from "./config";
-import logger from "./logger";
-import { trash, generate_file_paths } from "./fs";
-import upsert_video from "./upsert_video";
-import ErrorLog from "../models/error";
-import probe_and_upsert from "./probe_and_upsert";
-import wait from "./wait";
-import integrityCheck from "./integrityCheck";
+import fs from 'fs';
+import ffmpeg from 'fluent-ffmpeg';
+import dayjs from 'dayjs';
+import File from '../models/files';
+import ffprobe from './ffprobe';
+import config from './config';
+import logger from './logger';
+import { trash, generate_file_paths } from './fs';
+import upsert_video from './upsert_video';
+import ErrorLog from '../models/error';
+import probe_and_upsert from './probe_and_upsert';
+import wait from './wait';
+import integrityCheck from './integrityCheck';
 
 const { encode_version } = config;
 
-export default function transcode(file) {
+export default function transcode (file) {
   return new Promise(async (resolve, reject) => {
     try {
       // mongo record of the video
@@ -25,7 +25,7 @@ export default function transcode(file) {
       }
 
       // if the file is locked, short circuit
-      if (await video_record.hasLock("transcode")) {
+      if (await video_record.hasLock('transcode')) {
         logger.info(
           `File is locked. Skipping transcode: ${file} - ${video_record._id}`
         );
@@ -41,14 +41,14 @@ export default function transcode(file) {
 
       const ffprobe_data = await ffprobe(file);
 
-      logger.debug(ffprobe_data, { label: ">> FFPROBE DATA >>" });
+      logger.debug(ffprobe_data, { label: '>> FFPROBE DATA >>' });
 
       const video_stream = ffprobe_data.streams.find(
-        (s) => s.codec_type === "video"
+        (s) => s.codec_type === 'video'
       );
 
       if (!video_stream) {
-        throw new Error("No video stream found");
+        throw new Error('No video stream found');
       }
 
       const { scratch_file, dest_file } = generate_file_paths(file);
@@ -58,9 +58,9 @@ export default function transcode(file) {
         logger.info(
           {
             file,
-            encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
+            encode_version: ffprobe_data.format.tags?.ENCODE_VERSION
           },
-          { label: "File already encoded" }
+          { label: 'File already encoded' }
         );
         video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
         await video_record.save();
@@ -69,27 +69,27 @@ export default function transcode(file) {
 
       // get the audio stream, in english unless otherwise specified, with the highest channel count
       const audio_stream_test = new RegExp(
-        (video_record.audio_language || ["und", "eng"]).join("|"),
-        "i"
+        (video_record.audio_language || ['und', 'eng']).join('|'),
+        'i'
       );
 
       // preserve the audio lines specified in the video record, sorted by channel count
       const audio_streams = ffprobe_data.streams
         .filter(
           (s) =>
-            s.codec_type === "audio" &&
+            s.codec_type === 'audio' &&
             (!s.tags?.language || audio_stream_test.test(s.tags.language))
         )
         .sort((a, b) => (a.channels > b.channels ? -1 : 1));
 
       if (!audio_streams?.length) {
-        throw new Error("No audio stream found");
+        throw new Error('No audio stream found');
       }
 
       const subtitle_streams = ffprobe_data.streams.filter(
         (s) =>
-          s.codec_type === "subtitle" &&
-          s.tags?.language === "eng" &&
+          s.codec_type === 'subtitle' &&
+          s.tags?.language === 'eng' &&
           /subrip|hdmv_pgs_subtitle|substation/i.test(s.codec_name)
       );
       let transcode_video = false;
@@ -104,9 +104,9 @@ export default function transcode(file) {
           video_stream_width: video_stream.width,
           video_stream_aspect: video_stream.aspect,
           conversion_profile,
-          profiles,
+          profiles
         },
-        { label: "Profile debug info" }
+        { label: 'Profile debug info' }
       );
 
       conversion_profile.width =
@@ -146,29 +146,29 @@ export default function transcode(file) {
         !transcode_video
       ) {
         logger.debug(
-          "Video stream bitrate higher than conversion profile. Transcoding"
+          'Video stream bitrate higher than conversion profile. Transcoding'
         );
         transcode_video = true;
       }
 
       // if the video is 1gb or less in size and the codec is HEVC, don't transcode
       if (
-        video_stream.codec_name === "hevc" &&
+        video_stream.codec_name === 'hevc' &&
         ffprobe_data.format.size <= 1048576
       ) {
         logger.debug(
-          "Video stream codec is HEVC and size is less than 1GB. Not transcoding"
+          'Video stream codec is HEVC and size is less than 1GB. Not transcoding'
         );
         transcode_video = false;
       }
 
       // if the video is 350mb or less in size and the codec is h264, don't transcode
       if (
-        video_stream.codec_name === "h264" &&
+        video_stream.codec_name === 'h264' &&
         ffprobe_data.format.size <= 350000
       ) {
         logger.debug(
-          "Video stream codec is HEVC and size is less than 1GB. Not transcoding"
+          'Video stream codec is HEVC and size is less than 1GB. Not transcoding'
         );
         transcode_video = false;
       }
@@ -182,7 +182,7 @@ export default function transcode(file) {
           input_maps.push(`-map 0:${s.index}`);
         });
 
-        input_maps.push("-c:s copy");
+        input_maps.push('-c:s copy');
       }
 
       if (ffprobe_data.chapters.length > 0) {
@@ -197,22 +197,22 @@ export default function transcode(file) {
         await integrityCheck(file);
       }
 
-      await video_record.setLock("transcode");
+      await video_record.setLock('transcode');
 
       let cmd = ffmpeg(file);
 
       cmd = cmd
-        .inputOptions(["-v fatal", "-stats", "-hwaccel auto"])
+        .inputOptions(['-v fatal', '-stats', '-hwaccel auto'])
         .outputOptions(input_maps);
 
       if (transcode_video) {
-        const pix_fmt = "yuv420p10le";
+        const pix_fmt = 'yuv420p10le';
 
         conversion_profile.output.video.addFlags({
           maxrate: `${conversion_profile.output.video.bitrate}M`,
           bufsize: `${conversion_profile.output.video.bitrate * 3}M`,
           max_muxing_queue_size: 9999,
-          pix_fmt,
+          pix_fmt
         });
 
         // handle HDR
@@ -225,18 +225,18 @@ export default function transcode(file) {
           ...Object.keys(conversion_profile.output.video.flags || {}).map(
             (k) => `-${k} ${conversion_profile.output.video.flags[k]}`
           ),
-          ...map_metadata,
+          ...map_metadata
         ]);
       } else {
-        cmd = cmd.outputOptions("-c:v copy");
+        cmd = cmd.outputOptions('-c:v copy');
       }
 
       if (video_filters.length > 0) {
-        cmd = cmd.outputOptions(["-vf", ...video_filters]);
+        cmd = cmd.outputOptions(['-vf', ...video_filters]);
       }
 
       if (!transcode_audio) {
-        cmd = cmd.outputOptions("-c:a copy");
+        cmd = cmd.outputOptions('-c:a copy');
       } else {
         // add unique audio filters to output options
         cmd = cmd.outputOptions(
@@ -251,33 +251,33 @@ export default function transcode(file) {
       let start_time;
 
       cmd = cmd
-        .on("start", async (commandLine) => {
+        .on('start', async (commandLine) => {
           logger.info(`Spawned Ffmpeg with command: ${commandLine}`);
           start_time = dayjs();
           ffmpeg_cmd = commandLine;
 
           if (video_record) {
-            logger.debug(">> VIDEO FOUND -- REMOVING ERROR >>", video_record);
+            logger.debug('>> VIDEO FOUND -- REMOVING ERROR >>', video_record);
             video_record.error = undefined;
             video_record.transcode_details = {
               start_time: start_time.toDate(),
               source_codec: `${
-                video_record.probe.streams.find((f) => f.codec_type === "video")
+                video_record.probe.streams.find((f) => f.codec_type === 'video')
                   ?.codec_name
               }_${
-                video_record.probe.streams.find((f) => f.codec_type === "audio")
+                video_record.probe.streams.find((f) => f.codec_type === 'audio')
                   ?.codec_name
-              }`,
+              }`
             };
             await video_record.save();
           }
         })
-        .on("progress", (progress) => {
+        .on('progress', (progress) => {
           // set a 5 second lock on the video record
-          video_record.setLock("transcode");
+          video_record.setLock('transcode');
 
-          const elapsed = dayjs().diff(start_time, "seconds");
-          const run_time = dayjs.utc(elapsed * 1000).format("HH:mm:ss");
+          const elapsed = dayjs().diff(start_time, 'seconds');
+          const run_time = dayjs.utc(elapsed * 1000).format('HH:mm:ss');
           const pct_per_second = progress.percent / elapsed;
           const seconds_pct = 1 / pct_per_second;
           const pct_remaining = 100 - progress.percent;
@@ -285,9 +285,9 @@ export default function transcode(file) {
           const time_remaining = dayjs
             .utc(est_completed_seconds * 1000)
             .format(
-              [est_completed_seconds > 86400 && "D:", "HH:mm:ss"]
+              [est_completed_seconds > 86400 && 'D:', 'HH:mm:ss']
                 .filter((t) => t)
-                .join("")
+                .join('')
             );
           const estimated_final_kb =
             (progress.targetSize / progress.percent) * 100;
@@ -306,7 +306,7 @@ export default function transcode(file) {
                 progress: {
                   kb: progress.targetSize,
                   mb: progress.targetSize / 1024,
-                  gb: progress.targetSize / 1024 / 1024,
+                  gb: progress.targetSize / 1024 / 1024
                 },
                 estimated_final: {
                   kb: estimated_final_kb,
@@ -316,14 +316,14 @@ export default function transcode(file) {
                     ((estimated_final_kb - ffprobe_data.format.size) /
                       ffprobe_data.format.size) *
                     100
-                  }%`,
+                  }%`
                 },
                 original: {
                   kb: ffprobe_data.format.size,
                   mb: ffprobe_data.format.size / 1024,
-                  gb: ffprobe_data.format.size / 1024 / 1024,
-                },
-              },
+                  gb: ffprobe_data.format.size / 1024 / 1024
+                }
+              }
             },
             true,
             4
@@ -333,9 +333,9 @@ export default function transcode(file) {
             {
               ...conversion_profile,
               ffmpeg_cmd,
-              file,
+              file
             },
-            { label: "Job" }
+            { label: 'Job' }
           );
 
           logger.debug(output);
@@ -349,13 +349,13 @@ export default function transcode(file) {
               video_stream,
               audio_language: video_record.audio_language,
               file,
-              output: JSON.parse(output),
+              output: JSON.parse(output)
             })
           );
         })
-        .on("end", async (stdout, stderr) => {
+        .on('end', async (stdout, stderr) => {
           try {
-            logger.info("Transcoding succeeded!");
+            logger.info('Transcoding succeeded!');
             logger.info(`Confirming existence of ${scratch_file}`);
 
             await wait(5);
@@ -380,7 +380,7 @@ export default function transcode(file) {
             // delete the original file if the transcoded filename is different
             if (dest_file !== file) {
               logger.info(
-                "Destination filename and file name differ. Deleting original file",
+                'Destination filename and file name differ. Deleting original file',
                 { dest_file, file }
               );
               await trash(file, false);
@@ -390,26 +390,26 @@ export default function transcode(file) {
               transcode_details: {
                 ...video_record.transcode_details,
                 end_time: dayjs().toDate(),
-                duration: dayjs().diff(start_time, "seconds"),
-              },
+                duration: dayjs().diff(start_time, 'seconds')
+              }
             });
           } catch (e) {
-            logger.error(e, { label: "POST TRANSCODE ERROR" });
+            logger.error(e, { label: 'POST TRANSCODE ERROR' });
           } finally {
             resolve();
           }
         })
-        .on("error", async (err, stdout, stderr) => {
-          logger.error(err, { label: "Cannot process video", stdout, stderr });
+        .on('error', async (err, stdout, stderr) => {
+          logger.error(err, { label: 'Cannot process video', stdout, stderr });
           fs.appendFileSync(
-            "/usr/app/logs/ffmpeg.log",
+            '/usr/app/logs/ffmpeg.log',
             JSON.stringify(
               {
                 error: err.message,
                 stdout,
                 stderr,
                 ffmpeg_cmd,
-                trace: err.stack,
+                trace: err.stack
               },
               true,
               4
@@ -423,9 +423,9 @@ export default function transcode(file) {
               stdout,
               stderr,
               ffmpeg_cmd,
-              trace: err.stack,
+              trace: err.stack
             },
-            hasError: true,
+            hasError: true
           });
 
           await ErrorLog.create({
@@ -435,24 +435,24 @@ export default function transcode(file) {
               stdout,
               stderr,
               ffmpeg_cmd,
-              trace: err.stack,
-            },
+              trace: err.stack
+            }
           });
 
           resolve();
         });
       cmd.save(scratch_file);
     } catch (e) {
-      logger.error(e, { label: "TRANSCODE ERROR" });
+      logger.error(e, { label: 'TRANSCODE ERROR' });
       await upsert_video({
         path: file,
         error: { error: e.message, trace: e.stack },
-        hasError: true,
+        hasError: true
       });
 
       await ErrorLog.create({
         path: file,
-        error: { error: e.message, trace: e.stack },
+        error: { error: e.message, trace: e.stack }
       });
 
       if (/no\s+(video|audio)\s+stream\s+found/gi.test(e.message)) {

@@ -1,5 +1,5 @@
-import mongoose from "mongoose";
-import memcached from "./memcached";
+import mongoose from 'mongoose';
+import memcached from '../lib/memcached';
 
 const { Schema, model } = mongoose;
 
@@ -10,7 +10,7 @@ const { Schema, model } = mongoose;
  *
  * Note: This is being done as a variable so that you can simply dupe this file and change the model_name and schema to readily create a new model
  * */
-const model_name = "File";
+const model_name = 'File';
 
 // establish types and defaults for keys
 const schema = new Schema(
@@ -18,97 +18,98 @@ const schema = new Schema(
     path: {
       type: String,
       required: false,
-      unique: true,
+      unique: true
     },
     encode_version: {
       type: String,
       required: false,
-      index: true,
+      index: true
     },
     status: {
       type: String,
       required: true,
       index: true,
-      default: "pending",
+      default: 'pending'
     },
     probe: {
       type: Object,
-      required: false, // making this false so that we can easily add registration to the site without needing a subscription
+      required: false // making this false so that we can easily add registration to the site without needing a subscription
     },
     last_probe: {
       type: Date,
-      required: false,
+      required: false
     },
     transcode_details: {
       type: Object,
-      required: false,
+      required: false
     },
     sortFields: {
       type: Object,
-      required: true,
+      required: true
     },
     audio_language: {
       type: Array,
-      required: false,
+      required: false
     },
     error: {
       type: Object,
-      required: false,
+      required: false
     },
     hasError: {
       type: Boolean,
-      required: false,
+      required: false
     },
     integrityCheck: {
       type: Boolean,
       required: false,
-      default: false,
-    },
+      default: false
+    }
   },
-  { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
+  { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 
 schema.method.hasLock = async function (type) {
+  let lock;
   if (!type) {
-    return (
+    lock = (
       (await memcached.get(`transcode_lock_${this._id}`)) ||
       (await memcached.get(`transcode_lock_${this._id}`))
     );
   }
-  const lock = await memcached.get(`${type}_lock_${this._id}`);
+  lock = await memcached.get(`${type}_lock_${this._id}`);
   return !!lock;
 };
 
 schema.method.setLock = async function (type) {
   if (!type) {
-    throw new Error("Type is required to set a lock");
+    throw new Error('Type is required to set a lock');
   }
-  const lock = await memcached.set(`${type}_lock_${this._id}`, "locked", 10);
+  const lock = await memcached.set(`${type}_lock_${this._id}`, 'locked', 10);
   return lock;
 };
 
-schema.index({ "probe.format.size": 1 });
-schema.index({ "sortFields.width": -1, "sortFields.size": 1 });
+schema.index({ 'probe.format.size': 1 });
+schema.index({ 'sortFields.width': -1, 'sortFields.size': 1 });
 schema.index({
-  "sortFields.priority": 1,
-  "sortFields.width": -1,
-  "sortFields.size": 1,
+  'sortFields.priority': 1,
+  'sortFields.width': -1,
+  'sortFields.size': 1
 });
 schema.index({
-  "sortFields.priority": 1,
-  "sortFields.width": -1,
-  "sortFields.size": -1,
+  'sortFields.priority': 1,
+  'sortFields.width': -1,
+  'sortFields.size': -1
 });
 schema.index({
-  "sortFields.priority": 1,
-  "sortFields.size": -1,
-  "sortFields.width": -1,
+  'sortFields.priority': 1,
+  'sortFields.size': -1,
+  'sortFields.width': -1
 });
-schema.index({ "sortFields.priority": 1 });
-schema.index({ "sortFields.size": 1 });
-schema.index({ "sortFields.width": -1 });
-schema.index({ "probe.streams[0].codec_name": 1 });
-schema.index({ "probe.streams.codec_name": 1 });
+schema.index({ 'sortFields.priority': 1 });
+schema.index({ 'sortFields.size': 1 });
+schema.index({ 'sortFields.width': -1 });
+schema.index({ 'probe.streams[0].codec_name': 1 });
+schema.index({ 'probe.streams.codec_name': 1 });
 schema.index({ updated_at: -1 });
 schema.index({ last_probe: -1 });
 schema.index({ hasError: 1 });

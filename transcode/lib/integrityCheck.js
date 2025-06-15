@@ -131,7 +131,7 @@ export default function integrityCheck (file) {
         })
         .on('progress', (progress) => {
           // set a 5 second lock on the video record
-          video_record.setLock('integrity');          
+          video_record.setLock('integrity');
           /* logger.info(Math.floor(progress.percent), {
             label: 'INTEGRITY CHECK PROGRESS',
             file
