@@ -29,7 +29,7 @@ export default function transcode (file) {
         logger.info(
           `File is locked. Skipping transcode: ${file} - ${video_record._id}`
         );
-        return resolve();
+        return resolve({ locked: true });
       }
 
       const { profiles } = config;
@@ -64,7 +64,7 @@ export default function transcode (file) {
         );
         video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
         await video_record.save();
-        return resolve();
+        return resolve({});
       }
 
       // get the audio stream, in english unless otherwise specified, with the highest channel count
@@ -396,7 +396,7 @@ export default function transcode (file) {
           } catch (e) {
             logger.error(e, { label: 'POST TRANSCODE ERROR' });
           } finally {
-            resolve();
+            resolve({});
           }
         })
         .on('error', async (err, stdout, stderr) => {
@@ -439,7 +439,7 @@ export default function transcode (file) {
             }
           });
 
-          resolve();
+          resolve({});
         });
       cmd.save(scratch_file);
     } catch (e) {
@@ -463,7 +463,7 @@ export default function transcode (file) {
         await trash(file);
       }
 
-      resolve();
+      resolve({});
     }
   });
 }
