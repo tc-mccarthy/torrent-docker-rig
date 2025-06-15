@@ -64,7 +64,7 @@ export default function transcode (file) {
         );
         video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
         await video_record.save();
-        return resolve({});
+        return resolve({ locked: true }); // mark locked as true so that the loop doesnt' delay the next start
       }
 
       // get the audio stream, in english unless otherwise specified, with the highest channel count
