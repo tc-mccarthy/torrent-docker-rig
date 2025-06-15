@@ -5,7 +5,6 @@ import File from '../models/files';
 import ffprobe from './ffprobe';
 import config from './config';
 import logger from './logger';
-import memcached from './memcached';
 import { trash } from './fs';
 import IntegrityError from '../models/integrityError';
 
@@ -38,16 +37,16 @@ export default function integrityCheck (file) {
       // mongo record of the video
       logger.info(file, { label: 'INTEGRITY CHECKING FILE' });
       const video_record = await File.findOne({ path: file });
-      const locked = !!(await memcached.get(`integrity_lock_${video_record._id}`)) || !!(await memcached.get(`transcode_lock_${video_record._id}`));
+
       // if the file is locked, short circuit
-      if (locked) {
+      if (await video_record.hasLock()) {
         logger.info(
           `File is locked. Skipping integrity check: ${file} - ${video_record._id}`
         );
         return resolve();
       }
 
-      await memcached.set(`integrity_lock_${video_record._id}`, 'locked', 300);
+      await video_record.setLock('integrity');
 
       const exists = fs.existsSync(file);
 
@@ -132,7 +131,7 @@ export default function integrityCheck (file) {
         })
         .on('progress', (progress) => {
           // set a 5 second lock on the video record
-          memcached.set(`integrity_lock_${video_record._id}`, 'locked', 5);
+          video_record.setLock('integrity');          
           /* logger.info(Math.floor(progress.percent), {
             label: 'INTEGRITY CHECK PROGRESS',
             file

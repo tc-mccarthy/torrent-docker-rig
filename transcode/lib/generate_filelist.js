@@ -31,17 +31,10 @@ export default async function generate_filelist () {
     filelist,
     25,
     asyncify(async (video_record) => {
-      const lock = !!(await memcached.get(`transcode_lock_${video_record._id}`));
-
-      logger.debug(`transcode_lock_${video_record._id}`, {
-        label: 'TRANSCODE LOCK CHECK',
-        lock
-      });
-
       // find the file in the filelist
       const idx = filelist.findIndex((v) => v._id === video_record._id);
 
-      filelist[idx].locked = lock;
+      filelist[idx].locked = await video_record.hasLock('transcode');
 
       return true;
     })
