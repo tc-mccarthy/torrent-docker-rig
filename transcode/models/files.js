@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import memcached from '../lib/memcached';
-import dayjs from '../lib/dayjs';
+// import dayjs from '../lib/dayjs';
 
 const { Schema, model } = mongoose;
 
