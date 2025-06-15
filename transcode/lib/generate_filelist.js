@@ -13,7 +13,8 @@ export default async function generate_filelist () {
   // sort by priority, then size, then width
   let filelist = await File.find({
     encode_version: { $ne: encode_version },
-    status: 'pending'
+    status: 'pending',
+    $or: [{ 'lock.transcode': { $exists: false } }, { 'lock.transcode': null }, { 'lock.transcode': { $lt: new Date() } }] // exclude files that have a lock for integrity check
   })
     .sort({
       'sortFields.priority': 1,

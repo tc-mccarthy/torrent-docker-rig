@@ -12,7 +12,8 @@ export default async function generate_integrity_filelist () {
     $or: [
       { integrityCheck: { $exists: false } },
       { integrityCheck: { $ne: true } }
-    ]
+    ],
+    $or: [{ 'lock.integrity': { $exists: false } }, { 'lock.integrity': null }, { 'lock.integrity': { $lt: new Date() } }]
   })
     .sort({
       'sortFields.priority': 1,

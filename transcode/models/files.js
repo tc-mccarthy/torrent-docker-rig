@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import memcached from '../lib/memcached';
+import dayjs from '../lib/dayjs';
 
 const { Schema, model } = mongoose;
 
@@ -63,6 +64,20 @@ const schema = new Schema(
       type: Boolean,
       required: false,
       default: false
+    },
+    lock: {
+      integrity: {
+        type: Date,
+        required: false,
+        default: null,
+        index: true
+      },
+      transcode: {
+        type: Date,
+        required: false,
+        default: null,
+        index: true
+      }
     }
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
@@ -80,11 +95,14 @@ schema.methods.hasLock = async function (type) {
   return !!lock;
 };
 
-schema.methods.setLock = async function (type) {
+schema.methods.setLock = async function (type, sec = 10) {
   if (!type) {
     throw new Error('Type is required to set a lock');
   }
-  const lock = await memcached.set(`${type}_lock_${this._id}`, 'locked', 10);
+  const lock = await memcached.set(`${type}_lock_${this._id}`, 'locked', sec);
+
+  this.lock[type] = dayjs().add(10, 'seconds').toDate();
+  await this.save();
   return lock;
 };
 
@@ -115,6 +133,8 @@ schema.index({ last_probe: -1 });
 schema.index({ hasError: 1 });
 schema.index({ encode_version: 1, status: 1 });
 schema.index({ integrityCheck: 1, status: 1 });
+schema.index({ 'lock.integrity': 1, 'lock.transcode': 1 });
+schema.index({ 'lock.transcode': 1 });
 
 // create a model object that uses the above schema
 export default model(model_name, schema);
