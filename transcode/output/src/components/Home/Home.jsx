@@ -106,15 +106,17 @@ function Home () {
       <div className="overline" />
       <h1>Optimized video encoding</h1>
       {dataSource && dataSource.length > 0 && <Nav data={dataSource} dataSelection={dataSelection} setDataSelection={setDataSelection} />}
-      <div className="widget center">
-        <strong>{data.file}</strong>
-        {' '}
-        (
-        {data.video_stream.codec_name}
-        /
-        {data.audio_streams[0].codec_name}
-        )
-      </div>
+      {data && (
+        <div className="widget center">
+          <strong>{data.file}</strong>
+          {' '}
+          (
+          {data.video_stream.codec_name}
+          /
+          {data.audio_streams[0].codec_name}
+          )
+        </div>
+      )}
       <div className="flex">
         <div className="widget">
           <strong>CPU</strong>
@@ -125,49 +127,55 @@ function Home () {
           <LinearProgressWithLabel value={utilization.memory} />
         </div>
       </div>
-      <div className="flex">
-        <div className="widget">
-          <strong>Elapsed</strong>
-          {data.output.run_time}
+      {data && (
+        <div className="flex">
+          <div className="widget">
+            <strong>Elapsed</strong>
+            {data.output.run_time}
+          </div>
+          <div className="widget">
+            <strong>Timecode</strong>
+            {data.output.timemark}
+          </div>
+          <div className="widget">
+            <strong>Profile</strong>
+            {data.name}
+          </div>
+          <div className="widget">
+            <strong>Audio Languages</strong>
+            {data.audio_streams.map((stream) => stream.tags?.language).reduce((a, c) => {
+              if (!a.includes(c)) {
+                a.push(c);
+              }
+              return a;
+            }, []).join(', ')}
+          </div>
         </div>
-        <div className="widget">
-          <strong>Timecode</strong>
-          {data.output.timemark}
+      )}
+      {data && (
+        <div className="flex">
+          <div className="widget">
+            <strong>Expected completed time</strong>
+            {estimated_local_time(data.output.est_completed_seconds)}
+          </div>
+          <div className="widget">
+            <strong>ETA</strong>
+            {data.output.time_remaining}
+          </div>
         </div>
-        <div className="widget">
-          <strong>Profile</strong>
-          {data.name}
-        </div>
-        <div className="widget">
-          <strong>Audio Languages</strong>
-          {data.audio_streams.map((stream) => stream.tags?.language).reduce((a, c) => {
-            if (!a.includes(c)) {
-              a.push(c);
-            }
-            return a;
-          }, []).join(', ')}
-        </div>
-      </div>
-      <div className="flex">
-        <div className="widget">
-          <strong>Expected completed time</strong>
-          {estimated_local_time(data.output.est_completed_seconds)}
-        </div>
-        <div className="widget">
-          <strong>ETA</strong>
-          {data.output.time_remaining}
-        </div>
-      </div>
+      )}
       <div className="flex">
         <div className="widget">
           <strong>Files Remaining</strong>
           {status.unprocessed_files.toLocaleString()}
           {/* <CircularProgressWithLabel numerator={numerator} denominator={denominator} /> */}
         </div>
-        <div className="widget">
-          <strong>File Progress</strong>
-          <LinearProgressWithLabel value={data.output.percent} />
-        </div>
+        {data && (
+          <div className="widget">
+            <strong>File Progress</strong>
+            <LinearProgressWithLabel value={data.output.percent} />
+          </div>
+        )}
       </div>
       <div className="flex">
         <div className="widget">
@@ -176,30 +184,34 @@ function Home () {
         </div>
       </div>
 
-      <div className="flex">
-        <div className="widget">
-          <strong>Original Size</strong>
-          {human_size(data.output.size.original)}
-        </div>
-        <div className="widget">
-          <strong>Current Size</strong>
-          {human_size(data.output.size.progress)}
-        </div>
-        <div className="widget">
-          <strong>Est. Final Size</strong>
-          <em>
-            {`${
+      {data && (
+        <div className="flex">
+          <div className="widget">
+            <strong>Original Size</strong>
+            {human_size(data.output.size.original)}
+          </div>
+          <div className="widget">
+            <strong>Current Size</strong>
+            {human_size(data.output.size.progress)}
+          </div>
+          <div className="widget">
+            <strong>Est. Final Size</strong>
+            <em>
+              {`${
               Math.round(+data.output.size.estimated_final.change.replace('%', '') * 100) / 100
             }%`}
-          </em>
-          {human_size(data.output.size.estimated_final)}
+            </em>
+            {human_size(data.output.size.estimated_final)}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="widget center">
-        <strong>Command</strong>
-        {data.ffmpeg_cmd}
-      </div>
+      {data && (
+        <div className="widget center">
+          <strong>Command</strong>
+          {data.ffmpeg_cmd}
+        </div>
+      )}
 
       <div className="flex quarter disks">
         {!disks?.map && <div className="widget center">Loading...</div>}
