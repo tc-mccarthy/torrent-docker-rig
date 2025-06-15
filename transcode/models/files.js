@@ -133,8 +133,6 @@ schema.index({ last_probe: -1 });
 schema.index({ hasError: 1 });
 schema.index({ encode_version: 1, status: 1 });
 schema.index({ integrityCheck: 1, status: 1 });
-schema.index({ 'lock.integrity': 1, 'lock.transcode': 1 });
-schema.index({ 'lock.transcode': 1 });
 
 // create a model object that uses the above schema
 export default model(model_name, schema);
