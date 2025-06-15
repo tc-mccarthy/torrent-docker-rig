@@ -91,13 +91,13 @@ function Home () {
     );
   }
 
-  if (dataSource.length === 0) {
-    return (
-      <Box sx={{ display: 'flex' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  // if (dataSource.length === 0) {
+  //   return (
+  //     <Box sx={{ display: 'flex' }}>
+  //       <CircularProgress />
+  //     </Box>
+  //   );
+  // }
 
   const data = dataSource[dataSelection];
 
@@ -105,7 +105,7 @@ function Home () {
     <div className="container image">
       <div className="overline" />
       <h1>Optimized video encoding</h1>
-      <Nav data={dataSource} dataSelection={dataSelection} setDataSelection={setDataSelection} />
+      {dataSource && dataSource.length > 0 && <Nav data={dataSource} dataSelection={dataSelection} setDataSelection={setDataSelection} />}
       <div className="widget center">
         <strong>{data.file}</strong>
         {' '}
