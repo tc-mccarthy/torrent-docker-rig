@@ -2,11 +2,8 @@ import logger from './logger';
 import generate_filelist from './generate_filelist';
 import update_status from './update_status';
 import transcode from './transcode';
-import wait, { getRandomDelay } from './wait';
 
 export default async function transcode_loop (idx = 0) {
-  // generate a random number between 0 and 2 seconds
-  let randomDelay = getRandomDelay(5, 10);
   try {
     logger.info('STARTING TRANSCODE LOOP');
     const filelist = await generate_filelist();
@@ -23,17 +20,13 @@ export default async function transcode_loop (idx = 0) {
     logger.info('BEGINNING TRANSCODE');
 
     const file = filelist[idx];
-    const result = await transcode(file);
+    await transcode(file);
 
-    if (result.locked) {
-      randomDelay = 0;
-    }
     logger.info('TRANSCODE COMPLETE');
   } catch (e) {
     logger.error('TRANSCODE LOOP ERROR. RESTARTING LOOP');
     console.error(e);
   } finally {
-    await wait(randomDelay);
     return transcode_loop();
   }
 }

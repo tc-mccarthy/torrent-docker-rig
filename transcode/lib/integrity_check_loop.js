@@ -1,7 +1,6 @@
 import logger from './logger';
 import generate_integrity_filelist from './generate_integrity_filelist';
 import integrity_check from './integrityCheck';
-import wait, { getRandomDelay } from './wait';
 import dayjs from './dayjs';
 
 export default async function integrity_loop (idx = 0) {
@@ -26,14 +25,9 @@ export default async function integrity_loop (idx = 0) {
     logger.error('INTEGRITY_CHECK LOOP ERROR. RESTARTING LOOP');
     console.error(e);
   } finally {
-    // generate a random number between 0 and 2 seconds
-    let randomDelay = getRandomDelay(5, 10);
-    randomDelay = 1;
     // if the current time is before 9am, run again after a random delay
     const currentHourLocalTime = dayjs().tz(process.env.TZ).hour();
     if (currentHourLocalTime < 9) {
-      logger.info(`Waiting for ${randomDelay} seconds before next integrity check`);
-      await wait(randomDelay);
       return integrity_loop();
     }
     logger.info('Integrity check loop completed for today. Waiting until tomorrow.');
