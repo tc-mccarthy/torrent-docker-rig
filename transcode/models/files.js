@@ -68,7 +68,7 @@ const schema = new Schema(
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 
-schema.method.hasLock = async function (type) {
+schema.methods.hasLock = async function (type) {
   let lock;
   if (!type) {
     lock = (
@@ -80,7 +80,7 @@ schema.method.hasLock = async function (type) {
   return !!lock;
 };
 
-schema.method.setLock = async function (type) {
+schema.methods.setLock = async function (type) {
   if (!type) {
     throw new Error('Type is required to set a lock');
   }
