@@ -101,8 +101,8 @@ schema.methods.setLock = async function (type, sec = 10) {
   }
   const lock = await memcached.set(`${type}_lock_${this._id}`, 'locked', sec);
 
-  File.update({_id: this._id}, { $set: { [`lock.${type}`]: dayjs().add(sec, 'seconds').toDate() } });
-  
+  File.update({ _id: this._id }, { $set: { [`lock.${type}`]: dayjs().add(sec, 'seconds').toDate() } });
+
   return lock;
 };
 
