@@ -129,16 +129,9 @@ export default function integrityCheck (file) {
             await video_record.save();
           }
         })
-        .on('progress', (progress) => {
-          // set a 5 second lock on the video record
-          video_record.setLock('integrity');
-          /* logger.info(Math.floor(progress.percent), {
-            label: 'INTEGRITY CHECK PROGRESS',
-            file
-          }); */
-        })
         .on('end', async (stdout, stderr) => {
           try {
+            await video_record.clearLock('integrity');
             logger.info('FFMPEG INTEGRITY CHECK COMPLETE', { stdout, stderr });
             if (integrity_check_pass({ stderr })) {
               logger.info('No disqualifying errors found');
@@ -162,6 +155,7 @@ export default function integrityCheck (file) {
           }
         })
         .on('error', async (err, stdout, stderr) => {
+          await video_record.clearLock('transcode');
           logger.error(err, {
             label: 'Cannot process video during integrity check',
             stdout,

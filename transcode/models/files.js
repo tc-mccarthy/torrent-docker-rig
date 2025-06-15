@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import memcached from '../lib/memcached';
-// import dayjs from '../lib/dayjs';
+import dayjs from '../lib/dayjs';
 
 const { Schema, model } = mongoose;
 
@@ -101,10 +101,28 @@ schema.methods.setLock = async function (type, sec = 10) {
   }
   const lock = await memcached.set(`${type}_lock_${this._id}`, 'locked', sec);
 
-  // this.lock[type] = dayjs().add(sec, 'seconds').toDate();
-  // await this.save();
+  this.lock[type] = dayjs().add(sec, 'seconds').toDate();
+  await this.save();
+
+  schema[`${type}lockTimeout`] = setTimeout(() => {
+    this.setLock(type, sec);
+  }, sec / 2 * 1000);
 
   return lock;
+};
+
+schema.methods.clearLock = async function (type) {
+  if (!type) {
+    throw new Error('Type is required to clear a lock');
+  }
+
+  if (schema.lockTimeout) {
+    clearTimeout(schema.lockTimeout);
+    schema.lockTimeout = null;
+  }
+  await memcached.del(`${type}_lock_${this._id}`);
+  this.lock[type] = null;
+  await this.save();
 };
 
 schema.index({ 'probe.format.size': 1 });

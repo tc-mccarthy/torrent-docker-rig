@@ -273,9 +273,6 @@ export default function transcode (file) {
           }
         })
         .on('progress', (progress) => {
-          // set a 5 second lock on the video record
-          video_record.setLock('transcode');
-
           const elapsed = dayjs().diff(start_time, 'seconds');
           const run_time = dayjs.utc(elapsed * 1000).format('HH:mm:ss');
           const pct_per_second = progress.percent / elapsed;
@@ -355,6 +352,7 @@ export default function transcode (file) {
         })
         .on('end', async (stdout, stderr) => {
           try {
+            await video_record.clearLock('transcode');
             logger.info('Transcoding succeeded!');
             logger.info(`Confirming existence of ${scratch_file}`);
 
@@ -400,6 +398,7 @@ export default function transcode (file) {
           }
         })
         .on('error', async (err, stdout, stderr) => {
+          await video_record.clearLock('transcode');
           logger.error(err, { label: 'Cannot process video', stdout, stderr });
           fs.appendFileSync(
             '/usr/app/logs/ffmpeg.log',
