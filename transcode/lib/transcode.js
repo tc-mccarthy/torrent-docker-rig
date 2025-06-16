@@ -195,7 +195,7 @@ export default function transcode (file) {
         logger.info(
           "File hasn't been integrity checked. Checking before transcode"
         );
-        await integrityCheck(file);
+        await integrityCheck(video_record);
       }
 
       await video_record.setLock('transcode');
