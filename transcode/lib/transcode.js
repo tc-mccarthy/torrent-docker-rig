@@ -190,6 +190,9 @@ export default function transcode (file) {
         input_maps.push(`-map_chapters 0`);
       }
 
+      // need to lock before doing the integrity check
+      await video_record.setLock('transcode');
+
       // if the file hasn't already been integrity checked, do so now
       if (!video_record.integrityCheck) {
         logger.info(
@@ -197,8 +200,6 @@ export default function transcode (file) {
         );
         await integrityCheck(video_record);
       }
-
-      await video_record.setLock('transcode');
 
       let cmd = ffmpeg(file);
 
