@@ -102,7 +102,7 @@ schema.methods.setLock = async function (type, sec = 30) {
   const lock = await memcached.set(`${type}_lock_${this._id}`, 'locked', sec);
 
   this.lock[type] = dayjs().add(sec, 'seconds').toDate();
-  await this.save();
+  await this.saveDebounce();
 
   schema[`${type}lockTimeout`] = setTimeout(() => {
     this.setLock(type, sec);
@@ -122,7 +122,7 @@ schema.methods.clearLock = async function (type) {
   }
   await memcached.del(`${type}_lock_${this._id}`);
   this.lock[type] = null;
-  await this.save();
+  await this.saveDebounce();
 };
 
 schema.methods.saveDebounce = async function () {
