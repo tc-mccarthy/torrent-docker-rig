@@ -88,7 +88,7 @@ schema.methods.hasLock = async function (type) {
   if (!type) {
     lock =
       (await memcached.get(`transcode_lock_${this._id}`)) ||
-      (await memcached.get(`transcode_lock_${this._id}`));
+      (await memcached.get(`integrity_lock_${this._id}`));
   }
   lock = await memcached.get(`${type}_lock_${this._id}`);
   return !!lock;
