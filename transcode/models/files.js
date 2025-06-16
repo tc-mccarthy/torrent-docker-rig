@@ -130,8 +130,15 @@ schema.methods.saveDebounce = async function () {
     clearTimeout(this.saveTimeout);
   }
   this.saveTimeout = setTimeout(async () => {
-    await this.save();
-    this.saveTimeout = null;
+    try {
+      await this.save();
+      this.saveTimeout = null;
+    } catch (e) {
+      console.error('Error saving file:', e);
+      setTimeout(() => {
+        this.saveDebounce(); // retry saving after an error
+      }, 250);
+    }
   }, 250);
 };
 
