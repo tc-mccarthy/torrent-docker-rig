@@ -13,7 +13,7 @@ export default async function generate_integrity_filelist (limit = 1000) {
   })
     .sort({
       'sortFields.priority': 1,
-      'sortFields.size': -1,
+      'sortFields.size': 1,
       'sortFields.width': -1
     })
     .limit(limit);
