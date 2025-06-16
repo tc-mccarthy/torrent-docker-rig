@@ -3,7 +3,7 @@ import generate_filelist from './generate_filelist';
 import update_status from './update_status';
 import transcode from './transcode';
 import memcached from './memcached';
-import { getRandomDelay } from './wait';
+import wait, { getRandomDelay } from './wait';
 
 export default async function transcode_loop (idx = 0) {
   let delay = 0;
@@ -36,11 +36,12 @@ export default async function transcode_loop (idx = 0) {
 
     logger.info('TRANSCODE COMPLETE');
   } catch (e) {
+    delay = getRandomDelay(1, 2);
     logger.error('TRANSCODE LOOP ERROR. RESTARTING LOOP');
-    delay = getRandomDelay(2, 5) * 1000; // random delay between 2 and 5 seconds
     console.error(e);
   } finally {
+    await wait(delay);
     logger.info('TRANSCODE LOOP COMPLETED. STARTING NEXT JOB');
-    return setTimeout(() => { transcode_loop(); }, delay);
+    return transcode_loop();
   }
 }
