@@ -63,6 +63,7 @@ export default function transcode (file) {
           { label: 'File already encoded' }
         );
         video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
+        await video_record.clearLock('transcode');
         await video_record.save();
         return resolve({ locked: true }); // mark locked as true so that the loop doesnt' delay the next start
       }
@@ -391,6 +392,7 @@ export default function transcode (file) {
                 duration: dayjs().diff(start_time, 'seconds')
               }
             });
+            await video_record.clearLock('transcode');
           } catch (e) {
             logger.error(e, { label: 'POST TRANSCODE ERROR' });
           } finally {
@@ -426,6 +428,7 @@ export default function transcode (file) {
             },
             hasError: true
           });
+          await video_record.clearLock('transcode');
 
           await ErrorLog.create({
             path: file,

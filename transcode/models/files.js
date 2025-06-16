@@ -95,7 +95,7 @@ schema.methods.hasLock = async function (type) {
   return !!lock;
 };
 
-schema.methods.setLock = async function (type, sec = 10) {
+schema.methods.setLock = async function (type, sec = 30) {
   if (!type) {
     throw new Error('Type is required to set a lock');
   }
@@ -106,7 +106,7 @@ schema.methods.setLock = async function (type, sec = 10) {
 
   schema[`${type}lockTimeout`] = setTimeout(() => {
     this.setLock(type, sec);
-  }, sec / 2 * 1000);
+  }, sec * 0.75 * 1000);
 
   return lock;
 };

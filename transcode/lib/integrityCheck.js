@@ -79,6 +79,7 @@ export default function integrityCheck (file) {
         video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
         video_record.integrityCheck = true;
         video_record.status = 'complete';
+        await video_record.clearLock('integrity');
         await video_record.save();
         return resolve();
       }
@@ -138,6 +139,7 @@ export default function integrityCheck (file) {
             if (integrity_check_pass({ stderr })) {
               logger.info('No disqualifying errors found');
               video_record.integrityCheck = true;
+              await video_record.clearLock('integrity');
               await video_record.save();
             } else {
               logger.info('OUTPUT DETECTED, ERRORS MUST HAVE BEEN FOUND');
