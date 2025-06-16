@@ -6,7 +6,7 @@ import dayjs from './dayjs';
 export default async function integrity_loop (idx = 0) {
   try {
     logger.info('STARTING TRANSCODE LOOP');
-    const filelist = await generate_integrity_filelist();
+    const filelist = await generate_integrity_filelist(1);
     logger.info(
       `PRIMARY FILE LIST ACQUIRED. THERE ARE ${filelist.length} FILES TO INTEGRITY_CHECK.`
     );
