@@ -133,9 +133,9 @@ schema.methods.saveDebounce = async function () {
       await this.save();
       this.saveTimeout = null;
     } catch (e) {
-      console.error('Error saving file:', e);
       if (/parallel/i.test(e.message)) {
         setTimeout(() => {
+          console.error('Retrying save after parallel error');
           this.saveDebounce(); // retry saving after an error
         }, 250);
       }
