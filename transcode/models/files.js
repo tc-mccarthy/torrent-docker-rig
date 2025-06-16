@@ -125,6 +125,16 @@ schema.methods.clearLock = async function (type) {
   await this.save();
 };
 
+schema.methods.saveDebounce = async function () {
+  if (this.saveTimeout) {
+    clearTimeout(this.saveTimeout);
+  }
+  this.saveTimeout = setTimeout(async () => {
+    await this.save();
+    this.saveTimeout = null;
+  }, 250);
+};
+
 schema.index({ 'probe.format.size': 1 });
 schema.index({ 'sortFields.width': -1, 'sortFields.size': 1 });
 schema.index({

@@ -64,7 +64,7 @@ export default function transcode (file) {
         );
         video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
         await video_record.clearLock('transcode');
-        await video_record.save();
+        await video_record.saveDebounce();
         return resolve({ locked: true }); // mark locked as true so that the loop doesnt' delay the next start
       }
 
@@ -270,7 +270,7 @@ export default function transcode (file) {
                   ?.codec_name
               }`
             };
-            await video_record.save();
+            await video_record.saveDebounce();
           }
         })
         .on('progress', (progress) => {

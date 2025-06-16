@@ -80,7 +80,7 @@ export default function integrityCheck (file) {
         video_record.integrityCheck = true;
         video_record.status = 'complete';
         await video_record.clearLock('integrity');
-        await video_record.save();
+        await video_record.saveDebounceDebounce();
         return resolve();
       }
 
@@ -129,7 +129,7 @@ export default function integrityCheck (file) {
                   ?.codec_name
               }`
             };
-            await video_record.save();
+            await video_record.saveDebounce();
           }
         })
         .on('end', async (stdout, stderr) => {
@@ -140,7 +140,7 @@ export default function integrityCheck (file) {
               logger.info('No disqualifying errors found');
               video_record.integrityCheck = true;
               await video_record.clearLock('integrity');
-              await video_record.save();
+              await video_record.saveDebounce();
             } else {
               logger.info('OUTPUT DETECTED, ERRORS MUST HAVE BEEN FOUND');
               IntegrityError.create({

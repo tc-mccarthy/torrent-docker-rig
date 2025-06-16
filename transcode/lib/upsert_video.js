@@ -57,7 +57,7 @@ export default async function upsert_video (video) {
     // merge the file object with the video object and override with sortFields
     file = Object.assign(file, video, { sortFields });
 
-    await file.save();
+    await file.saveDebounce();
   } catch (e) {
     logger.error(e, { label: 'UPSERT FAILURE' });
   }
