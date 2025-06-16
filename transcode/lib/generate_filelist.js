@@ -5,7 +5,7 @@ import File from '../models/files';
 
 const { encode_version } = config;
 
-export default async function generate_filelist (limit = 1000) {
+export default async function generate_filelist ({ limit = 1, writeToFile = false }) {
   logger.info('GENERATING PRIMARY FILE LIST');
   // query for any files that have an encode version that doesn't match the current encode version
   // do not hydrate results into models
@@ -22,22 +22,24 @@ export default async function generate_filelist (limit = 1000) {
     })
     .limit(limit + config.concurrent_transcodes);
 
-  fs.writeFileSync(
-    './output/filelist.json',
-    JSON.stringify(
-      filelist.slice(1, 1001).map((f) => ({
-        path: f.path.split(/\//).pop(),
-        size: f.sortFields.size,
-        priority: f.sortFields.priority,
-        resolution:
+  if (writeToFile) {
+    fs.writeFileSync(
+      './output/filelist.json',
+      JSON.stringify(
+        filelist.slice(1, 1001).map((f) => ({
+          path: f.path.split(/\//).pop(),
+          size: f.sortFields.size,
+          priority: f.sortFields.priority,
+          resolution:
           f.probe.streams.find((v) => v.codec_type === 'video').width * 0.5625, // use width at 56.25% to calculate resolution
-        codec: `${
+          codec: `${
           f.probe.streams.find((v) => v.codec_type === 'video')?.codec_name
         }/${f.probe.streams.find((v) => v.codec_type === 'audio')?.codec_name}`,
-        encode_version: f.encode_version
-      }))
-    )
-  );
+          encode_version: f.encode_version
+        }))
+      )
+    );
+  }
 
   // send back full list
   return filelist;

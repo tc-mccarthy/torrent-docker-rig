@@ -6,7 +6,7 @@ import transcode from './transcode';
 export default async function transcode_loop (idx = 0) {
   try {
     logger.info('STARTING A TRANSCODE JOB');
-    const filelist = await generate_filelist(1);
+    const filelist = await generate_filelist({ limit: 1 });
 
     // if there are no files, wait 1 minute and try again
     if (filelist.length === 0) {

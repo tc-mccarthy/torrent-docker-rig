@@ -86,8 +86,8 @@ async function run () {
     });
 
     // generate the filelist every 10 minutes
-    cron.schedule('*/10 * * * *', async () => {
-      generate_filelist();
+    cron.schedule('*/5 * * * *', async () => {
+      generate_filelist({ limit: 1000, writeToFile: true });
     });
 
     // schedule the cleanup tasks
