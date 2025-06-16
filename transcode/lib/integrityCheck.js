@@ -36,7 +36,9 @@ export default function integrityCheck (file) {
     try {
       // mongo record of the video
       logger.info(file, { label: 'INTEGRITY CHECKING FILE' });
-      const video_record = await File.findOne({ path: file });
+
+      const video_record = file;
+      file = file.path;
 
       // if the file is locked, short circuit
       if (await video_record.hasLock()) {

@@ -19,6 +19,11 @@ export default async function integrity_loop (idx = 0) {
     logger.info('BEGINNING INTEGRITY_CHECK');
 
     const file = filelist[idx];
+
+    if (await file.hasLock('integrity')) {
+      throw new Error(`File ${file.path} is already locked for integrity check.`);
+    }
+
     await integrity_check(file);
     logger.info('INTEGRITY_CHECK COMPLETE');
   } catch (e) {

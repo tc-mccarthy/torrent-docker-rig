@@ -1,4 +1,3 @@
-import async, { asyncify } from 'async';
 import fs from 'fs';
 import logger from './logger';
 import config from './config';
@@ -6,12 +5,12 @@ import File from '../models/files';
 
 const { encode_version } = config;
 
-export default async function generate_filelist () {
+export default async function generate_filelist (limit = 1000) {
   logger.info('GENERATING PRIMARY FILE LIST');
   // query for any files that have an encode version that doesn't match the current encode version
   // do not hydrate results into models
   // sort by priority, then size, then width
-  let filelist = await File.find({
+  const filelist = await File.find({
     encode_version: { $ne: encode_version },
     status: 'pending',
     $or: [{ 'lock.transcode': { $exists: false } }, { 'lock.transcode': null }, { 'lock.transcode': { $lt: new Date() } }] // exclude files that have a lock for integrity check
@@ -21,35 +20,8 @@ export default async function generate_filelist () {
       'sortFields.size': -1,
       'sortFields.width': -1
     })
-    .limit(1000 + config.concurrent_transcodes);
+    .limit(limit + config.concurrent_transcodes);
 
-  // filter out files that are missing paths
-  filelist = filelist.filter((f) => f.path);
-
-  // now filter out files that have locks
-  await async.eachLimit(
-    filelist,
-    25,
-    asyncify(async (video_record) => {
-      // find the file in the filelist
-      const idx = filelist.findIndex((v) => v._id === video_record._id);
-
-      filelist[idx].locked = await video_record.hasLock('transcode');
-
-      return true;
-    })
-  );
-
-  filelist = filelist.filter((f) => !f.locked);
-
-  // remove first item from the list and write the rest to a file
-  fs.writeFileSync(
-    './filelist.txt',
-    filelist
-      .slice(1)
-      .map((f) => f.path)
-      .join('\n')
-  );
   fs.writeFileSync(
     './output/filelist.json',
     JSON.stringify(
@@ -68,5 +40,5 @@ export default async function generate_filelist () {
   );
 
   // send back full list
-  return filelist.map((f) => f.path);
+  return filelist;
 }

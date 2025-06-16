@@ -5,21 +5,24 @@ import transcode from './transcode';
 
 export default async function transcode_loop (idx = 0) {
   try {
-    logger.info('STARTING TRANSCODE LOOP');
-    const filelist = await generate_filelist();
-    logger.info(
-      `PRIMARY FILE LIST ACQUIRED. THERE ARE ${filelist.length} FILES TO TRANSCODE.`
-    );
+    logger.info('STARTING A TRANSCODE JOB');
+    const filelist = await generate_filelist(1);
 
     // if there are no files, wait 1 minute and try again
     if (filelist.length === 0) {
       return setTimeout(() => transcode_loop(), 60 * 1000);
     }
 
+    logger.info('UPDATING METRICS');
     await update_status();
-    logger.info('BEGINNING TRANSCODE');
 
     const file = filelist[idx];
+
+    if (await file.hasLock('transcode')) {
+      throw new Error(`File ${file.path} is already locked for transcode.`);
+    }
+
+    logger.info('STARTING FFMPEG TRANSCODE');
     await transcode(file);
 
     logger.info('TRANSCODE COMPLETE');
@@ -27,6 +30,7 @@ export default async function transcode_loop (idx = 0) {
     logger.error('TRANSCODE LOOP ERROR. RESTARTING LOOP');
     console.error(e);
   } finally {
+    logger.info('TRANSCODE LOOP COMPLETED. STARTING NEXT JOB');
     return transcode_loop();
   }
 }

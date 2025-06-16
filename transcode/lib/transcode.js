@@ -1,7 +1,6 @@
 import fs from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
 import dayjs from 'dayjs';
-import File from '../models/files';
 import ffprobe from './ffprobe';
 import config from './config';
 import logger from './logger';
@@ -18,7 +17,8 @@ export default function transcode (file) {
   return new Promise(async (resolve, reject) => {
     try {
       // mongo record of the video
-      const video_record = await File.findOne({ path: file });
+      const video_record = file;
+      file = file.path;
 
       if (!video_record || !video_record?._id) {
         throw new Error(`Video record not found for file: ${file}`);
