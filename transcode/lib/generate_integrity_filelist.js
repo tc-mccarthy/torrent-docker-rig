@@ -8,6 +8,7 @@ export default async function generate_integrity_filelist (limit = 1000) {
   // sort by priority, then size, then width
   const filelist = await File.find({
     status: 'pending',
+    integrityCheck: false,
     $or: [{ 'lock.integrity': { $exists: false } }, { 'lock.integrity': null }, { 'lock.integrity': { $lt: new Date() } }] // exclude files that have a lock for integrity check
   })
     .sort({
