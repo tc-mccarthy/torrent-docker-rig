@@ -104,6 +104,8 @@ export default function integrityCheck (file) {
       }
 
       let start_time;
+      let ffmpeg_cmd;
+      const conversion_profile = {};
 
       ffmpeg(file)
         .inputOptions(['-v fatal', '-stats'])
@@ -115,6 +117,7 @@ export default function integrityCheck (file) {
         .on('start', async (commandLine) => {
           logger.info(`Spawned integrity check with command: ${commandLine}`);
           start_time = dayjs();
+          ffmpeg_cmd = commandLine;
 
           if (video_record) {
             logger.debug('>> VIDEO FOUND -- REMOVING ERROR >>', video_record);
@@ -131,6 +134,85 @@ export default function integrityCheck (file) {
             };
             await video_record.saveDebounce();
           }
+        })
+        .on('progress', (progress) => {
+          const elapsed = dayjs().diff(start_time, 'seconds');
+          const run_time = dayjs.utc(elapsed * 1000).format('HH:mm:ss');
+          const pct_per_second = progress.percent / elapsed;
+          const seconds_pct = 1 / pct_per_second;
+          const pct_remaining = 100 - progress.percent;
+          const est_completed_seconds = pct_remaining * seconds_pct;
+          const time_remaining = dayjs
+            .utc(est_completed_seconds * 1000)
+            .format(
+              [est_completed_seconds > 86400 && 'D:', 'HH:mm:ss']
+                .filter((t) => t)
+                .join('')
+            );
+          const estimated_final_kb =
+                    (progress.targetSize / progress.percent) * 100;
+          const output = JSON.stringify(
+            {
+              ...progress,
+              video_stream,
+              audio_streams,
+              audio_language: video_record.audio_language,
+              run_time,
+              pct_per_second,
+              pct_remaining,
+              time_remaining,
+              est_completed_seconds,
+              size: {
+                progress: {
+                  kb: progress.targetSize,
+                  mb: progress.targetSize / 1024,
+                  gb: progress.targetSize / 1024 / 1024
+                },
+                estimated_final: {
+                  kb: estimated_final_kb,
+                  mb: estimated_final_kb / 1024,
+                  gb: estimated_final_kb / 1024 / 1024,
+                  change: `${
+                            ((estimated_final_kb - ffprobe_data.format.size) /
+                              ffprobe_data.format.size) *
+                            100
+                          }%`
+                },
+                original: {
+                  kb: ffprobe_data.format.size,
+                  mb: ffprobe_data.format.size / 1024,
+                  gb: ffprobe_data.format.size / 1024 / 1024
+                }
+              },
+              action: 'verify'
+            },
+            true,
+            4
+          );
+          console.clear();
+          logger.debug(
+            {
+              ...conversion_profile,
+              ffmpeg_cmd,
+              file
+            },
+            { label: 'Job' }
+          );
+
+          logger.debug(output);
+
+          fs.writeFileSync(
+                    `/usr/app/output/active-${video_record._id}.json`,
+                    JSON.stringify({
+                      ...conversion_profile,
+                      ffmpeg_cmd,
+                      audio_streams,
+                      video_stream,
+                      audio_language: video_record.audio_language,
+                      file,
+                      output: JSON.parse(output)
+                    })
+          );
         })
         .on('end', async (stdout, stderr) => {
           try {

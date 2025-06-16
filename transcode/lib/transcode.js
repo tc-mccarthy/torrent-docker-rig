@@ -321,7 +321,8 @@ export default function transcode (file) {
                   mb: ffprobe_data.format.size / 1024,
                   gb: ffprobe_data.format.size / 1024 / 1024
                 }
-              }
+              },
+              action: 'transcode'
             },
             true,
             4

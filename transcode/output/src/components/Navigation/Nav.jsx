@@ -31,6 +31,10 @@ export default function Nav ({ data, setDataSelection, dataSelection }) {
                 -
                 {' '}
                 {item.name}
+                {' '}
+                |
+                {' '}
+                {item.output.action}
               </div>
             </button>
           </li>
