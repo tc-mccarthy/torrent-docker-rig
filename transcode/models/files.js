@@ -1,6 +1,6 @@
-import mongoose from "mongoose";
-import memcached from "../lib/memcached";
-import dayjs from "../lib/dayjs";
+import mongoose from 'mongoose';
+import memcached from '../lib/memcached';
+import dayjs from '../lib/dayjs';
 
 const { Schema, model } = mongoose;
 
@@ -11,7 +11,7 @@ const { Schema, model } = mongoose;
  *
  * Note: This is being done as a variable so that you can simply dupe this file and change the model_name and schema to readily create a new model
  * */
-const model_name = "File";
+const model_name = 'File';
 
 // establish types and defaults for keys
 const schema = new Schema(
@@ -19,68 +19,68 @@ const schema = new Schema(
     path: {
       type: String,
       required: false,
-      unique: true,
+      unique: true
     },
     encode_version: {
       type: String,
       required: false,
-      index: true,
+      index: true
     },
     status: {
       type: String,
       required: true,
       index: true,
-      default: "pending",
+      default: 'pending'
     },
     probe: {
       type: Object,
-      required: false, // making this false so that we can easily add registration to the site without needing a subscription
+      required: false // making this false so that we can easily add registration to the site without needing a subscription
     },
     last_probe: {
       type: Date,
-      required: false,
+      required: false
     },
     transcode_details: {
       type: Object,
-      required: false,
+      required: false
     },
     sortFields: {
       type: Object,
-      required: true,
+      required: true
     },
     audio_language: {
       type: Array,
-      required: false,
+      required: false
     },
     error: {
       type: Object,
-      required: false,
+      required: false
     },
     hasError: {
       type: Boolean,
-      required: false,
+      required: false
     },
     integrityCheck: {
       type: Boolean,
       required: false,
-      default: false,
+      default: false
     },
     lock: {
       integrity: {
         type: Date,
         required: false,
         default: null,
-        index: true,
+        index: true
       },
       transcode: {
         type: Date,
         required: false,
         default: null,
-        index: true,
-      },
-    },
+        index: true
+      }
+    }
   },
-  { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
+  { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 
 schema.methods.hasLock = async function (type) {
@@ -96,11 +96,11 @@ schema.methods.hasLock = async function (type) {
 
 schema.methods.setLock = async function (type, sec = 30) {
   if (!type) {
-    throw new Error("Type is required to set a lock");
+    throw new Error('Type is required to set a lock');
   }
-  const lock = await memcached.set(`${type}_lock_${this._id}`, "locked", sec);
+  const lock = await memcached.set(`${type}_lock_${this._id}`, 'locked', sec);
 
-  this.lock[type] = dayjs().add(sec, "seconds").toDate();
+  this.lock[type] = dayjs().add(sec, 'seconds').toDate();
   await this.saveDebounce();
 
   schema[`${type}lockTimeout`] = setTimeout(() => {
@@ -112,7 +112,7 @@ schema.methods.setLock = async function (type, sec = 30) {
 
 schema.methods.clearLock = async function (type) {
   if (!type) {
-    throw new Error("Type is required to clear a lock");
+    throw new Error('Type is required to clear a lock');
   }
 
   if (schema.lockTimeout) {
@@ -133,7 +133,7 @@ schema.methods.saveDebounce = async function () {
       await this.save();
       this.saveTimeout = null;
     } catch (e) {
-      console.error("Error saving file:", e);
+      console.error('Error saving file:', e);
       if (/parallel/i.test(e.message)) {
         setTimeout(() => {
           this.saveDebounce(); // retry saving after an error
@@ -143,28 +143,28 @@ schema.methods.saveDebounce = async function () {
   }, 250);
 };
 
-schema.index({ "probe.format.size": 1 });
-schema.index({ "sortFields.width": -1, "sortFields.size": 1 });
+schema.index({ 'probe.format.size': 1 });
+schema.index({ 'sortFields.width': -1, 'sortFields.size': 1 });
 schema.index({
-  "sortFields.priority": 1,
-  "sortFields.width": -1,
-  "sortFields.size": 1,
+  'sortFields.priority': 1,
+  'sortFields.width': -1,
+  'sortFields.size': 1
 });
 schema.index({
-  "sortFields.priority": 1,
-  "sortFields.width": -1,
-  "sortFields.size": -1,
+  'sortFields.priority': 1,
+  'sortFields.width': -1,
+  'sortFields.size': -1
 });
 schema.index({
-  "sortFields.priority": 1,
-  "sortFields.size": -1,
-  "sortFields.width": -1,
+  'sortFields.priority': 1,
+  'sortFields.size': -1,
+  'sortFields.width': -1
 });
-schema.index({ "sortFields.priority": 1 });
-schema.index({ "sortFields.size": 1 });
-schema.index({ "sortFields.width": -1 });
-schema.index({ "probe.streams[0].codec_name": 1 });
-schema.index({ "probe.streams.codec_name": 1 });
+schema.index({ 'sortFields.priority': 1 });
+schema.index({ 'sortFields.size': 1 });
+schema.index({ 'sortFields.width': -1 });
+schema.index({ 'probe.streams[0].codec_name': 1 });
+schema.index({ 'probe.streams.codec_name': 1 });
 schema.index({ updated_at: -1 });
 schema.index({ last_probe: -1 });
 schema.index({ hasError: 1 });
