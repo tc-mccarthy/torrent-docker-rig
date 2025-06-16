@@ -68,7 +68,7 @@ export default function integrityCheck (file) {
 
       // if this file has already been encoded, short circuit
       if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
-        logger.info(
+        logger.debug(
           {
             file,
             encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
@@ -115,7 +115,7 @@ export default function integrityCheck (file) {
           '-f null'
         ])
         .on('start', async (commandLine) => {
-          logger.info(`Spawned integrity check with command: ${commandLine}`);
+          logger.debug(`Spawned integrity check with command: ${commandLine}`);
           start_time = dayjs();
           ffmpeg_cmd = commandLine;
 
@@ -217,14 +217,14 @@ export default function integrityCheck (file) {
         .on('end', async (stdout, stderr) => {
           try {
             await video_record.clearLock('integrity');
-            logger.info('FFMPEG INTEGRITY CHECK COMPLETE', { stdout, stderr });
+            logger.debug('FFMPEG INTEGRITY CHECK COMPLETE', { stdout, stderr });
             if (integrity_check_pass({ stderr })) {
-              logger.info('No disqualifying errors found');
+              logger.debug('No disqualifying errors found');
               video_record.integrityCheck = true;
               await video_record.clearLock('integrity');
               await video_record.saveDebounce();
             } else {
-              logger.info('OUTPUT DETECTED, ERRORS MUST HAVE BEEN FOUND');
+              logger.debug('OUTPUT DETECTED, ERRORS MUST HAVE BEEN FOUND');
               IntegrityError.create({
                 path: file,
                 stdout,

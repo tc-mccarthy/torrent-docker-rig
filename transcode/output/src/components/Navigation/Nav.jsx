@@ -28,9 +28,7 @@ export default function Nav ({ data, setDataSelection, dataSelection }) {
               <div>
                 {item.output.time_remaining}
                 {' '}
-                -
-                {' '}
-                {item.name}
+                {item.name && `- ${item.name}`}
               </div>
               <div><em>{item.output.action}</em></div>
             </button>
