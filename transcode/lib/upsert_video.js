@@ -12,13 +12,18 @@ export function default_priority (video) {
     return 97;
   }
 
-  // if the size is less than 1GB in kilobytes
+  // if the size is less than 500 MB in kilobytes and is HEVC encoded
   if (video.probe.format.size <= 524288) {
     return 98;
   }
 
   // if the size is less than 1GB in kilobytes
   if (video.probe.format.size <= 1048576) {
+    // if the video is HEVC encoded, return 98
+    if (video.probe.streams.find((s) => s.codec_type === 'video')?.codec_name === 'hevc') {
+      return 98;
+    }
+
     return 99;
   }
 
