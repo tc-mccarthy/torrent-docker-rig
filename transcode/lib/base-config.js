@@ -15,8 +15,8 @@ const config = {
       width: 3840,
       height: 2160,
       aspect: 16 / 9,
-      bitrate: 10,
       crf: 28,
+      preset: 8,
       output: 'av1'
     },
     {
@@ -24,8 +24,8 @@ const config = {
       width: 2960,
       height: 2160,
       aspect: 1.37 / 1,
-      bitrate: 10,
       crf: 28,
+      preset: 8,
       output: 'av1'
     },
     {
@@ -33,8 +33,8 @@ const config = {
       width: 1920,
       height: 1080,
       aspect: 16 / 9,
-      bitrate: 7,
-      crf: 28,
+      crf: 24,
+      preset: 8,
       output: 'av1'
     },
     {
@@ -42,8 +42,8 @@ const config = {
       width: 1920,
       height: 1396,
       aspect: 1.37 / 1,
-      bitrate: 7,
-      crf: 28,
+      crf: 24,
+      preset: 8,
       output: 'av1'
     },
     {
@@ -51,8 +51,8 @@ const config = {
       width: 1440,
       height: 1080,
       aspect: 4 / 3,
-      bitrate: 7,
-      crf: 28,
+      crf: 24,
+      preset: 8,
       output: 'av1'
     },
     {
@@ -60,8 +60,8 @@ const config = {
       width: 1280,
       height: 720,
       aspect: 16 / 9,
-      bitrate: 7,
-      crf: 28,
+      crf: 23,
+      preset: 8,
       output: 'av1'
     },
     {
@@ -70,7 +70,8 @@ const config = {
       height: 480,
       aspect: 4 / 3,
       bitrate: 3.5,
-      crf: 28,
+      crf: 30,
+      preset: 8,
       output: 'av1',
       default: true
     },
@@ -80,7 +81,8 @@ const config = {
       height: 1920,
       aspect: 9 / 16,
       bitrate: 12,
-      crf: 28,
+      crf: 24,
+      preset: 8,
       output: 'av1'
     }
   ],
@@ -101,11 +103,7 @@ const config = {
     av1: {
       video: {
         codec: 'libsvtav1',
-        codec_name: 'av1',
-        flags: {
-          crf: 28,
-          preset: 8
-        }
+        codec_name: 'av1'
       },
       audio: {
         codec: 'libfdk_aac',
@@ -119,11 +117,14 @@ const config = {
     config.profiles = config.profiles
       .map((x) => ({
         ...x,
-        output: config.dest_formats[x.output] || config.dest_formats.av1, // merge in the defaults for the output profile specified
+        output: (config.dest_formats[x.output] || config.dest_formats.av1), // merge in the defaults for the output profile specified
         aspect: aspect_round(x.aspect)
       }))
       .map((x) => {
-        x.output.video.bitrate = x.bitrate;
+        x.output.video.flags = {
+          crf: x.crf,
+          preset: x.preset
+        };
         return x;
       });
   },
