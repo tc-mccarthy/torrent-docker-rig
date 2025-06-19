@@ -144,7 +144,7 @@ const config = {
         output: (config.dest_formats[x.output] || config.dest_formats.av1), // merge in the defaults for the output profile specified
         aspect: aspect_round(x.aspect)
       })).map((x) => {
-        x.output.video.flags = x.flags;
+        x.output.video.flags = x.flags || {};
         return x;
       });
   },
