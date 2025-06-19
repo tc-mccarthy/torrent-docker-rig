@@ -160,10 +160,6 @@ const config = {
     // copy the profile so changes don't propagate to the next use of the profile
     conversion_profile = copy(conversion_profile);
 
-    // set the output video bitrate and crf to the profile's values
-    conversion_profile.output.video.bitrate = conversion_profile.bitrate;
-    conversion_profile.output.video.flags.crf = conversion_profile.crf;
-
     // add a function to add flags to the output video profile
     conversion_profile.output.video.addFlags = function (flags) {
       Object.assign(conversion_profile.output.video.flags, flags);
