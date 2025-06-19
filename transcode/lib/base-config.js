@@ -143,7 +143,10 @@ const config = {
         ...x,
         output: (config.dest_formats[x.output] || config.dest_formats.av1), // merge in the defaults for the output profile specified
         aspect: aspect_round(x.aspect)
-      }));
+      })).map((x) => {
+        x.output.video.flags = x.flags;
+        return x;
+      });
   },
   get_profile (video_stream) {
     // locate the conversion profile that's best suited for this source media and duplicate it so changes don't propagate to the next use of the profile
