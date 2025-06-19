@@ -1,7 +1,7 @@
-import logger from "./logger";
-import File from "../models/files";
+import logger from './logger';
+import File from '../models/files';
 
-export function default_priority(video) {
+export function default_priority (video) {
   // if we can't assess the size, return 100 and also this video is probably garbage
   if (!video?.probe?.format?.size) {
     return 100;
@@ -12,23 +12,28 @@ export function default_priority(video) {
     return 97;
   }
 
-  // if the size is less than 1GB in kilobytes
+  // if the size is less than 500 MB in kilobytes
   if (video.probe.format.size <= 524288) {
     return 98;
   }
 
   // if the size is less than 1GB in kilobytes
   if (video.probe.format.size <= 1048576) {
+    // if the video is HEVC encoded, return 98
+    if (video.probe.streams.find((s) => s.codec_type === 'video')?.codec_name === 'hevc') {
+      return 98;
+    }
+
     return 99;
   }
 
   return 100;
 }
 
-export default async function upsert_video(video) {
+export default async function upsert_video (video) {
   try {
     let { path, record_id } = video;
-    path = path.replace(/\n+$/, "");
+    path = path.replace(/\n+$/, '');
     let file;
 
     if (record_id) {
@@ -57,8 +62,8 @@ export default async function upsert_video(video) {
     // merge the file object with the video object and override with sortFields
     file = Object.assign(file, video, { sortFields });
 
-    await file.save();
+    await file.saveDebounce();
   } catch (e) {
-    logger.error(e, { label: "UPSERT FAILURE" });
+    logger.error(e, { label: 'UPSERT FAILURE' });
   }
 }
