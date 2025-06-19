@@ -15,8 +15,11 @@ const config = {
       width: 3840,
       height: 2160,
       aspect: 16 / 9,
-      crf: 28,
-      preset: 8,
+      flags: {
+        crf: 28,
+        preset: 8,
+        tune: 0
+      },
       output: 'av1'
     },
     {
@@ -24,8 +27,11 @@ const config = {
       width: 2960,
       height: 2160,
       aspect: 1.37 / 1,
-      crf: 28,
-      preset: 8,
+      flags: {
+        crf: 28,
+        preset: 8,
+        tune: 0
+      },
       output: 'av1'
     },
     {
@@ -33,8 +39,11 @@ const config = {
       width: 1920,
       height: 1080,
       aspect: 16 / 9,
-      crf: 24,
-      preset: 8,
+      flags: {
+        crf: 24,
+        preset: 8,
+        tune: 0
+      },
       output: 'av1'
     },
     {
@@ -42,8 +51,11 @@ const config = {
       width: 1920,
       height: 1396,
       aspect: 1.37 / 1,
-      crf: 24,
-      preset: 8,
+      flags: {
+        crf: 24,
+        preset: 8,
+        tune: 0
+      },
       output: 'av1'
     },
     {
@@ -51,8 +63,11 @@ const config = {
       width: 1440,
       height: 1080,
       aspect: 4 / 3,
-      crf: 24,
-      preset: 8,
+      flags: {
+        crf: 24,
+        preset: 8,
+        tune: 0
+      },
       output: 'av1'
     },
     {
@@ -60,8 +75,11 @@ const config = {
       width: 1280,
       height: 720,
       aspect: 16 / 9,
-      crf: 23,
-      preset: 8,
+      flags: {
+        crf: 23,
+        preset: 8,
+        tune: 0
+      },
       output: 'av1'
     },
     {
@@ -70,8 +88,11 @@ const config = {
       height: 480,
       aspect: 4 / 3,
       bitrate: 3.5,
-      crf: 30,
-      preset: 8,
+      flags: {
+        crf: 30,
+        preset: 8,
+        tune: 0
+      },
       output: 'av1',
       default: true
     },
@@ -81,8 +102,11 @@ const config = {
       height: 1920,
       aspect: 9 / 16,
       bitrate: 12,
-      crf: 24,
-      preset: 8,
+      flags: {
+        crf: 24,
+        preset: 8,
+        tune: 0
+      },
       output: 'av1'
     }
   ],
@@ -119,14 +143,7 @@ const config = {
         ...x,
         output: (config.dest_formats[x.output] || config.dest_formats.av1), // merge in the defaults for the output profile specified
         aspect: aspect_round(x.aspect)
-      }))
-      .map((x) => {
-        x.output.video.flags = {
-          crf: x.crf,
-          preset: x.preset
-        };
-        return x;
-      });
+      }));
   },
   get_profile (video_stream) {
     // locate the conversion profile that's best suited for this source media and duplicate it so changes don't propagate to the next use of the profile
