@@ -211,8 +211,8 @@ export default function transcode (file) {
         const pix_fmt = 'yuv420p10le';
 
         conversion_profile.output.video.addFlags({
-          maxrate: `${conversion_profile.output.video.bitrate}M`,
-          bufsize: `${conversion_profile.output.video.bitrate * 3}M`,
+          // maxrate: `${conversion_profile.output.video.bitrate}M`,
+          // bufsize: `${conversion_profile.output.video.bitrate * 3}M`,
           max_muxing_queue_size: 9999,
           pix_fmt
         });
