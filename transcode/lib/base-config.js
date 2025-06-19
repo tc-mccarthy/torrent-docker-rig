@@ -40,7 +40,7 @@ const config = {
       height: 1080,
       aspect: 16 / 9,
       flags: {
-        crf: 24,
+        crf: 26,
         preset: 8,
         tune: 0
       },
@@ -52,7 +52,7 @@ const config = {
       height: 1396,
       aspect: 1.37 / 1,
       flags: {
-        crf: 24,
+        crf: 26,
         preset: 8,
         tune: 0
       },
@@ -64,7 +64,7 @@ const config = {
       height: 1080,
       aspect: 4 / 3,
       flags: {
-        crf: 24,
+        crf: 26,
         preset: 8,
         tune: 0
       },
@@ -76,7 +76,7 @@ const config = {
       height: 720,
       aspect: 16 / 9,
       flags: {
-        crf: 23,
+        crf: 25,
         preset: 8,
         tune: 0
       },
@@ -103,7 +103,7 @@ const config = {
       aspect: 9 / 16,
       bitrate: 12,
       flags: {
-        crf: 24,
+        crf: 26,
         preset: 8,
         tune: 0
       },
