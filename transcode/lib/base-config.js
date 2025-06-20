@@ -20,7 +20,7 @@ const config = {
         preset: 8,
         tune: 0,
         maxrate: '40M',
-        bufsize: "120M"
+        bufsize: '120M'
       },
       output: 'av1'
     },
@@ -34,7 +34,7 @@ const config = {
         preset: 8,
         tune: 0,
         maxrate: '40M',
-        bufsize: "120M"
+        bufsize: '120M'
       },
       output: 'av1'
     },
@@ -48,7 +48,7 @@ const config = {
         preset: 8,
         tune: 0,
         maxrate: '10M',
-        bufsize: "40M"
+        bufsize: '40M'
       },
       output: 'av1'
     },
@@ -62,7 +62,7 @@ const config = {
         preset: 8,
         tune: 0,
         maxrate: '10M',
-        bufsize: "40M"
+        bufsize: '40M'
       },
       output: 'av1'
     },
@@ -76,7 +76,7 @@ const config = {
         preset: 8,
         tune: 0,
         maxrate: '10M',
-        bufsize: "40M"
+        bufsize: '40M'
       },
       output: 'av1'
     },
@@ -90,7 +90,7 @@ const config = {
         preset: 8,
         tune: 0,
         maxrate: '10M',
-        bufsize: "40M"
+        bufsize: '40M'
       },
       output: 'av1'
     },
@@ -105,7 +105,7 @@ const config = {
         preset: 8,
         tune: 0,
         maxrate: '10M',
-        bufsize: "40M"
+        bufsize: '40M'
       },
       output: 'av1',
       default: true
@@ -121,7 +121,7 @@ const config = {
         preset: 8,
         tune: 0,
         maxrate: '10M',
-        bufsize: "40M"
+        bufsize: '40M'
       },
       output: 'av1'
     }
