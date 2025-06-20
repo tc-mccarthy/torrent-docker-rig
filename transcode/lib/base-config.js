@@ -18,7 +18,9 @@ const config = {
       flags: {
         crf: 28,
         preset: 8,
-        tune: 0
+        tune: 0,
+        maxrate: '40M',
+        bufsize: "120M"
       },
       output: 'av1'
     },
@@ -30,7 +32,9 @@ const config = {
       flags: {
         crf: 28,
         preset: 8,
-        tune: 0
+        tune: 0,
+        maxrate: '40M',
+        bufsize: "120M"
       },
       output: 'av1'
     },
@@ -40,9 +44,11 @@ const config = {
       height: 1080,
       aspect: 16 / 9,
       flags: {
-        crf: 26,
+        crf: 30,
         preset: 8,
-        tune: 0
+        tune: 0,
+        maxrate: '10M',
+        bufsize: "40M"
       },
       output: 'av1'
     },
@@ -52,9 +58,11 @@ const config = {
       height: 1396,
       aspect: 1.37 / 1,
       flags: {
-        crf: 26,
+        crf: 30,
         preset: 8,
-        tune: 0
+        tune: 0,
+        maxrate: '10M',
+        bufsize: "40M"
       },
       output: 'av1'
     },
@@ -64,9 +72,11 @@ const config = {
       height: 1080,
       aspect: 4 / 3,
       flags: {
-        crf: 26,
+        crf: 30,
         preset: 8,
-        tune: 0
+        tune: 0,
+        maxrate: '10M',
+        bufsize: "40M"
       },
       output: 'av1'
     },
@@ -76,9 +86,11 @@ const config = {
       height: 720,
       aspect: 16 / 9,
       flags: {
-        crf: 25,
+        crf: 30,
         preset: 8,
-        tune: 0
+        tune: 0,
+        maxrate: '10M',
+        bufsize: "40M"
       },
       output: 'av1'
     },
@@ -91,7 +103,9 @@ const config = {
       flags: {
         crf: 30,
         preset: 8,
-        tune: 0
+        tune: 0,
+        maxrate: '10M',
+        bufsize: "40M"
       },
       output: 'av1',
       default: true
@@ -103,9 +117,11 @@ const config = {
       aspect: 9 / 16,
       bitrate: 12,
       flags: {
-        crf: 26,
+        crf: 30,
         preset: 8,
-        tune: 0
+        tune: 0,
+        maxrate: '10M',
+        bufsize: "40M"
       },
       output: 'av1'
     }
