@@ -1,4 +1,5 @@
 import copy from 'fast-copy';
+import logger from './logger';
 
 export function aspect_round (val) {
   return Math.round(val * 10) / 10;
@@ -200,5 +201,7 @@ const config = {
 };
 
 config.build_profiles(config);
+
+logger.info(config.profiles, { label: 'CALCULATED PROFILES' });
 
 export default config;
