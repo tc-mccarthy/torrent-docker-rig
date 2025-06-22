@@ -87,6 +87,8 @@ export default function transcode (file) {
         throw new Error('No audio stream found');
       }
 
+      const map_metadata = [];
+
       const subtitle_streams = ffprobe_data.streams.filter(
         (s) =>
           s.codec_type === 'subtitle' &&
@@ -119,8 +121,6 @@ export default function transcode (file) {
       ) {
         transcode_video = true;
       }
-
-      const map_metadata = [];
 
       // add transcode instructions for any audio streams that don't match the profile
       audio_streams.forEach((audio_stream, idx) => {
@@ -179,8 +179,9 @@ export default function transcode (file) {
       );
 
       if (subtitle_streams.length > 0) {
-        subtitle_streams.forEach((s) => {
+        subtitle_streams.forEach((s, idx) => {
           input_maps.push(`-map 0:${s.index}`);
+          map_metadata.push(`-map_metadata:s:s:${idx} 0:s:s:${idx}`); // source the metadata from the original audio stream
         });
 
         input_maps.push('-c:s copy');
