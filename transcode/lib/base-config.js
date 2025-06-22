@@ -18,7 +18,7 @@ const config = {
       aspect: 16 / 9,
       flags: {
         crf: 28,
-        preset: 8,
+        preset: 7,
         tune: 0,
         maxrate: '40M',
         bufsize: '120M'
@@ -32,7 +32,7 @@ const config = {
       aspect: 1.37 / 1,
       flags: {
         crf: 28,
-        preset: 8,
+        preset: 7,
         tune: 0,
         maxrate: '40M',
         bufsize: '120M'
