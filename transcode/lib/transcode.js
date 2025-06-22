@@ -208,15 +208,6 @@ export default function transcode (file) {
         .outputOptions(input_maps);
 
       if (transcode_video) {
-        const pix_fmt = 'yuv420p10le';
-
-        conversion_profile.output.video.addFlags({
-          // maxrate: `${conversion_profile.output.video.bitrate}M`,
-          // bufsize: `${conversion_profile.output.video.bitrate * 3}M`,
-          max_muxing_queue_size: 9999,
-          pix_fmt
-        });
-
         // handle HDR
         if (/arib[-]std[-]b67|smpte2084/i.test(video_stream.color_transfer)) {
           conversion_profile.name += ` (hdr)`; // add HDR to the profile name

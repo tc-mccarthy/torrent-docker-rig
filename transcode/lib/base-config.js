@@ -143,7 +143,11 @@ const config = {
     av1: {
       video: {
         codec: 'libsvtav1',
-        codec_name: 'av1'
+        codec_name: 'av1',
+        flags: {
+          max_muxing_queue_size: 9999,
+          pix_fmt: 'yuv420p10le'
+        }
       },
       audio: {
         codec: 'libfdk_aac',
@@ -160,7 +164,10 @@ const config = {
         output: (config.dest_formats[x.output] || config.dest_formats.av1), // merge in the defaults for the output profile specified
         aspect: aspect_round(x.aspect)
       })).map((x) => {
-        x.output.video.flags = x.flags || {};
+        x.output.video.flags = {
+          ...(x.output.video.flags || {}), // default flags
+          ...(x.flags || {}) // profile overrides and extensions
+        };
         return x;
       });
   },
