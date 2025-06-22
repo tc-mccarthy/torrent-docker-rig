@@ -162,7 +162,7 @@ const config = {
     config.profiles = config.profiles
       .map((x) => ({
         ...x,
-        output: (config.dest_formats[x.output] || config.dest_formats.av1), // merge in the defaults for the output profile specified
+        output: copy((config.dest_formats[x.output] || config.dest_formats.av1)), // merge in the defaults for the output profile specified, as a copy
         aspect: aspect_round(x.aspect)
       })).map((x) => {
         x.output.video.flags = {
