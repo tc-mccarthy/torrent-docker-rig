@@ -467,7 +467,6 @@ services:
   tautulli:
     container_name: tautulli
     image: lscr.io/linuxserver/tautulli:latest
-    network_mode: host
     environment:
       - TZ
       - PUID=1000
