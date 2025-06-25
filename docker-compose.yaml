@@ -9,7 +9,7 @@ services:
       - ALLOWED_IPS=0.0.0.0/0 # So this docker network can access it
       - NET_LOCAL=172.16.0.0/16 # So it can be accessed within the local network
       - PRIVATE_KEY=${NORDVPN_PRIVATE_KEY} # Your NordLynx private key. You can obtain this by running the get_nordvpn_private_key script
-      - QUERY="filters\[servers_groups\]\[identifier\]=legacy_p2p&filters\[country_id\]=228" # narrow the list of servers to US-based P2P servers
+      # - QUERY="filters\[servers_groups\]\[identifier\]=legacy_p2p&filters\[country_id\]=228" # narrow the list of servers to US-based P2P servers
       - TZ # Timezone used for logging
     ports:
       - 8088:8088 ## qbittorrent web ui
