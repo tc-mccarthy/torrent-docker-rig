@@ -1,36 +1,47 @@
-import logger from "./logger";
-import generate_filelist from "./generate_filelist";
-import update_status from "./update_status";
-import transcode from "./transcode";
-import wait, { getRandomDelay } from "./wait";
+import logger from './logger';
+import generate_filelist from './generate_filelist';
+import update_status from './update_status';
+import transcode from './transcode';
+import memcached from './memcached';
+import wait, { getRandomDelay } from './wait';
 
-export default async function transcode_loop(idx = 0) {
+export default async function transcode_loop (idx = 0) {
+  let delay = 0;
   try {
-    logger.info("STARTING TRANSCODE LOOP");
-    const filelist = await generate_filelist();
-    logger.info(
-      `PRIMARY FILE LIST ACQUIRED. THERE ARE ${filelist.length} FILES TO TRANSCODE.`
-    );
+    logger.info('STARTING A TRANSCODE JOB');
+    if (await memcached.get('transcode_loop_lock')) {
+      throw new Error('Another worker is fetching the pool. Please wait.');
+    }
+    // set a lock to prevent multiple workers from running this loop at the same time
+    await memcached.set('transcode_loop_lock', 'locked', 2);
+
+    const filelist = await generate_filelist({ limit: 1 });
 
     // if there are no files, wait 1 minute and try again
     if (filelist.length === 0) {
       return setTimeout(() => transcode_loop(), 60 * 1000);
     }
 
+    logger.info('UPDATING METRICS');
     await update_status();
-    logger.info("BEGINNING TRANSCODE");
 
     const file = filelist[idx];
+
+    if (await file.hasLock('transcode')) {
+      throw new Error(`File ${file.path} is already locked for transcode.`);
+    }
+
+    logger.info('STARTING FFMPEG TRANSCODE');
     await transcode(file);
-    logger.info("TRANSCODE COMPLETE");
+
+    logger.info('TRANSCODE COMPLETE');
   } catch (e) {
-    logger.error("TRANSCODE LOOP ERROR. RESTARTING LOOP");
+    delay = getRandomDelay(1, 2);
+    logger.error('TRANSCODE LOOP ERROR. RESTARTING LOOP');
     console.error(e);
   } finally {
-    // generate a random number between 0 and 2 seconds
-    const randomDelay = getRandomDelay(5, 10);
-
-    await wait(randomDelay);
+    await wait(delay);
+    logger.info('TRANSCODE LOOP COMPLETED. STARTING NEXT JOB');
     return transcode_loop();
   }
 }

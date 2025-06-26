@@ -2,6 +2,8 @@ import fs from 'fs';
 import File from '../models/files';
 import Cleanup from '../models/cleanup';
 import logger from './logger';
+import config from './config';
+import exec_promise from './exec_promise';
 
 export default async function db_cleanup () {
   logger.info('Cleaning up the database...');
@@ -18,4 +20,15 @@ export default async function db_cleanup () {
   });
 
   await Cleanup.create({ paths: to_remove, count: to_remove.length });
+
+  // purge aging scratch files from the scratch directories
+  const scratch_paths = config.sources.map((p) => p.scratch);
+
+  logger.info(
+    `find ${scratch_paths.join(' ')} -type f -mtime +7 -exec rm {} \\;`,
+    { label: 'PURGING SCRATCH FILES' }
+  );
+  await exec_promise(
+    `find ${scratch_paths.join(' ')} -type f -mtime +7 -exec rm {} \\;`
+  );
 }

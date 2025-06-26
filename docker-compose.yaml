@@ -9,7 +9,7 @@ services:
       - ALLOWED_IPS=0.0.0.0/0 # So this docker network can access it
       - NET_LOCAL=172.16.0.0/16 # So it can be accessed within the local network
       - PRIVATE_KEY=${NORDVPN_PRIVATE_KEY} # Your NordLynx private key. You can obtain this by running the get_nordvpn_private_key script
-      - QUERY="filters\[servers_groups\]\[identifier\]=legacy_p2p&filters\[country_id\]=228" # narrow the list of servers to US-based P2P servers
+      # - QUERY="filters\[servers_groups\]\[identifier\]=legacy_p2p&filters\[country_id\]=228" # narrow the list of servers to US-based P2P servers
       - TZ # Timezone used for logging
     ports:
       - 8088:8088 ## qbittorrent web ui
@@ -24,6 +24,7 @@ services:
       - 8090:8080 ## usenet
       - 5055:5055 ## overseerr
       - 8181:8181 ## tautulli
+      - 9705:9705 ## huntarr
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1 # Recommended if using ipv4 only
       - net.ipv4.conf.all.rp_filter=2
@@ -222,6 +223,7 @@ services:
       - NODE_OPTIONS=--max-old-space-size=57344 --enable-source-maps
       - CONCURRENT_TRANSCODES
       - CONCURRENT_FILE_CHECKS
+      - CONCURRENT_INTEGRITY_CHECKS
       - ENV=${ENV:-prod}
       - TMDB_READ_ACCESS_TOKEN
     volumes:
@@ -237,7 +239,6 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '16' # 16 cores
           memory: 56G # 56GB
     logging: 
       driver: "json-file"
@@ -466,13 +467,29 @@ services:
   tautulli:
     container_name: tautulli
     image: lscr.io/linuxserver/tautulli:latest
-    network_mode: service:vpn # all traffic goes through vpn
     environment:
       - TZ
       - PUID=1000
       - PGID=1000
     volumes:
       - ./tautulli/config:/config
+    restart: unless-stopped
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
+  
+  huntarr:
+    container_name: huntarr
+    image: huntarr/huntarr:latest
+    network_mode: service:vpn # all traffic goes through vpn
+    environment:
+      - TZ
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ./huntarr/config:/config
     restart: unless-stopped
     logging: 
       driver: "json-file"

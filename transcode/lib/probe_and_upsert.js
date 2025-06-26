@@ -6,6 +6,9 @@ import { trash } from './fs';
 import tmdb_api from './tmdb_api';
 import File from '../models/files';
 import language_map from './lang';
+import config from './config';
+
+const { encode_version } = config;
 
 export default async function probe_and_upsert (file, record_id, opts = {}) {
   file = file.replace(/\n+$/, '');
@@ -54,6 +57,7 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
       path: file,
       probe: ffprobe_data,
       encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
+      status: ffprobe_data.format.tags?.ENCODE_VERSION === encode_version ? 'complete' : 'pending',
       last_probe: current_time,
       sortFields: {
         width: ffprobe_data.streams.find((s) => s.codec_type === 'video')
