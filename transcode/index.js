@@ -57,7 +57,7 @@ async function run () {
 
     const transcodeQueue = new TranscodeQueue({ maxScore: concurrent_transcodes });
     transcodeQueue.start();
-    
+
     console.log(transcodeQueue);
 
     const currentHourLocalTime = dayjs().tz(process.env.TZ).hour();

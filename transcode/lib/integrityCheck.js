@@ -35,7 +35,7 @@ export default function integrityCheck (file) {
   return new Promise(async (resolve, reject) => {
     try {
       // mongo record of the video
-      logger.info(file, { label: 'INTEGRITY CHECKING FILE' });
+      logger.debug(file, { label: 'INTEGRITY CHECKING FILE' });
 
       const video_record = file;
       file = file.path;
