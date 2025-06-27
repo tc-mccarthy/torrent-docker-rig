@@ -59,7 +59,7 @@ export default async function upsert_video (video) {
 
     // merge the sortFields object with the priority
     const sortFields = { ...(video.sortFields || file.sortFields), priority };
-    const computeScore = roundToNearestQuarter(3840 / sortFields.width);
+    const computeScore = roundToNearestQuarter(sortFields.width / 3840);
 
     // merge the file object with the video object and override with sortFields
     file = Object.assign(file, video, { sortFields, computeScore });

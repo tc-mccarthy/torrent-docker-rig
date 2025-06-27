@@ -88,7 +88,7 @@ const schema = new Schema(
         if (this.computeScore) {
           return this.computeScore;
         }
-        return roundToNearestQuarter(3840 / this.sortFields.width);
+        return roundToNearestQuarter(this.sortFields.width / 3840);
       }
     }
   },
