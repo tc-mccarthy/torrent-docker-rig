@@ -55,14 +55,7 @@ async function run () {
     // update the transcode queue
     update_queue();
 
-    // start the transcode loops
-    logger.info(`Starting ${concurrent_transcodes} transcode loops...`);
-
-    // Array.from({ length: concurrent_transcodes }).forEach((val, idx) => {
-    //   transcode_loop(idx);
-    // });
-
-    const transcodeQueue = new TranscodeQueue();
+    const transcodeQueue = new TranscodeQueue({ maxScore: concurrent_transcodes });
     console.log(transcodeQueue);
 
     const currentHourLocalTime = dayjs().tz(process.env.TZ).hour();

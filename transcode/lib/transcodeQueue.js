@@ -1,10 +1,12 @@
 import { setTimeout as delay } from 'timers/promises';
 import transcode from './transcode';
-import Logger from './logger';
+import logger from './logger';
 import generate_filelist from './generate_filelist';
 
 export default class TranscodeQueue {
   constructor ({ maxScore = 4, pollDelay = 2000 }) {
+    // start the transcode loops
+    logger.info(`Initiating transcode queue for a max compute of ${maxScore}...`);
     this.maxScore = maxScore; // Max compute units allowed simultaneously
     this.pollDelay = pollDelay; // Delay between scheduling attempts (ms)
     this.runningJobs = []; // In-memory list of currently active jobs
@@ -15,7 +17,7 @@ export default class TranscodeQueue {
   async start () {
     if (this._isRunning) return;
     this._isRunning = true;
-    Logger.info('Transcode queue started.');
+    logger.info('Transcode queue started.');
     await this.loop();
   }
 
