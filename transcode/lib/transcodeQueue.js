@@ -50,6 +50,8 @@ export default class TranscodeQueue {
     const availableCompute = this.getAvailableCompute();
     if (availableCompute <= 0) return;
 
+    logger.info(`Available compute: ${availableCompute}. Checking for new jobs...`);
+
     const jobs = await generate_filelist({ limit: 50 });
 
     const nextJob = jobs.find((job) => {
