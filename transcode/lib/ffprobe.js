@@ -58,7 +58,7 @@ export default async function ffprobe_func (file) {
     if (/video\s+not\s+supported/gi.test(e.message)) {
       trash(file);
     }
-    
+
     logger.error('FFPROBE FAILED', e);
     return false;
   }

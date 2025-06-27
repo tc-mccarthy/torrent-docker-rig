@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import memcached from '../lib/memcached';
 import dayjs from '../lib/dayjs';
+import roundToNearestQuarter from '../lib/round-to-nearest-quarter';
 
 const { Schema, model } = mongoose;
 
@@ -77,6 +78,17 @@ const schema = new Schema(
         required: false,
         default: null,
         index: true
+      }
+    },
+    computeScore: {
+      type: Number,
+      required: false,
+      get () {
+        // return the stored value.
+        if (this.computeScore) {
+          return this.computeScore;
+        }
+        return roundToNearestQuarter(3840 / this.sortFields.width);
       }
     }
   },
