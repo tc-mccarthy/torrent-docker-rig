@@ -83,10 +83,10 @@ const schema = new Schema(
     computeScore: {
       type: Number,
       required: false,
-      get () {
+      get (value) {
         // return the stored value.
-        if (this.computeScore) {
-          return this.computeScore;
+        if (value) {
+          return value;
         }
         return roundToNearestQuarter(this.sortFields.width / 3840);
       }
