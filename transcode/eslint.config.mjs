@@ -159,6 +159,7 @@ export default [{
         "new-parens": "error",
         "no-array-constructor": "error",
         "no-async-promise-executor": 0,
+        "no-await-in-loop": 0,
         "no-caller": "error",
         "no-case-declarations": "error",
         "no-class-assign": "error",

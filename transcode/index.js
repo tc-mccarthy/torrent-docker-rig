@@ -3,7 +3,6 @@ import dayjs from 'dayjs';
 import mongo_connect from './lib/mongo_connection';
 import update_active from './lib/update_active';
 import update_queue from './lib/update_queue';
-import transcode_loop from './lib/transcode_loop';
 import fs_monitor from './lib/fs_monitor';
 import redisClient from './lib/redis';
 import logger from './lib/logger';
@@ -13,6 +12,7 @@ import { create_scratch_disks } from './lib/fs';
 import config from './lib/config';
 import generate_filelist from './lib/generate_filelist';
 import integrity_loop from './lib/integrity_check_loop';
+import TranscodeQueue from './lib/transcodeQueue';
 
 const {
   concurrent_transcodes,
@@ -58,9 +58,12 @@ async function run () {
     // start the transcode loops
     logger.info(`Starting ${concurrent_transcodes} transcode loops...`);
 
-    Array.from({ length: concurrent_transcodes }).forEach((val, idx) => {
-      transcode_loop(idx);
-    });
+    // Array.from({ length: concurrent_transcodes }).forEach((val, idx) => {
+    //   transcode_loop(idx);
+    // });
+
+    const transcodeQueue = new TranscodeQueue();
+    console.log(transcodeQueue);
 
     const currentHourLocalTime = dayjs().tz(process.env.TZ).hour();
     logger.info(
