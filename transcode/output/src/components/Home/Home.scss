@@ -96,7 +96,7 @@ figcaption {
 .overline {
   max-width: 20%;
   height: 1px;
-  border-bottom: 5px solid #3792cb;
+  border-bottom: 5px solid $color-accent-primary;
   margin: 10px 0 -10px 0;
 }
 
@@ -185,7 +185,7 @@ figcaption {
   .widget {
     .danger {
       > * {
-        background-color: #f00;
+        background-color: $color-accent-error;
       }
     }
   }
