@@ -48,10 +48,11 @@ export default class TranscodeQueue {
   // Attempts to find and run a job that fits within available compute
   async scheduleJobs () {
     const availableCompute = this.getAvailableCompute();
+    logger.info(`Available compute: ${availableCompute}.`);
+
     if (availableCompute <= 0) return;
 
-    logger.info(`Available compute: ${availableCompute}. Checking for new jobs...`);
-
+    logger.info('Checking for new jobs to run...');
     const jobs = await generate_filelist({ limit: 50 });
 
     const nextJob = jobs.find((job) => {
