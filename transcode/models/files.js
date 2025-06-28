@@ -105,8 +105,6 @@ schema.methods.setLock = async function (type, sec = 30) {
   schema[`${type}lockTimeout`] = setTimeout(() => {
     this.setLock(type, sec);
   }, sec * 0.75 * 1000);
-
-  return lock;
 };
 
 schema.methods.clearLock = async function (type) {
@@ -118,7 +116,7 @@ schema.methods.clearLock = async function (type) {
     clearTimeout(schema.lockTimeout);
     schema.lockTimeout = null;
   }
-  
+
   this.lock[type] = null;
   await this.saveDebounce();
 };
