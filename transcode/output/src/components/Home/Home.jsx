@@ -154,18 +154,20 @@ function Home () {
           </div>
         </div>
       )}
-      <div className="flex">
-        <div className="widget">
-          <strong>Compute Score</strong>
-          {data.output.computeScore}
-        </div>
-        {data && (
+      {data && (
+        <div className="flex">
           <div className="widget">
-            <strong>File Progress</strong>
-            <LinearProgressWithLabel value={data.output.percent} />
+            <strong>Compute Score</strong>
+            {data.output.computeScore}
           </div>
-        )}
-      </div>
+          {data && (
+            <div className="widget">
+              <strong>File Progress</strong>
+              <LinearProgressWithLabel value={data.output.percent} />
+            </div>
+          )}
+        </div>
+      )}
 
       {data && (
         <div className="flex">
@@ -205,6 +207,8 @@ function Home () {
           <strong>Memory</strong>
           <LinearProgressWithLabel value={utilization.memory} />
         </div>
+      </div>
+      <div className="flex">
         <div className="widget">
           <strong>Files Remaining</strong>
           {status.unprocessed_files.toLocaleString()}
