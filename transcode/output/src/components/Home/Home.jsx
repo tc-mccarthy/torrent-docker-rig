@@ -119,6 +119,16 @@ function Home () {
       )}
       {data && (
         <div className="flex">
+          {data && (
+            <div className="widget">
+              <strong>File Progress</strong>
+              <LinearProgressWithLabel value={data.output.percent} />
+            </div>
+          )}
+        </div>
+      )}
+      {data && (
+        <div className="flex">
           <div className="widget">
             <strong>Elapsed</strong>
             {data.output.run_time}
@@ -156,16 +166,6 @@ function Home () {
             <strong>Compute Score</strong>
             {data.output.computeScore}
           </div>
-        </div>
-      )}
-      {data && (
-        <div className="flex">
-          {data && (
-            <div className="widget">
-              <strong>File Progress</strong>
-              <LinearProgressWithLabel value={data.output.percent} />
-            </div>
-          )}
         </div>
       )}
 
