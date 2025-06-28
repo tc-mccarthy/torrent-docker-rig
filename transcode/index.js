@@ -68,12 +68,12 @@ async function run () {
       integrityQueue.start();
     }
 
-    // start the integrity check loops every day at midnight
+    // start the integrity check queue every day at midnight
     cron.schedule('0 0 * * *', () => {
       integrityQueue.start();
     });
 
-    // stop the integrity check loops every day at 9am
+    // pause the integrity check queue every day at 9am
     cron.schedule('0 9 * * *', () => {
       integrityQueue.stop();
     });
