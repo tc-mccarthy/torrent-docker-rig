@@ -35,7 +35,8 @@ export default async function generate_filelist ({ limit = 1, writeToFile = fals
           codec: `${
           f.probe.streams.find((v) => v.codec_type === 'video')?.codec_name
         }/${f.probe.streams.find((v) => v.codec_type === 'audio')?.codec_name}`,
-          encode_version: f.encode_version
+          encode_version: f.encode_version,
+          computeScore: f.computeScore
         }))
       )
     );
