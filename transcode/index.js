@@ -55,7 +55,7 @@ async function run () {
     // update the transcode queue
     update_queue();
 
-    const transcodeQueue = new TranscodeQueue({ maxScore: concurrent_transcodes });
+    const transcodeQueue = new TranscodeQueue({ maxScore: concurrent_transcodes, pollDelay: 10000 });
     transcodeQueue.start();
 
     const integrityQueue = new IntegrityQueue({ maxScore: concurrent_integrity_checks });

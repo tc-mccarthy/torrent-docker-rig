@@ -48,7 +48,7 @@ export default class IntegrityQueue {
   // Attempts to find and run a job that fits within available compute
   async scheduleJobs () {
     const availableCompute = this.getAvailableCompute();
-    logger.info(`Available compute: ${availableCompute}.`);
+    logger.info(`Available integrity check compute: ${availableCompute}.`);
 
     if (availableCompute <= 0) return;
 
