@@ -243,6 +243,7 @@ function Home () {
                 <th>Path</th>
                 <th>Size</th>
                 <th>Resolution</th>
+                <th>Compute Score</th>
                 <th>Codec</th>
                 <th>Encode version</th>
               </tr>
@@ -253,6 +254,7 @@ function Home () {
                   <td>{f.path}</td>
                   <td>{make_human_readable(f.size)}</td>
                   <td>{f.resolution}</td>
+                  <td>{f.computeScore}</td>
                   <td>{f.codec}</td>
                   <td>{f.encode_version}</td>
                 </tr>

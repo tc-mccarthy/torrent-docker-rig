@@ -10,6 +10,36 @@ You will find this is far easier than the opposite task of using CSS to cram you
  LOADS IN A NICE RESET TO ENSURE ALL BROWSERS HAVE THE SAME BASE STYLES
 *********************************************************************/
 @import url('https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.min.css');
+
+/* VARIABLES */
+
+// 🌘 Dark Mode SCSS Variables (Lighter Surfaces)
+
+// Base Backgrounds
+$color-background: #0f1419;
+$color-surface: #1c2128;
+$color-surface-elevated: #262b33;
+
+// Text
+$color-text-primary: #f0f3f6;
+$color-text-secondary: #b1b7c0;
+$color-text-tertiary: #8d94a0;
+
+// Accents
+$color-accent-primary: #2d7ff9;
+$color-accent-success: #28c37b;
+$color-accent-warning: #ffb72c;
+$color-accent-error: #f85757;
+
+// UI Elements
+$color-border: #323843;
+$color-focus-ring: #3a99ff;
+
+// Extras
+$color-overlay: rgba(15, 20, 25, 0.85);
+$color-scrollbar-thumb: #2c313a;
+$color-scrollbar-hover: #3b424e;
+
 /*********************************************************************
   YOUR MOBILE/BASE STYLES GO HERE
 *********************************************************************/
@@ -23,7 +53,8 @@ html {
   /* Sets default font-size to 16px, ensuring 1em = 16px; */
   font-size: 16px;
   font-family: 'Lato', sans-serif;
-  background-color: #eee;
+  background-color: $color-background;
+  color: $color-text-primary;
 }
 /** RESPONSIVE IMAGES */
 figure,
@@ -41,7 +72,7 @@ p {
 .caption,
 figcaption {
   font-size: 0.9rem;
-  color: #8e8a8a;
+  color: $color-text-primary;
   padding: 5px 0;
 }
 /** BASE CLASSES */
@@ -129,7 +160,8 @@ figcaption {
 }
 
 .widget {
-  background-color: #fff;
+  background-color: $color-surface;
+  color: $color-text-primary;
   border-radius: 5px;
   padding: 10px;
   max-width: 800px;
@@ -169,8 +201,9 @@ figcaption {
       td {
         padding: 5px;
       }
+      background-color: $color-surface;
       &:nth-child(even) {
-        background-color: #f9f9f9;
+        background-color: $color-surface-elevated;
       }
     }
   }
