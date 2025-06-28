@@ -171,12 +171,13 @@ function Home () {
       {data && (
         <div className="flex">
           <div className="widget">
-            <strong>Expected completed time</strong>
-            {estimated_local_time(data.output.est_completed_seconds)}
-          </div>
-          <div className="widget">
             <strong>ETA</strong>
             {data.output.time_remaining}
+            <em>
+              (
+              {estimated_local_time(data.output.est_completed_seconds)}
+              )
+            </em>
           </div>
           <div className="widget">
             <strong>Compute Score</strong>
