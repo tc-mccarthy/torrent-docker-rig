@@ -152,14 +152,14 @@ function Home () {
             <strong>ETA</strong>
             {data.output.time_remaining}
           </div>
-        </div>
-      )}
-      {data && (
-        <div className="flex">
           <div className="widget">
             <strong>Compute Score</strong>
             {data.output.computeScore}
           </div>
+        </div>
+      )}
+      {data && (
+        <div className="flex">
           {data && (
             <div className="widget">
               <strong>File Progress</strong>
