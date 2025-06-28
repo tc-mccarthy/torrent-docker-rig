@@ -7,26 +7,42 @@ import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWi
 // import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 import Nav from '../Navigation/Nav';
 
+function fetchData (src, cache_buster = true) {
+  try {
+    const timestamp = Date.now();
+    let url = src;
+
+    if (cache_buster) {
+      url += `?t=${timestamp}`;
+    }
+
+    return fetch(url).then((r) => r.json());
+  } catch (e) {
+    console.error('Error fetching data:', e);
+    throw e;
+  }
+}
+
 async function getData (setData, setFileList, setDisks, setUtilization, setStatus) {
   try {
     clearTimeout(window.dataTimeout);
-    const d = await fetch('active.json').then((r) => r.json());
+    const d = await fetchData('active.json');
 
     setData(d);
 
-    const f = await fetch('filelist.json').then((r) => r.json());
+    const f = await fetchData('filelist.json');
 
     setFileList(f);
 
-    const disks = await fetch('disk.json').then((r) => r.json());
+    const disks = await fetchData('disk.json');
 
     setDisks(disks);
 
-    const utilization = await fetch('utilization.json').then((r) => r.json());
+    const utilization = await fetchData('utilization.json');
 
     setUtilization(utilization);
 
-    const status = await fetch('status.json').then((r) => r.json());
+    const status = await fetchData('status.json');
 
     setStatus(status);
 

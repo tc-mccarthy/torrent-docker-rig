@@ -79,7 +79,7 @@ async function run () {
     });
 
     // generate the filelist every 10 minutes
-    cron.schedule('*/5 * * * *', async () => {
+    cron.schedule('*/2 * * * *', async () => {
       generate_filelist({ limit: 1000, writeToFile: true });
     });
 

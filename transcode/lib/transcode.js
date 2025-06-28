@@ -294,6 +294,7 @@ export default function transcode (file) {
               time_remaining,
               est_completed_seconds,
               computeScore: video_record.computeScore,
+              priority: video_record.sortFields.priority,
               size: {
                 progress: {
                   kb: progress.targetSize,
