@@ -182,6 +182,10 @@ function Home () {
             <strong>Compute Score</strong>
             {data.output.computeScore}
           </div>
+          <div className="widget">
+            <strong>Priority</strong>
+            {data.output.priority}
+          </div>
         </div>
       )}
 
