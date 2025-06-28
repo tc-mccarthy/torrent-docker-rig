@@ -301,6 +301,7 @@ export default function transcode (file) {
               pct_remaining,
               time_remaining,
               est_completed_seconds,
+              computeScore: video_record.computeScore,
               size: {
                 progress: {
                   kb: progress.targetSize,

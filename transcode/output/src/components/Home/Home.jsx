@@ -117,16 +117,6 @@ function Home () {
           )
         </div>
       )}
-      <div className="flex">
-        <div className="widget">
-          <strong>CPU</strong>
-          <LinearProgressWithLabel value={utilization.cpu} />
-        </div>
-        <div className="widget">
-          <strong>Memory</strong>
-          <LinearProgressWithLabel value={utilization.memory} />
-        </div>
-      </div>
       {data && (
         <div className="flex">
           <div className="widget">
@@ -166,9 +156,8 @@ function Home () {
       )}
       <div className="flex">
         <div className="widget">
-          <strong>Files Remaining</strong>
-          {status.unprocessed_files.toLocaleString()}
-          {/* <CircularProgressWithLabel numerator={numerator} denominator={denominator} /> */}
+          <strong>Compute Score</strong>
+          {data.output.computeScore}
         </div>
         {data && (
           <div className="widget">
@@ -176,12 +165,6 @@ function Home () {
             <LinearProgressWithLabel value={data.output.percent} />
           </div>
         )}
-      </div>
-      <div className="flex">
-        <div className="widget">
-          <strong>Library Coverage</strong>
-          <LinearProgressWithLabel value={Math.round(status.library_coverage)} />
-        </div>
       </div>
 
       {data && (
@@ -212,6 +195,26 @@ function Home () {
           {data.ffmpeg_cmd}
         </div>
       )}
+
+      <div className="flex">
+        <div className="widget">
+          <strong>CPU</strong>
+          <LinearProgressWithLabel value={utilization.cpu} />
+        </div>
+        <div className="widget">
+          <strong>Memory</strong>
+          <LinearProgressWithLabel value={utilization.memory} />
+        </div>
+        <div className="widget">
+          <strong>Files Remaining</strong>
+          {status.unprocessed_files.toLocaleString()}
+          {/* <CircularProgressWithLabel numerator={numerator} denominator={denominator} /> */}
+        </div>
+        <div className="widget">
+          <strong>Library Coverage</strong>
+          <LinearProgressWithLabel value={Math.round(status.library_coverage)} />
+        </div>
+      </div>
 
       <div className="flex quarter disks">
         {!disks?.map && <div className="widget center">Loading...</div>}
