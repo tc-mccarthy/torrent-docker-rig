@@ -40,14 +40,6 @@ export default function integrityCheck (file) {
       const video_record = file;
       file = file.path;
 
-      // if the file is locked, short circuit
-      if (await video_record.hasLock()) {
-        logger.info(
-          `File is locked. Skipping integrity check: ${file} - ${video_record._id}`
-        );
-        return resolve();
-      }
-
       await video_record.setLock('integrity');
 
       const exists = fs.existsSync(file);

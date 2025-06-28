@@ -24,14 +24,6 @@ export default function transcode (file) {
         throw new Error(`Video record not found for file: ${file}`);
       }
 
-      // if the file is locked, short circuit
-      if (await video_record.hasLock('transcode')) {
-        logger.info(
-          `File is locked. Skipping transcode: ${file} - ${video_record._id}`
-        );
-        return resolve({ locked: true });
-      }
-
       const { profiles } = config;
       const exists = fs.existsSync(file);
 

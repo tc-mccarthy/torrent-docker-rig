@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import memcached from '../lib/memcached';
 import dayjs from '../lib/dayjs';
 import roundToNearestQuarter from '../lib/round-to-nearest-quarter';
 
@@ -95,22 +94,10 @@ const schema = new Schema(
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 
-schema.methods.hasLock = async function (type) {
-  let lock;
-  if (!type) {
-    lock =
-      (await memcached.get(`transcode_lock_${this._id}`)) ||
-      (await memcached.get(`integrity_lock_${this._id}`));
-  }
-  lock = await memcached.get(`${type}_lock_${this._id}`);
-  return !!lock;
-};
-
 schema.methods.setLock = async function (type, sec = 30) {
   if (!type) {
     throw new Error('Type is required to set a lock');
   }
-  const lock = await memcached.set(`${type}_lock_${this._id}`, 'locked', sec);
 
   this.lock[type] = dayjs().add(sec, 'seconds').toDate();
   await this.saveDebounce();
@@ -131,7 +118,7 @@ schema.methods.clearLock = async function (type) {
     clearTimeout(schema.lockTimeout);
     schema.lockTimeout = null;
   }
-  await memcached.del(`${type}_lock_${this._id}`);
+  
   this.lock[type] = null;
   await this.saveDebounce();
 };
