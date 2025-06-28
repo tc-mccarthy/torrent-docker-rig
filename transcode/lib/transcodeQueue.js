@@ -71,13 +71,13 @@ export default class TranscodeQueue {
       if (alreadyRunning || job.computeScore > availableCompute) return false; // discount any jobs that are already running or exceed available compute
 
       // If a higher-priority job is blocked, don't schedule lower-priority jobs
-      if (blockedHighPriorityJob && job.sortFields.priority < blockedHighPriorityJob.sortFields.priority) {
+      if (blockedHighPriorityJob && job.sortFields.priority > blockedHighPriorityJob.sortFields.priority) {
         logger.info(`Skipping file ${job.path} because ${blockedHighPriorityJob.path} has a higher priority and is awaiting available compute.`);
         return false; // if a higher-priority job is blocked, don't schedule lower-priority jobs, let the queue open up to process the higher-priority job
       }
 
       if (blockedHighPriorityJob) {
-        logger.info(`Scheduling file ${job.path} because ${blockedHighPriorityJob.path} does not have a higher priority than this job.`, { blockedPriority: blockedHighPriorityJob.sortFields.priority, jobPriority: job.sortFields.priority });
+        logger.info(`Scheduling file ${job.path} because ${blockedHighPriorityJob.path} does not have a higher priority than this job.`, { blockedPriority: blockedHighPriorityJob.sortFields.priority, jobPriority: job.sortFields.priority, note: 'Lower numbers indicate higher importance' });
       }
 
       // If we reach here, the job is eligible to run
