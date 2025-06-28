@@ -55,11 +55,22 @@ export default class TranscodeQueue {
     logger.info('Checking for new jobs to run...');
     const jobs = await generate_filelist({ limit: 50 });
 
+    // Are there any jobs being blocked due to lack of compute?
+    const blockedHighPriorityJob = jobs.find((job) => {
+      const alreadyRunning = this.runningJobs.some((j) => j._id.toString() === job._id.toString());
+      return !alreadyRunning && job.computeScore > availableCompute;
+    });
+
+    // Now let's find the next job that will fit within available compute
     const nextJob = jobs.find((job) => {
-      const alreadyRunning = this.runningJobs.some(
-        (j) => j._id.toString() === job._id.toString()
-      );
-      return !alreadyRunning && job.computeScore <= availableCompute;
+      const alreadyRunning = this.runningJobs.some((j) => j._id.toString() === job._id.toString()); // skip any already running jobs
+      if (alreadyRunning || job.computeScore > availableCompute) return false; // discount any jobs that are already running or exceed available compute
+
+      // If a higher-priority job is blocked, don't schedule lower-priority jobs
+      if (blockedHighPriorityJob && job.sortFields.priority < blockedHighPriorityJob.sortFields.priority) return false; // if a higher-priority job is blocked, don't schedule lower-priority jobs, let the queue open up to process the higher-priority job
+
+      // If we reach here, the job is eligible to run
+      return true;
     });
 
     if (nextJob) {
