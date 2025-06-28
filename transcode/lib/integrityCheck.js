@@ -35,18 +35,10 @@ export default function integrityCheck (file) {
   return new Promise(async (resolve, reject) => {
     try {
       // mongo record of the video
-      logger.info(file, { label: 'INTEGRITY CHECKING FILE' });
+      logger.debug(file, { label: 'INTEGRITY CHECKING FILE' });
 
       const video_record = file;
       file = file.path;
-
-      // if the file is locked, short circuit
-      if (await video_record.hasLock()) {
-        logger.info(
-          `File is locked. Skipping integrity check: ${file} - ${video_record._id}`
-        );
-        return resolve();
-      }
 
       await video_record.setLock('integrity');
 

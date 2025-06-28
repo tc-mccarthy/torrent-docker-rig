@@ -24,14 +24,6 @@ export default function transcode (file) {
         throw new Error(`Video record not found for file: ${file}`);
       }
 
-      // if the file is locked, short circuit
-      if (await video_record.hasLock('transcode')) {
-        logger.info(
-          `File is locked. Skipping transcode: ${file} - ${video_record._id}`
-        );
-        return resolve({ locked: true });
-      }
-
       const { profiles } = config;
       const exists = fs.existsSync(file);
 
@@ -169,7 +161,7 @@ export default function transcode (file) {
         ffprobe_data.format.size <= 350000
       ) {
         logger.debug(
-          'Video stream codec is HEVC and size is less than 1GB. Not transcoding'
+          'Video stream codec is h264 and size is less than 350mb. Not transcoding'
         );
         transcode_video = false;
       }
@@ -200,6 +192,14 @@ export default function transcode (file) {
           "File hasn't been integrity checked. Checking before transcode"
         );
         await integrityCheck(video_record);
+      }
+
+      if (!transcode_video) {
+        video_record.computeScore = 0.2; // set the compute score to 0.2 because we're not transcoding
+      }
+
+      if (!transcode_audio) {
+        video_record.computeScore -= 0.1; // reduce 0.1 from the compute score because we're not transcoding audio
       }
 
       let cmd = ffmpeg(file);
@@ -293,6 +293,7 @@ export default function transcode (file) {
               pct_remaining,
               time_remaining,
               est_completed_seconds,
+              computeScore: video_record.computeScore,
               size: {
                 progress: {
                   kb: progress.targetSize,

@@ -44,11 +44,21 @@ export default async function ffprobe_func (file) {
       video.aspect = aspect_round(video.width / video.height);
     }
 
+    // mark the video as unsupported if it has a dv_profile value and that value is less than 8
+    if (video.side_data_list?.dv_profile && video.side_data_list?.dv_profile < 8) {
+      throw new Error(`Video not supported: Dolby Vision profile version is less than 8`);
+    }
+
     return data;
   } catch (e) {
     if (/command\s+failed/gi.test(e.message)) {
       trash(file);
     }
+
+    if (/video\s+not\s+supported/gi.test(e.message)) {
+      trash(file);
+    }
+
     logger.error('FFPROBE FAILED', e);
     return false;
   }

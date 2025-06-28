@@ -3,7 +3,6 @@ import dayjs from 'dayjs';
 import mongo_connect from './lib/mongo_connection';
 import update_active from './lib/update_active';
 import update_queue from './lib/update_queue';
-import transcode_loop from './lib/transcode_loop';
 import fs_monitor from './lib/fs_monitor';
 import redisClient from './lib/redis';
 import logger from './lib/logger';
@@ -12,7 +11,8 @@ import pre_sanitize from './lib/pre_sanitize';
 import { create_scratch_disks } from './lib/fs';
 import config from './lib/config';
 import generate_filelist from './lib/generate_filelist';
-import integrity_loop from './lib/integrity_check_loop';
+import IntegrityQueue from './lib/integrityQueue';
+import TranscodeQueue from './lib/transcodeQueue';
 
 const {
   concurrent_transcodes,
@@ -55,34 +55,27 @@ async function run () {
     // update the transcode queue
     update_queue();
 
-    // start the transcode loops
-    logger.info(`Starting ${concurrent_transcodes} transcode loops...`);
+    const transcodeQueue = new TranscodeQueue({ maxScore: concurrent_transcodes, pollDelay: 10000 });
+    transcodeQueue.start();
 
-    Array.from({ length: concurrent_transcodes }).forEach((val, idx) => {
-      transcode_loop(idx);
-    });
+    const integrityQueue = new IntegrityQueue({ maxScore: concurrent_integrity_checks });
 
     const currentHourLocalTime = dayjs().tz(process.env.TZ).hour();
     logger.info(
       `Current local time is ${currentHourLocalTime}`
     );
     if (currentHourLocalTime >= 0 && currentHourLocalTime < 9) {
-      logger.info(
-        'Starting integrity check loop immediately since it is before 9 AM'
-      );
-      integrity_loop();
+      integrityQueue.start();
     }
 
-    // start the integrity check loops every day at midnight
+    // start the integrity check queue every day at midnight
     cron.schedule('0 0 * * *', () => {
-      logger.info(
-        `Starting ${concurrent_integrity_checks} integrity check loops...`
-      );
-      Array.from({ length: concurrent_integrity_checks }).forEach(
-        (val, idx) => {
-          integrity_loop(idx);
-        }
-      );
+      integrityQueue.start();
+    });
+
+    // pause the integrity check queue every day at 9am
+    cron.schedule('0 9 * * *', () => {
+      integrityQueue.stop();
     });
 
     // generate the filelist every 10 minutes
