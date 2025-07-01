@@ -13,6 +13,7 @@ import config from './lib/config';
 import generate_filelist from './lib/generate_filelist';
 import IntegrityQueue from './lib/integrityQueue';
 import TranscodeQueue from './lib/transcodeQueue';
+import update_status from './lib/update_status';
 
 const {
   concurrent_transcodes,
