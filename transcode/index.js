@@ -53,6 +53,7 @@ async function run () {
     fs_monitor();
 
     // update the transcode queue
+    update_status();
     update_queue();
 
     const transcodeQueue = new TranscodeQueue({ maxScore: concurrent_transcodes, pollDelay: 10000 });

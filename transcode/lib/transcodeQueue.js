@@ -2,6 +2,7 @@ import { setTimeout as delay } from 'timers/promises';
 import transcode from './transcode';
 import logger from './logger';
 import generate_filelist from './generate_filelist';
+import update_status from './update_status';
 
 export default class TranscodeQueue {
   constructor ({ maxScore = 4, pollDelay = 2000 }) {
@@ -101,6 +102,8 @@ export default class TranscodeQueue {
       this.runningJobs = this.runningJobs.filter(
         (j) => j._id.toString() !== job._id.toString()
       );
+
+      update_status(); // Update status after job completion or failure
     }
   }
 }
