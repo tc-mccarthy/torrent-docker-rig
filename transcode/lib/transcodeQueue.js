@@ -104,6 +104,7 @@ export default class TranscodeQueue {
       );
 
       update_status(); // Update status after job completion or failure
+      generate_filelist({ limit: 1000, writeToFile: true }); // Regenerate file list after job completion
     }
   }
 }
