@@ -89,7 +89,7 @@ export default function transcode (file) {
       );
       let transcode_video = false;
       let transcode_audio = false;
-      let hwaccel = 'qsv';
+      let hwaccel = 'vaapi';
       const video_filters = [];
       const audio_filters = [];
 
