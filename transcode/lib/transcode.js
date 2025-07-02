@@ -89,6 +89,7 @@ export default function transcode (file) {
       );
       let transcode_video = false;
       let transcode_audio = false;
+      let hwaccel = 'qsv';
       const video_filters = [];
       const audio_filters = [];
 
@@ -142,6 +143,11 @@ export default function transcode (file) {
           'Video stream bitrate higher than conversion profile. Transcoding'
         );
         transcode_video = true;
+      }
+
+      if (!/hevc|h264/i.test(video_stream.codec_name)) {
+        // if the video is not HEVC or H264, disable hardware acceleration
+        hwaccel = 'none';
       }
 
       // if the video is 1gb or less in size and the codec is HEVC, don't transcode
@@ -205,7 +211,7 @@ export default function transcode (file) {
       let cmd = ffmpeg(file);
 
       cmd = cmd
-        .inputOptions(['-v fatal', '-stats', !transcode_video && '-hwaccel auto'].filter((f) => f)) // use hardware acceleration if not transcoding video
+        .inputOptions(['-v fatal', '-stats', `-hwaccel ${hwaccel}`].filter((f) => f)) // use hardware acceleration if not transcoding video
         .outputOptions(input_maps);
 
       if (transcode_video) {
