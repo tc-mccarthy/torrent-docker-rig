@@ -80,8 +80,8 @@ async function run () {
       integrityQueue.stop();
     });
 
-    // generate the filelist every hour
-    cron.schedule('0 * * * *', async () => {
+    // generate the filelist every 5 minutes
+    cron.schedule('*/5 * * * *', async () => {
       generate_filelist({ limit: 1000, writeToFile: true });
     });
 
