@@ -100,7 +100,11 @@ export default function integrityCheck (file) {
       const conversion_profile = {};
 
       ffmpeg(file)
-        .inputOptions(['-v fatal', '-stats'])
+        .inputOptions([
+          '-hwaccel auto',
+          '-v fatal',
+          '-stats'
+        ])
         .outputOptions([
           '-c:v copy',
           '-c:a copy',

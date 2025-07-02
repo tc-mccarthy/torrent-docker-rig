@@ -205,7 +205,7 @@ export default function transcode (file) {
       let cmd = ffmpeg(file);
 
       cmd = cmd
-        .inputOptions(['-v fatal', '-stats', '-hwaccel auto'])
+        .inputOptions(['-v fatal', '-stats', !transcode_video && '-hwaccel auto'].filter((f) => f)) // use hardware acceleration if not transcoding video
         .outputOptions(input_maps);
 
       if (transcode_video) {
