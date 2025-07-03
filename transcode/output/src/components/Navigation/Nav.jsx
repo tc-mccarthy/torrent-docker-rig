@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import md5 from 'crypto-js/md5';
 import './Nav.scss';
 
-export default function Nav ({ data, setDataSelection, dataSelection }) {
+export default function Nav ({ data, setDataSelection, dataSelection, availableCompute }) {
   function display_file_name (file) {
     return file.split('/').pop();
   }
@@ -18,6 +18,14 @@ export default function Nav ({ data, setDataSelection, dataSelection }) {
         {data.length}
         {' '}
         Running jobs
+        {availableCompute && (
+          <>
+            {' '}
+            - Available Compute:
+            {' '}
+            {availableCompute}
+          </>
+        )}
       </h4>
       <nav>
 
@@ -50,5 +58,6 @@ export default function Nav ({ data, setDataSelection, dataSelection }) {
 Nav.propTypes = {
   data: PropTypes.object.isRequired,
   setDataSelection: PropTypes.func.isRequired,
-  dataSelection: PropTypes.number.isRequired
+  dataSelection: PropTypes.number.isRequired,
+  availableCompute: PropTypes.number.isRequired
 };

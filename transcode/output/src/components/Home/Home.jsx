@@ -23,12 +23,13 @@ function fetchData (src, cache_buster = true) {
   }
 }
 
-async function getData (setData, setFileList, setDisks, setUtilization, setStatus) {
+async function getData (setData, setFileList, setDisks, setUtilization, setStatus, setAvailableCompute) {
   try {
     clearTimeout(window.dataTimeout);
     const d = await fetchData('active.json');
 
-    setData(d);
+    setData(d.active);
+    setAvailableCompute(d.availableCompute);
 
     const f = await fetchData('filelist.json');
 
@@ -89,6 +90,7 @@ function make_human_readable (size) {
 
 function Home () {
   const [dataSource, setData] = useState(false);
+  const [availableCompute, setAvailableCompute] = useState(false);
   const [filelist, setFileList] = useState([]);
   const [disks, setDisks] = useState(false);
   const [utilization, setUtilization] = useState(false);
@@ -99,7 +101,7 @@ function Home () {
 
   // interface waits for all data to be loaded
   if (mvp.length > 0) {
-    getData(setData, setFileList, setDisks, setUtilization, setStatus);
+    getData(setData, setFileList, setDisks, setUtilization, setStatus, setAvailableCompute);
     return (
       <Box sx={{ display: 'flex' }}>
         <CircularProgress />
@@ -121,7 +123,7 @@ function Home () {
     <div className="container image">
       <div className="overline" />
       <h1>Optimized video encoding</h1>
-      {dataSource && dataSource.length > 0 && <Nav data={dataSource} dataSelection={dataSelection} setDataSelection={setDataSelection} />}
+      {dataSource && dataSource.length > 0 && <Nav data={dataSource} availableCompute={availableCompute} dataSelection={dataSelection} setDataSelection={setDataSelection} />}
       {data && (
         <div className="widget center">
           <strong>{data.file}</strong>

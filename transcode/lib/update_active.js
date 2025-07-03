@@ -20,9 +20,14 @@ export default async function update_active () {
     (a, b) => b.output.size.original.kb - a.output.size.original.kb
   );
 
+  const output = {
+    availableCompute: global.transcodeQueue.getAvailableCompute(),
+    active: active_data
+  };
+
   fs.writeFileSync(
     '/usr/app/output/pending-active.json',
-    JSON.stringify(active_data)
+    JSON.stringify(output)
   );
   await exec_promise(
     'mv /usr/app/output/pending-active.json /usr/app/output/active.json'

@@ -61,6 +61,8 @@ async function run () {
     const transcodeQueue = new TranscodeQueue({ maxScore: concurrent_transcodes, pollDelay: 10000 });
     transcodeQueue.start();
 
+    global.transcodeQueue = transcodeQueue; // Make the queue globally accessible
+
     const integrityQueue = new IntegrityQueue({ maxScore: concurrent_integrity_checks });
 
     const currentHourLocalTime = dayjs().tz(process.env.TZ).hour();
