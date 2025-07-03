@@ -89,7 +89,7 @@ export default function transcode (file) {
       );
       let transcode_video = false;
       let transcode_audio = false;
-      let hwaccel = 'vaapi';
+      const hwaccel = video_record.permitHWDecode ? 'auto' : 'none';
       const video_filters = [];
       const audio_filters = [];
 
@@ -143,11 +143,6 @@ export default function transcode (file) {
           'Video stream bitrate higher than conversion profile. Transcoding'
         );
         transcode_video = true;
-      }
-
-      if (!/hevc|h264/i.test(video_stream.codec_name)) {
-        // if the video is not HEVC or H264, disable hardware acceleration
-        hwaccel = 'none';
       }
 
       // if the video is 1gb or less in size and the codec is HEVC, don't transcode
@@ -419,8 +414,14 @@ export default function transcode (file) {
             )
           );
           await trash(scratch_file, false);
-          await upsert_video({
-            path: file,
+          // if the error message contains '251' disable the hardware acceleration
+          if (/251/i.test(err.message)) {
+            logger.warn(
+              'FFmpeg error 251 detected. Disabling hardware acceleration for this video.'
+            );
+            video_record.permitHWDecode = false;
+          }
+          Object.assign(video_record, {
             error: {
               error: err.message,
               stdout,

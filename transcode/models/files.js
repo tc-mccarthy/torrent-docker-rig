@@ -91,6 +91,11 @@ const schema = new Schema(
         const calculatedScore = (video_stream.width * video_stream.height) / (3840 * 2160); // take the video area and divide it by 4K resolution area
         return roundComputeScore(calculatedScore);
       }
+    },
+    permitHWDecode: {
+      type: Boolean,
+      required: false,
+      default: true
     }
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
