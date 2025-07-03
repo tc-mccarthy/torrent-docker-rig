@@ -14,6 +14,11 @@ export default function Nav ({ data, setDataSelection, dataSelection }) {
 
   return (
     <nav>
+      <h3>
+        Running jobs (
+        {data.length}
+        )
+      </h3>
       <ul>
         {data.map((item, index) => (
           <li key={filename_hash(item.file)}>
