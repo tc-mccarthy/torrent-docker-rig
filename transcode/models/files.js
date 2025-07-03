@@ -87,7 +87,9 @@ const schema = new Schema(
         if (value) {
           return value;
         }
-        return roundComputeScore(this.sortFields.width / 3840);
+        const video_stream = this.probe?.streams?.find((s) => s.codec_type === 'video');
+        const calculatedScore = (video_stream.width * video_stream.height) / (3840 * 2160); // take the video area and divide it by 4K resolution area
+        return roundComputeScore(calculatedScore);
       }
     }
   },
