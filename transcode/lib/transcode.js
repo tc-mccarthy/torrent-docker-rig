@@ -201,7 +201,7 @@ export default function transcode (file) {
       }
 
       if (!transcode_video) {
-        video_record.computeScore = 0.2; // set the compute score to 0.2 because we're not transcoding
+        video_record.computeScore = 0.1; // set the compute score to 0.1 because we're not transcoding video
       }
 
       if (!transcode_audio) {

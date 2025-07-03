@@ -1,6 +1,6 @@
 import logger from './logger';
 import File from '../models/files';
-import roundToNearestQuarter from './round-to-nearest-quarter';
+import roundComputeScore from './round-compute-score';
 
 /**
  * Converts a value in kilobytes (KB) to another byte unit.
@@ -90,7 +90,7 @@ export default async function upsert_video (video) {
 
     // merge the sortFields object with the priority
     const sortFields = { ...(video.sortFields || file.sortFields), priority };
-    const computeScore = roundToNearestQuarter(sortFields.width / 3840);
+    const computeScore = roundComputeScore(sortFields.width / 3840);
 
     // merge the file object with the video object and override with sortFields
     file = Object.assign(file, video, { sortFields, computeScore });
