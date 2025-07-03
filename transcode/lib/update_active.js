@@ -3,7 +3,7 @@ import exec_promise from './exec_promise';
 
 export default async function update_active () {
   const active_list = await exec_promise(
-    `find /usr/app/output/ -iname "active-*.json" -type f -mmin -${5 / 60}`
+    `find /usr/app/output/ -iname "active-*.json" -type f -mmin -${30 / 60}`
   );
 
   // purge inactive files
@@ -31,6 +31,9 @@ export default async function update_active () {
   await exec_promise(
     'find /usr/app/output/ -iname "active-*.json" -type f -mmin +300 -exec rm {} \\;'
   );
+
+  // wait 1 second
+  await new Promise((resolve) => setTimeout(resolve, 1000)));
 
   update_active();
 }

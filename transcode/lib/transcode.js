@@ -431,6 +431,7 @@ export default function transcode (file) {
             },
             hasError: true
           });
+          await video_record.saveDebounce();
           await video_record.clearLock('transcode');
 
           await ErrorLog.create({

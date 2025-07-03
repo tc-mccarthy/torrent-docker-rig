@@ -119,9 +119,9 @@ schema.methods.clearLock = async function (type) {
     throw new Error('Type is required to clear a lock');
   }
 
-  if (schema.lockTimeout) {
-    clearTimeout(schema.lockTimeout);
-    schema.lockTimeout = null;
+  if (schema[`${type}lockTimeout`]) {
+    clearTimeout(schema[`${type}lockTimeout`]);
+    schema[`${type}lockTimeout`] = null;
   }
 
   this.lock[type] = null;
