@@ -13,6 +13,17 @@ import integrityCheck from './integrityCheck';
 
 const { encode_version } = config;
 
+// function to format seconds to HH:mm:ss
+function formatSecondsToHHMMSS (totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const pad = (n) => String(n).padStart(2, '0');
+
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
 export default function transcode (file) {
   return new Promise(async (resolve, reject) => {
     try {
@@ -266,13 +277,7 @@ export default function transcode (file) {
           const seconds_pct = 1 / pct_per_second;
           const pct_remaining = 100 - progress.percent;
           const est_completed_seconds = pct_remaining * seconds_pct;
-          const time_remaining = dayjs
-            .utc(est_completed_seconds * 1000)
-            .format(
-              [est_completed_seconds > 86400 && 'D:', 'HH:mm:ss']
-                .filter((t) => t)
-                .join('')
-            );
+          const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
           const estimated_final_kb =
             (progress.targetSize / progress.percent) * 100;
           const output = JSON.stringify(
