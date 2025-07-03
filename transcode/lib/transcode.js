@@ -15,7 +15,7 @@ const { encode_version } = config;
 
 // function to format seconds to HH:mm:ss
 function formatSecondsToHHMMSS (totalSeconds) {
-  if (isNaN(totalSeconds)) return 'calculating';
+  if (Number.isNaN(totalSeconds)) return 'calculating';
 
   const total = Math.ceil(Number(totalSeconds)); // round up
   const hours = Math.floor(total / 3600);
