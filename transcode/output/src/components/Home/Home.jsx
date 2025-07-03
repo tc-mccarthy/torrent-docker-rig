@@ -268,7 +268,8 @@ function Home () {
               <tr>
                 <th>#</th>
                 <th>Priority</th>
-                <th>Path</th>
+                <th>File</th>
+                <th>Storage Volume</th>
                 <th>Size</th>
                 <th>Resolution</th>
                 <th>Compute Score</th>
@@ -280,6 +281,7 @@ function Home () {
                   <td>{idx + 1}</td>
                   <td>{f.priority}</td>
                   <td>{f.path}</td>
+                  <td>{f.volume}</td>
                   <td>{make_human_readable(f.size)}</td>
                   <td>{f.resolution}</td>
                   <td>{f.computeScore}</td>

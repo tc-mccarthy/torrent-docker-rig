@@ -28,6 +28,7 @@ export default async function generate_filelist ({ limit = 1, writeToFile = fals
       JSON.stringify(
         filelist.slice(1, 1001).map((f) => ({
           path: f.path.split(/\//).pop(),
+          volume: f.path.split(/\//)[2],
           size: f.sortFields.size,
           priority: f.sortFields.priority,
           resolution:

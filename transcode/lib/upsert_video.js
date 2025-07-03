@@ -2,33 +2,64 @@ import logger from './logger';
 import File from '../models/files';
 import roundToNearestQuarter from './round-to-nearest-quarter';
 
+/**
+ * Converts a value in kilobytes (KB) to another byte unit.
+ *
+ * @param {number} valueInKB - The value in kilobytes to convert.
+ * @param {string} targetUnit - The unit to convert to. Supported values: B, KB, MB, GB, TB, PB.
+ * @returns {number} - The converted value in the target unit.
+ */
+function convertKilobytes (valueInKB, targetUnit) {
+  // Define conversion factors relative to 1 KB
+  const units = {
+    B: 1024, // 1 KB = 1024 Bytes
+    KB: 1, // 1 KB = 1 KB
+    MB: 1 / 1024, // 1 KB = 1/1024 MB
+    GB: 1 / (1024 ** 2), // 1 KB = 1/1,048,576 GB
+    TB: 1 / (1024 ** 3), // 1 KB = 1/1,073,741,824 TB
+    PB: 1 / (1024 ** 4) // 1 KB = 1/1,099,511,627,776 PB
+  };
+
+  // Normalize the target unit to uppercase for consistent comparison
+  const normalizedUnit = targetUnit.toUpperCase();
+
+  // Check if the target unit is supported
+  if (!units[normalizedUnit]) {
+    throw new Error(`Unsupported unit: ${targetUnit}`);
+  }
+
+  // Perform the conversion using the appropriate factor
+  return valueInKB * units[normalizedUnit];
+}
+
 export function default_priority (video) {
-  // if we can't assess the size, return 100 and also this video is probably garbage
-  if (!video?.probe?.format?.size) {
-    return 100;
-  }
+  try {
+    // if the size is more than 20GB in kilobytes
+    if (convertKilobytes(video.probe.format.size, 'GB') >= 20) {
+      return 97;
+    }
 
-  // if the size is more than 20GB in kilobytes
-  if (video.probe.format.size >= 20971520) {
-    return 97;
-  }
-
-  // if the size is less than 500 MB in kilobytes
-  if (video.probe.format.size <= 524288) {
-    return 98;
-  }
-
-  // if the size is less than 1GB in kilobytes
-  if (video.probe.format.size <= 1048576) {
-    // if the video is HEVC encoded, return 98
-    if (video.probe.streams.find((s) => s.codec_type === 'video')?.codec_name === 'hevc') {
+    // if the size is less than 500 MB in kilobytes
+    if (convertKilobytes(video.probe.format.size, 'MB') <= 500) {
       return 98;
     }
 
-    return 99;
-  }
+    // if the size is less than 1GB in kilobytes
+    if (convertKilobytes(video.probe.format.size, 'GB') <= 1) {
+    // if the video is HEVC encoded, return 98
+      if (video.probe.streams.find((s) => s.codec_type === 'video')?.codec_name === 'hevc') {
+        return 98;
+      }
 
-  return 100;
+      return 99;
+    }
+
+    // default priority for other videos
+    return 100;
+  } catch (e) {
+    logger.error(e, { label: 'DEFAULT PRIORITY ERROR' });
+    return 100;
+  }
 }
 
 export default async function upsert_video (video) {
