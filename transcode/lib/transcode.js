@@ -15,9 +15,12 @@ const { encode_version } = config;
 
 // function to format seconds to HH:mm:ss
 function formatSecondsToHHMMSS (totalSeconds) {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
+  if (isNaN(totalSeconds)) return 'calculating';
+
+  const total = Math.ceil(Number(totalSeconds)); // round up
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
 
   const pad = (n) => String(n).padStart(2, '0');
 
