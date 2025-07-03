@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import dayjs from '../lib/dayjs';
-import roundComputeScore from '../lib/round-compute-score';
+import roundComputeScore, { getMinimum } from '../lib/round-compute-score';
 import wait, { getRandomDelay } from '../lib/wait';
 
 const { Schema, model } = mongoose;
@@ -85,7 +85,7 @@ const schema = new Schema(
       required: false,
       get (value) {
         // return the stored value.
-        if (value) {
+        if (value && value >= getMinimum()) {
           return value;
         }
         const video_stream = this.probe?.streams?.find((s) => s.codec_type === 'video');
