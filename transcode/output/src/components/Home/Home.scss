@@ -170,10 +170,17 @@ figcaption {
   table {
     border-collapse: collapse;
     tr {
+      background-color: $color-surface;
+
+      th {
+        white-space: nowrap;
+        padding: 0 10px;
+      }
+
       td {
         padding: 5px;
       }
-      background-color: $color-surface;
+
       &:nth-child(even) {
         background-color: $color-surface-elevated;
       }
