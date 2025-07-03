@@ -7,26 +7,42 @@ import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWi
 // import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 import Nav from '../Navigation/Nav';
 
+function fetchData (src, cache_buster = true) {
+  try {
+    const timestamp = Date.now();
+    let url = src;
+
+    if (cache_buster) {
+      url += `?t=${timestamp}`;
+    }
+
+    return fetch(url).then((r) => r.json());
+  } catch (e) {
+    console.error('Error fetching data:', e);
+    throw e;
+  }
+}
+
 async function getData (setData, setFileList, setDisks, setUtilization, setStatus) {
   try {
     clearTimeout(window.dataTimeout);
-    const d = await fetch('active.json').then((r) => r.json());
+    const d = await fetchData('active.json');
 
     setData(d);
 
-    const f = await fetch('filelist.json').then((r) => r.json());
+    const f = await fetchData('filelist.json');
 
     setFileList(f);
 
-    const disks = await fetch('disk.json').then((r) => r.json());
+    const disks = await fetchData('disk.json');
 
     setDisks(disks);
 
-    const utilization = await fetch('utilization.json').then((r) => r.json());
+    const utilization = await fetchData('utilization.json');
 
     setUtilization(utilization);
 
-    const status = await fetch('status.json').then((r) => r.json());
+    const status = await fetchData('status.json');
 
     setStatus(status);
 
@@ -117,16 +133,16 @@ function Home () {
           )
         </div>
       )}
-      <div className="flex">
-        <div className="widget">
-          <strong>CPU</strong>
-          <LinearProgressWithLabel value={utilization.cpu} />
+      {data && (
+        <div className="flex">
+          {data && (
+            <div className="widget">
+              <strong>File Progress</strong>
+              <LinearProgressWithLabel value={data.output.percent} />
+            </div>
+          )}
         </div>
-        <div className="widget">
-          <strong>Memory</strong>
-          <LinearProgressWithLabel value={utilization.memory} />
-        </div>
-      </div>
+      )}
       {data && (
         <div className="flex">
           <div className="widget">
@@ -155,34 +171,24 @@ function Home () {
       {data && (
         <div className="flex">
           <div className="widget">
-            <strong>Expected completed time</strong>
-            {estimated_local_time(data.output.est_completed_seconds)}
-          </div>
-          <div className="widget">
             <strong>ETA</strong>
             {data.output.time_remaining}
+            <em>
+              (
+              {estimated_local_time(data.output.est_completed_seconds)}
+              )
+            </em>
+          </div>
+          <div className="widget">
+            <strong>Compute Score</strong>
+            {data.output.computeScore}
+          </div>
+          <div className="widget">
+            <strong>Priority</strong>
+            {data.output.priority}
           </div>
         </div>
       )}
-      <div className="flex">
-        <div className="widget">
-          <strong>Files Remaining</strong>
-          {status.unprocessed_files.toLocaleString()}
-          {/* <CircularProgressWithLabel numerator={numerator} denominator={denominator} /> */}
-        </div>
-        {data && (
-          <div className="widget">
-            <strong>File Progress</strong>
-            <LinearProgressWithLabel value={data.output.percent} />
-          </div>
-        )}
-      </div>
-      <div className="flex">
-        <div className="widget">
-          <strong>Library Coverage</strong>
-          <LinearProgressWithLabel value={Math.round(status.library_coverage)} />
-        </div>
-      </div>
 
       {data && (
         <div className="flex">
@@ -213,6 +219,28 @@ function Home () {
         </div>
       )}
 
+      <div className="flex">
+        <div className="widget">
+          <strong>CPU</strong>
+          <LinearProgressWithLabel value={utilization.cpu} />
+        </div>
+        <div className="widget">
+          <strong>Memory</strong>
+          <LinearProgressWithLabel value={utilization.memory} />
+        </div>
+      </div>
+      <div className="flex">
+        <div className="widget">
+          <strong>Files Remaining</strong>
+          {status.unprocessed_files.toLocaleString()}
+          {/* <CircularProgressWithLabel numerator={numerator} denominator={denominator} /> */}
+        </div>
+        <div className="widget">
+          <strong>Library Coverage</strong>
+          <LinearProgressWithLabel value={Math.round(status.library_coverage)} />
+        </div>
+      </div>
+
       <div className="flex quarter disks">
         {!disks?.map && <div className="widget center">Loading...</div>}
         {disks?.map &&
@@ -240,9 +268,11 @@ function Home () {
               <tr>
                 <th>#</th>
                 <th>Priority</th>
-                <th>Path</th>
+                <th>File</th>
+                <th>Storage Volume</th>
                 <th>Size</th>
                 <th>Resolution</th>
+                <th>Compute Score</th>
                 <th>Codec</th>
                 <th>Encode version</th>
               </tr>
@@ -251,8 +281,10 @@ function Home () {
                   <td>{idx + 1}</td>
                   <td>{f.priority}</td>
                   <td>{f.path}</td>
+                  <td>{f.volume}</td>
                   <td>{make_human_readable(f.size)}</td>
                   <td>{f.resolution}</td>
+                  <td>{f.computeScore}</td>
                   <td>{f.codec}</td>
                   <td>{f.encode_version}</td>
                 </tr>

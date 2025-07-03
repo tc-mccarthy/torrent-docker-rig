@@ -10,6 +10,8 @@ You will find this is far easier than the opposite task of using CSS to cram you
  LOADS IN A NICE RESET TO ENSURE ALL BROWSERS HAVE THE SAME BASE STYLES
 *********************************************************************/
 @import url('https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.min.css');
+@import '../variables';
+
 /*********************************************************************
   YOUR MOBILE/BASE STYLES GO HERE
 *********************************************************************/
@@ -23,7 +25,8 @@ html {
   /* Sets default font-size to 16px, ensuring 1em = 16px; */
   font-size: 16px;
   font-family: 'Lato', sans-serif;
-  background-color: #eee;
+  background-color: $color-background;
+  color: $color-text-primary;
 }
 /** RESPONSIVE IMAGES */
 figure,
@@ -41,7 +44,7 @@ p {
 .caption,
 figcaption {
   font-size: 0.9rem;
-  color: #8e8a8a;
+  color: $color-text-primary;
   padding: 5px 0;
 }
 /** BASE CLASSES */
@@ -93,7 +96,7 @@ figcaption {
 .overline {
   max-width: 20%;
   height: 1px;
-  border-bottom: 5px solid #3792cb;
+  border-bottom: 5px solid $color-accent-primary;
   margin: 10px 0 -10px 0;
 }
 
@@ -129,7 +132,8 @@ figcaption {
 }
 
 .widget {
-  background-color: #fff;
+  background-color: $color-surface;
+  color: $color-text-primary;
   border-radius: 5px;
   padding: 10px;
   max-width: 800px;
@@ -166,11 +170,19 @@ figcaption {
   table {
     border-collapse: collapse;
     tr {
+      background-color: $color-surface;
+
+      th {
+        white-space: nowrap;
+        padding: 0 10px;
+      }
+
       td {
         padding: 5px;
       }
+
       &:nth-child(even) {
-        background-color: #f9f9f9;
+        background-color: $color-surface-elevated;
       }
     }
   }
@@ -180,7 +192,7 @@ figcaption {
   .widget {
     .danger {
       > * {
-        background-color: #f00;
+        background-color: $color-accent-error;
       }
     }
   }

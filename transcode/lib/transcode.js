@@ -24,14 +24,6 @@ export default function transcode (file) {
         throw new Error(`Video record not found for file: ${file}`);
       }
 
-      // if the file is locked, short circuit
-      if (await video_record.hasLock('transcode')) {
-        logger.info(
-          `File is locked. Skipping transcode: ${file} - ${video_record._id}`
-        );
-        return resolve({ locked: true });
-      }
-
       const { profiles } = config;
       const exists = fs.existsSync(file);
 
@@ -97,6 +89,7 @@ export default function transcode (file) {
       );
       let transcode_video = false;
       let transcode_audio = false;
+      let hwaccel = 'vaapi';
       const video_filters = [];
       const audio_filters = [];
 
@@ -152,6 +145,11 @@ export default function transcode (file) {
         transcode_video = true;
       }
 
+      if (!/hevc|h264/i.test(video_stream.codec_name)) {
+        // if the video is not HEVC or H264, disable hardware acceleration
+        hwaccel = 'none';
+      }
+
       // if the video is 1gb or less in size and the codec is HEVC, don't transcode
       if (
         video_stream.codec_name === 'hevc' &&
@@ -169,7 +167,7 @@ export default function transcode (file) {
         ffprobe_data.format.size <= 350000
       ) {
         logger.debug(
-          'Video stream codec is HEVC and size is less than 1GB. Not transcoding'
+          'Video stream codec is h264 and size is less than 350mb. Not transcoding'
         );
         transcode_video = false;
       }
@@ -202,10 +200,18 @@ export default function transcode (file) {
         await integrityCheck(video_record);
       }
 
+      if (!transcode_video) {
+        video_record.computeScore = 0.1; // set the compute score to 0.1 because we're not transcoding video
+      }
+
+      if (!transcode_audio) {
+        video_record.computeScore -= 0.1; // reduce 0.1 from the compute score because we're not transcoding audio
+      }
+
       let cmd = ffmpeg(file);
 
       cmd = cmd
-        .inputOptions(['-v fatal', '-stats', '-hwaccel auto'])
+        .inputOptions(['-v fatal', '-stats', `-hwaccel ${hwaccel}`].filter((f) => f)) // use hardware acceleration if not transcoding video
         .outputOptions(input_maps);
 
       if (transcode_video) {
@@ -293,6 +299,8 @@ export default function transcode (file) {
               pct_remaining,
               time_remaining,
               est_completed_seconds,
+              computeScore: video_record.computeScore,
+              priority: video_record.sortFields.priority,
               size: {
                 progress: {
                   kb: progress.targetSize,
