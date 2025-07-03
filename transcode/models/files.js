@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import dayjs from '../lib/dayjs';
 import roundComputeScore from '../lib/round-compute-score';
+import wait, { getRandomDelay } from '../lib/wait';
 
 const { Schema, model } = mongoose;
 
@@ -138,10 +139,10 @@ schema.methods.saveDebounce = async function () {
       this.saveTimeout = null;
     } catch (e) {
       if (/parallel/i.test(e.message)) {
-        setTimeout(() => {
-          console.error('Retrying save after parallel error');
-          this.saveDebounce(); // retry saving after an error
-        }, 250);
+        await wait(getRandomDelay(0.25, 0.5)); // wait a random time between 1/4 and 1/2 seconds
+
+        console.error('Retrying save after parallel error');
+        this.saveDebounce(); // retry saving after an error
       }
     }
   }, 250);
