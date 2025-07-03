@@ -27,7 +27,7 @@ nav {
         color: $color-text-primary;
 
         &.active {
-          border-bottom: 3px solid $color-focus-ring;
+          border-left: 8px solid $color-focus-ring;
         }
       }
     }
