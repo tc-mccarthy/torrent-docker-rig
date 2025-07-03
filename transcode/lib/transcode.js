@@ -203,6 +203,11 @@ export default function transcode (file) {
         video_record.computeScore -= 0.1; // reduce 0.1 from the compute score because we're not transcoding audio
       }
 
+      // computeScore can never be less than 0.05
+      if (video_record.computeScore < 0.05) {
+        video_record.computeScore = 0.05;
+      }
+
       let cmd = ffmpeg(file);
 
       cmd = cmd
