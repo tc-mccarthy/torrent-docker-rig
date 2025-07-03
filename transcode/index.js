@@ -56,6 +56,7 @@ async function run () {
     // update the transcode queue
     update_status();
     update_queue();
+    generate_filelist({ limit: 1000, writeToFile: true });
 
     const transcodeQueue = new TranscodeQueue({ maxScore: concurrent_transcodes, pollDelay: 10000 });
     transcodeQueue.start();
