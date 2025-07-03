@@ -13,34 +13,37 @@ export default function Nav ({ data, setDataSelection, dataSelection }) {
   }
 
   return (
-    <nav>
-      <h3>
-        Running jobs (
+    <>
+      <h4>
         {data.length}
-        )
-      </h3>
-      <ul>
-        {data.map((item, index) => (
-          <li key={filename_hash(item.file)}>
-            <button type="button" className={dataSelection === index && 'active'} onClick={() => setDataSelection(index)}>
-              {display_file_name(item.file)}
-              {' '}
-              <strong>
-                (
-                {Math.round(item.output.percent)}
-                %)
-              </strong>
-              <div>
-                {item.output.time_remaining}
+        {' '}
+        Running jobs
+      </h4>
+      <nav>
+
+        <ul>
+          {data.map((item, index) => (
+            <li key={filename_hash(item.file)}>
+              <button type="button" className={dataSelection === index && 'active'} onClick={() => setDataSelection(index)}>
+                {display_file_name(item.file)}
                 {' '}
-                {item.name && `- ${item.name}`}
-              </div>
-              <div><em>{item.output.action}</em></div>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </nav>
+                <strong>
+                  (
+                  {Math.round(item.output.percent)}
+                  %)
+                </strong>
+                <div>
+                  {item.output.time_remaining}
+                  {' '}
+                  {item.name && `- ${item.name}`}
+                </div>
+                <div><em>{item.output.action}</em></div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </>
   );
 }
 
