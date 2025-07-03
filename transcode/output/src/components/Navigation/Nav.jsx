@@ -18,14 +18,10 @@ export default function Nav ({ data, setDataSelection, dataSelection, availableC
         {data.length}
         {' '}
         Running jobs
-        {availableCompute && (
-          <>
-            {' '}
-            - Available Compute:
-            {' '}
-            {availableCompute}
-          </>
-        )}
+        {' '}
+        - Available Compute:
+        {' '}
+        {availableCompute}
       </h4>
       <nav>
 
