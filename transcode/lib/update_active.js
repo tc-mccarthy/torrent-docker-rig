@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { setTimeout } from 'node:timers/promises';
 import exec_promise from './exec_promise';
 
 export default async function update_active () {
@@ -32,8 +33,7 @@ export default async function update_active () {
     'find /usr/app/output/ -iname "active-*.json" -type f -mmin +300 -exec rm {} \\;'
   );
 
-  // wait 1 second
-  await new Promise((resolve) => setTimeout(resolve, 1000)));
+  await setTimeout(1 * 1000); // wait 1 second before next run
 
   update_active();
 }
