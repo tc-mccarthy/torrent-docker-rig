@@ -1,6 +1,5 @@
 import logger from './logger';
 import File from '../models/files';
-import roundComputeScore from './round-compute-score';
 
 /**
  * Converts a value in kilobytes (KB) to another byte unit.

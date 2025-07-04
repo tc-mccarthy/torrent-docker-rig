@@ -10,6 +10,7 @@ import ErrorLog from '../models/error';
 import probe_and_upsert from './probe_and_upsert';
 import wait from './wait';
 import integrityCheck from './integrityCheck';
+import generate_filelist from './generate_filelist';
 
 const { encode_version } = config;
 
@@ -256,6 +257,11 @@ export default function transcode (file) {
           logger.info(`Spawned Ffmpeg with command: ${commandLine}`);
           start_time = dayjs();
           ffmpeg_cmd = commandLine;
+
+          generate_filelist({
+            limit: 1000,
+            writeToFile: true
+          });
 
           if (video_record) {
             logger.debug('>> VIDEO FOUND -- REMOVING ERROR >>', video_record);
