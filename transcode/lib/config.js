@@ -7,35 +7,35 @@ const transcode_config = {
   sources: [
     {
       path: '/source_media/Drax/Movies',
-      scratch: '/source_media/Drax/transcode_scratch'
+      scratch: '/source_media/Romanoff/transcode_scratch'
     },
     {
       path: '/source_media/Rogers/Movies',
-      scratch: '/source_media/Rogers/transcode_scratch'
+      scratch: '/source_media/Romanoff/transcode_scratch'
     },
     {
       path: '/source_media/Drax/Disney',
-      scratch: '/source_media/Drax/transcode_scratch'
+      scratch: '/source_media/Romanoff/transcode_scratch'
     },
     {
       path: '/source_media/Danvers/TV Shows',
-      scratch: '/source_media/Danvers/transcode_scratch'
+      scratch: '/source_media/Romanoff/transcode_scratch'
     },
     {
       path: '/source_media/Wanda/TV Shows',
-      scratch: '/source_media/Wanda/transcode_scratch'
+      scratch: '/source_media/Romanoff/transcode_scratch'
     },
     {
       path: '/source_media/Drax/Random',
-      scratch: '/source_media/Drax/transcode_scratch'
+      scratch: '/source_media/Romanoff/transcode_scratch'
     },
     {
       path: '/source_media/Stark/TV Shows',
-      scratch: '/source_media/Stark/transcode_scratch'
+      scratch: '/source_media/Romanoff/transcode_scratch'
     },
     {
       path: '/source_media/Parker/TV Shows',
-      scratch: '/source_media/Parker/transcode_scratch'
+      scratch: '/source_media/Romanoff/transcode_scratch'
     }
   ]
 };
