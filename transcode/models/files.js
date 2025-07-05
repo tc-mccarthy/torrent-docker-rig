@@ -98,7 +98,7 @@ const schema = new Schema(
           return roundComputeScore(calculatedScore);
         } catch (e) {
           logger.error(e, { label: 'COMPUTE SCORE ERROR' });
-          logger.info(this, { label: 'COMPUTE SCORE ERROR FILE' });
+          logger.debug(this, { label: 'COMPUTE SCORE ERROR FILE' });
           return 1; // default to 100 if there's an error
         }
       }
