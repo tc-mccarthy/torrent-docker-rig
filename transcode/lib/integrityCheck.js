@@ -7,6 +7,7 @@ import config from './config';
 import logger from './logger';
 import { trash } from './fs';
 import IntegrityError from '../models/integrityError';
+import { formatSecondsToHHMMSS } from './transcode';
 
 const { encode_version } = config;
 
@@ -138,13 +139,7 @@ export default function integrityCheck (file) {
           const seconds_pct = 1 / pct_per_second;
           const pct_remaining = 100 - progress.percent;
           const est_completed_seconds = pct_remaining * seconds_pct;
-          const time_remaining = dayjs
-            .utc(est_completed_seconds * 1000)
-            .format(
-              [est_completed_seconds > 86400 && 'D:', 'HH:mm:ss']
-                .filter((t) => t)
-                .join('')
-            );
+          const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
           const estimated_final_kb =
                     (progress.targetSize / progress.percent) * 100;
           const output = JSON.stringify(
@@ -158,6 +153,8 @@ export default function integrityCheck (file) {
               pct_remaining,
               time_remaining,
               est_completed_seconds,
+              computeScore: video_record.computeScore,
+              priority: video_record.sortFields.priority,
               size: {
                 progress: {
                   kb: progress.targetSize,
@@ -237,7 +234,7 @@ export default function integrityCheck (file) {
           }
         })
         .on('error', async (err, stdout, stderr) => {
-          await video_record.clearLock('transcode');
+          await video_record.clearLock('verify');
           logger.error(err, {
             label: 'Cannot process video during integrity check',
             stdout,

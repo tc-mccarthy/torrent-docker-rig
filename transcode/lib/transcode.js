@@ -15,7 +15,7 @@ import generate_filelist from './generate_filelist';
 const { encode_version } = config;
 
 // function to format seconds to HH:mm:ss
-function formatSecondsToHHMMSS (totalSeconds) {
+export function formatSecondsToHHMMSS (totalSeconds) {
   if (Number.isNaN(totalSeconds)) return 'calculating';
 
   const total = Math.ceil(Number(totalSeconds)); // round up
