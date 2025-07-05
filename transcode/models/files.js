@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import dayjs from '../lib/dayjs';
 import roundComputeScore, { getMinimum } from '../lib/round-compute-score';
 import wait, { getRandomDelay } from '../lib/wait';
+import logger from '../lib/logger';
 
 const { Schema, model } = mongoose;
 
@@ -84,13 +85,22 @@ const schema = new Schema(
       type: Number,
       required: false,
       get (value) {
+        try {
         // return the stored value.
-        if (value && value >= getMinimum()) {
-          return value;
+          if (value && value >= getMinimum()) {
+            return value;
+          }
+          const video_stream = this.probe?.streams?.find((s) => s.codec_type === 'video');
+          if (!video_stream) {
+            throw new Error('No video stream found in probe data');
+          }
+          const calculatedScore = (video_stream.width * video_stream.height) / (3840 * 2160); // take the video area and divide it by 4K resolution area
+          return roundComputeScore(calculatedScore);
+        } catch (e) {
+          logger.error(e, { label: 'COMPUTE SCORE ERROR' });
+          logger.info(this, { label: 'COMPUTE SCORE ERROR FILE' });
+          return 1; // default to 100 if there's an error
         }
-        const video_stream = this.probe?.streams?.find((s) => s.codec_type === 'video');
-        const calculatedScore = (video_stream.width * video_stream.height) / (3840 * 2160); // take the video area and divide it by 4K resolution area
-        return roundComputeScore(calculatedScore);
       }
     },
     permitHWDecode: {
