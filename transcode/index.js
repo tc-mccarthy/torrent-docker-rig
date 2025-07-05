@@ -1,7 +1,6 @@
 import cron from 'node-cron';
 import dayjs from 'dayjs';
 import mongo_connect from './lib/mongo_connection';
-import update_active from './lib/update_active';
 import update_queue from './lib/update_queue';
 import fs_monitor from './lib/fs_monitor';
 import redisClient from './lib/redis';
@@ -34,9 +33,6 @@ async function run () {
     logger.info('Connecting to Redis');
     // connect to redis
     await redisClient.connect();
-
-    // update the active list
-    update_active();
 
     // create scratch disks
     logger.info('Creating scratch space');
