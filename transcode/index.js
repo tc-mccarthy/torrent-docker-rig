@@ -1,5 +1,4 @@
 import cron from 'node-cron';
-import dayjs from 'dayjs';
 import mongo_connect from './lib/mongo_connection';
 import update_queue from './lib/update_queue';
 import fs_monitor from './lib/fs_monitor';
@@ -61,23 +60,7 @@ async function run () {
 
     const integrityQueue = new IntegrityQueue({ maxScore: concurrent_integrity_checks });
 
-    const currentHourLocalTime = dayjs().tz(process.env.TZ).hour();
-    logger.info(
-      `Current local time is ${currentHourLocalTime}`
-    );
-    if (currentHourLocalTime >= 0 && currentHourLocalTime < 9) {
-      integrityQueue.start();
-    }
-
-    // start the integrity check queue every day at midnight
-    cron.schedule('0 0 * * *', () => {
-      integrityQueue.start();
-    });
-
-    // pause the integrity check queue every day at 9am
-    cron.schedule('0 9 * * *', () => {
-      integrityQueue.stop();
-    });
+    integrityQueue.start();
 
     // generate the filelist every 5 minutes
     cron.schedule('*/5 * * * *', async () => {
