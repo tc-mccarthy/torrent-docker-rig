@@ -3,6 +3,7 @@ import transcode from './transcode';
 import logger from './logger';
 import generate_filelist from './generate_filelist';
 import update_status from './update_status';
+import update_active from './update_active';
 
 export default class TranscodeQueue {
   constructor ({ maxScore = 4, pollDelay = 2000 }) {
@@ -19,6 +20,7 @@ export default class TranscodeQueue {
     if (this._isRunning) return;
     this._isRunning = true;
     logger.info('Transcode queue started.');
+    update_active();
     await this.loop();
   }
 
