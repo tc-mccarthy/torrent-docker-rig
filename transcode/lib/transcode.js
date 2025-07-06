@@ -11,6 +11,7 @@ import probe_and_upsert from './probe_and_upsert';
 import wait from './wait';
 import integrityCheck from './integrityCheck';
 import generate_filelist from './generate_filelist';
+import moveFile from './moveFile';
 
 const { encode_version } = config;
 
@@ -374,7 +375,7 @@ export default function transcode (file) {
             logger.info(`${scratch_file} found by nodejs`);
 
             // rename the scratch file to the destination file name
-            await fs.promises.rename(scratch_file, dest_file);
+            await moveFile(scratch_file, dest_file);
 
             // update the timestamp on the destination file so that it's picked up scans
             await fs.promises.utimes(dest_file, new Date(), new Date());
