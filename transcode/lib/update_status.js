@@ -24,7 +24,7 @@ export default async function update_status () {
     global.serviceStartTime = Date.now();
   }
 
-  data.processed_files_delta = data.processed_files - global.processedOnStart;
+  data.processed_files_delta = Math.max(data.processed_files - global.processedOnStart, 0);
   data.service_up_time = formatSecondsToHHMMSS(
     Math.floor((Date.now() - global.serviceStartTime) / 1000)
   );
