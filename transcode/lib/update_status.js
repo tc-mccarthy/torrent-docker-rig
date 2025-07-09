@@ -2,7 +2,6 @@ import fs from 'fs';
 import File from '../models/files';
 import config from './config';
 import { formatSecondsToHHMMSS } from './transcode';
-import ./
 
 const { encode_version } = config;
 
