@@ -174,7 +174,7 @@ function Home () {
         <div className="flex">
           <div className="widget">
             <strong>FPS</strong>
-            {data.output.currentFPS}
+            {data.output.currentFps}
           </div>
           <div className="widget">
             <strong>Kbps</strong>
