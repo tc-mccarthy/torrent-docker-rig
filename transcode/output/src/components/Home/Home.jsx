@@ -235,7 +235,14 @@ function Home () {
         <div className="widget">
           <strong>Files Remaining</strong>
           {status.unprocessed_files.toLocaleString()}
-          {/* <CircularProgressWithLabel numerator={numerator} denominator={denominator} /> */}
+        </div>
+        <div className="widget">
+          <strong>Files Processed this session</strong>
+          {status.processed_files_delta.toLocaleString()}
+        </div>
+        <div className="widget">
+          <strong>Files Processed all time</strong>
+          {status.processed_files.toLocaleString()}
         </div>
         <div className="widget">
           <strong>Library Coverage</strong>
