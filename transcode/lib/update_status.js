@@ -6,6 +6,7 @@ import { formatSecondsToHHMMSS } from './transcode';
 const { encode_version } = config;
 
 export default async function update_status () {
+  clearTimeout(global.updateStatusTimeout);
   const data = {
     processed_files: await File.countDocuments({ encode_version }),
     total_files: await File.countDocuments(),
@@ -30,4 +31,6 @@ export default async function update_status () {
   data.serviceStartTime = global.serviceStartTime;
 
   fs.writeFileSync('/usr/app/output/status.json', JSON.stringify(data));
+
+  global.updateStatusTimeout = setTimeout(update_status, 1000 * 5);
 }
