@@ -209,41 +209,40 @@ services:
         max-file: "10"
 
   transcode:
-  container_name: transcode
-  build:
-    context: ./transcode
-  devices:
-    - "/dev/dri:/dev/dri" # GPU passthrough for hardware transcoding (intel quicksync)
-  environment:
-    - TZ
-    - TRANSCODE_PATHS
-    - LOG_PRETTY=on
-    - LOG_LEVEL=info # make debug when debugging
-    - CHOKIDAR_USEPOLLING=1
-    - NODE_OPTIONS=--max-old-space-size=57344 --enable-source-maps
-    - CONCURRENT_TRANSCODES
-    - CONCURRENT_FILE_CHECKS
-    - CONCURRENT_INTEGRITY_CHECKS
-    - ENV=${ENV:-prod}
-    - TMDB_READ_ACCESS_TOKEN
-  volumes:
-    - ${TRANSCODE_STORAGE}:/source_media
-    - ./transcode:/usr/app
-    - /usr/app/node_modules
-    - /usr/app/bin
-  restart: unless-stopped
-  depends_on:
-    - redis
-    - mongo
-    - rabbitmq
-  mem_limit: 56g
-  memswap_limit: 64g
-  logging: 
-    driver: "json-file"
-    options: 
-      max-size: "200k"
-      max-file: "10"
-
+    container_name: transcode
+    build:
+      context: ./transcode
+    devices:
+      - "/dev/dri:/dev/dri" # GPU passthrough for hardware transcoding (intel quicksync)
+    environment:
+      - TZ
+      - TRANSCODE_PATHS
+      - LOG_PRETTY=on
+      - LOG_LEVEL=info # make debug when debugging
+      - CHOKIDAR_USEPOLLING=1
+      - NODE_OPTIONS=--max-old-space-size=57344 --enable-source-maps
+      - CONCURRENT_TRANSCODES
+      - CONCURRENT_FILE_CHECKS
+      - CONCURRENT_INTEGRITY_CHECKS
+      - ENV=${ENV:-prod}
+      - TMDB_READ_ACCESS_TOKEN
+    volumes:
+      - ${TRANSCODE_STORAGE}:/source_media # path to my volumes for download storage
+      - ./transcode:/usr/app
+      - /usr/app/node_modules
+      - /usr/app/bin
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - mongo
+      - rabbitmq
+    mem_limit: 56g
+    memswap_limit: 64g
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   plex:
     container_name: plex
