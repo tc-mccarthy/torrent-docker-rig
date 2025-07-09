@@ -8,7 +8,7 @@ const { encode_version } = config;
 export default async function update_status () {
   clearTimeout(global.updateStatusTimeout);
   const data = {
-    processed_files: await File.countDocuments({ encode_version }),
+    processed_files: await File.countDocuments({ status: 'complete' }),
     total_files: await File.countDocuments(),
     unprocessed_files: await File.countDocuments({
       encode_version: { $ne: encode_version }
