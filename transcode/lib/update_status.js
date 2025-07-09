@@ -18,7 +18,7 @@ export default async function update_status () {
       100
   };
 
-  if(!global.processedOnStart) {
+  if (typeof global.processedOnStart === 'undefined') {
     global.processedOnStart = data.processed_files;
     global.serviceStartTime = Date.now();
   }
@@ -27,6 +27,7 @@ export default async function update_status () {
   data.service_up_time = formatSecondsToHHMMSS(
     Math.floor((Date.now() - global.serviceStartTime) / 1000)
   );
+  data.serviceStartTime = global.serviceStartTime;
 
   fs.writeFileSync('/usr/app/output/status.json', JSON.stringify(data));
 }
