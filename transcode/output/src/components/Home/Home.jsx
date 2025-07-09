@@ -189,6 +189,10 @@ function Home () {
               )
             </em>
           </div>
+        </div>
+      )}
+      {data && (
+        <div className="flex">
           <div className="widget">
             <strong>Compute Score</strong>
             {data.output.computeScore}
