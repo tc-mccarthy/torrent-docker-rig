@@ -290,7 +290,6 @@ export default function transcode (file) {
           const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
           const estimated_final_kb =
             (progress.targetSize / progress.percent) * 100;
-          const fps = Math.round(progress.frames / elapsed);
           const output = JSON.stringify(
             {
               ...progress,
@@ -304,7 +303,6 @@ export default function transcode (file) {
               est_completed_seconds,
               computeScore: video_record.computeScore,
               priority: video_record.sortFields.priority,
-              fps,
               size: {
                 progress: {
                   kb: progress.targetSize,

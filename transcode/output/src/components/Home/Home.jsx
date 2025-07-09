@@ -173,6 +173,14 @@ function Home () {
       {data && (
         <div className="flex">
           <div className="widget">
+            <strong>FPS</strong>
+            {data.output.currentFPS}
+          </div>
+          <div className="widget">
+            <strong>Kbps</strong>
+            {data.output.currentKbps}
+          </div>
+          <div className="widget">
             <strong>ETA</strong>
             {data.output.time_remaining}
             <em>
