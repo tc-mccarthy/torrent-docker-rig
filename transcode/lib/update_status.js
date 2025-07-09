@@ -22,9 +22,10 @@ export default async function update_status () {
   if (typeof global.processedOnStart === 'undefined') {
     global.processedOnStart = data.processed_files;
     global.serviceStartTime = Date.now();
+    global.processed_files_delta = 0;
   }
 
-  data.processed_files_delta = Math.max(data.processed_files - global.processedOnStart, 0);
+  data.processed_files_delta = global.processed_files_delta || 0;
   data.service_up_time = formatSecondsToHHMMSS(
     Math.floor((Date.now() - global.serviceStartTime) / 1000)
   );

@@ -377,8 +377,9 @@ export default function transcode (file) {
             // rename the scratch file to the destination file name
             await moveFile(scratch_file, dest_file);
 
-            // update the timestamp on the destination file so that it's picked up scans
+            // update the timestamp on the destination file so that it's picked up in scans
             await fs.promises.utimes(dest_file, new Date(), new Date());
+            global.processed_files_delta += 1;
 
             // delete the original file if the transcoded filename is different
             if (dest_file !== file) {
