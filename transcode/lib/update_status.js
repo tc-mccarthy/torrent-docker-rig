@@ -1,6 +1,8 @@
 import fs from 'fs';
 import File from '../models/files';
 import config from './config';
+import { formatSecondsToHHMMSS } from './transcode';
+import ./
 
 const { encode_version } = config;
 
@@ -16,6 +18,16 @@ export default async function update_status () {
         (await File.countDocuments())) *
       100
   };
+
+  if(!global.processedOnStart) {
+    global.processedOnStart = data.processed_files;
+    global.serviceStartTime = Date.now();
+  }
+
+  data.processed_files_delta = data.processed_files - global.processedOnStart;
+  data.service_up_time = formatSecondsToHHMMSS(
+    Math.floor((Date.now() - global.serviceStartTime) / 1000)
+  );
 
   fs.writeFileSync('/usr/app/output/status.json', JSON.stringify(data));
 }
