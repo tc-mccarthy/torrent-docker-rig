@@ -244,16 +244,15 @@ function Home () {
           <strong>Files Processed all time</strong>
           {status.processed_files.toLocaleString()}
         </div>
-        <div className="widget">
-          <strong>Up time</strong>
-          {status.service_up_time}
-        </div>
       </div>
       <div className="flex">
         <div className="widget">
-          <strong>Library coverage</strong>
-          {status.library_coverage.toLocaleString()}
-          %
+          <strong>Service Uptime</strong>
+          {status.service_up_time}
+        </div>
+        <div className="widget">
+          <strong>Library Coverage</strong>
+          <LinearProgressWithLabel value={Math.round(status.library_coverage)} />
         </div>
       </div>
 
