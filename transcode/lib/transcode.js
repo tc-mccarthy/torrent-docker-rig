@@ -10,8 +10,24 @@ import ErrorLog from '../models/error';
 import probe_and_upsert from './probe_and_upsert';
 import wait from './wait';
 import integrityCheck from './integrityCheck';
+import generate_filelist from './generate_filelist';
+import moveFile from './moveFile';
 
 const { encode_version } = config;
+
+// function to format seconds to HH:mm:ss
+export function formatSecondsToHHMMSS (totalSeconds) {
+  if (Number.isNaN(totalSeconds)) return 'calculating';
+
+  const total = Math.ceil(Number(totalSeconds)); // round up
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+
+  const pad = (n) => String(n).padStart(2, '0');
+
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
 
 export default function transcode (file) {
   return new Promise(async (resolve, reject) => {
@@ -22,14 +38,6 @@ export default function transcode (file) {
 
       if (!video_record || !video_record?._id) {
         throw new Error(`Video record not found for file: ${file}`);
-      }
-
-      // if the file is locked, short circuit
-      if (await video_record.hasLock('transcode')) {
-        logger.info(
-          `File is locked. Skipping transcode: ${file} - ${video_record._id}`
-        );
-        return resolve({ locked: true });
       }
 
       const { profiles } = config;
@@ -97,6 +105,7 @@ export default function transcode (file) {
       );
       let transcode_video = false;
       let transcode_audio = false;
+      const hwaccel = video_record.permitHWDecode ? 'auto' : 'none';
       const video_filters = [];
       const audio_filters = [];
 
@@ -169,7 +178,7 @@ export default function transcode (file) {
         ffprobe_data.format.size <= 350000
       ) {
         logger.debug(
-          'Video stream codec is HEVC and size is less than 1GB. Not transcoding'
+          'Video stream codec is h264 and size is less than 350mb. Not transcoding'
         );
         transcode_video = false;
       }
@@ -205,7 +214,7 @@ export default function transcode (file) {
       let cmd = ffmpeg(file);
 
       cmd = cmd
-        .inputOptions(['-v fatal', '-stats', '-hwaccel auto'])
+        .inputOptions(['-v fatal', '-stats', `-hwaccel ${hwaccel}`].filter((f) => f)) // use hardware acceleration if not transcoding video
         .outputOptions(input_maps);
 
       if (transcode_video) {
@@ -250,6 +259,11 @@ export default function transcode (file) {
           start_time = dayjs();
           ffmpeg_cmd = commandLine;
 
+          generate_filelist({
+            limit: 1000,
+            writeToFile: true
+          });
+
           if (video_record) {
             logger.debug('>> VIDEO FOUND -- REMOVING ERROR >>', video_record);
             video_record.error = undefined;
@@ -273,13 +287,7 @@ export default function transcode (file) {
           const seconds_pct = 1 / pct_per_second;
           const pct_remaining = 100 - progress.percent;
           const est_completed_seconds = pct_remaining * seconds_pct;
-          const time_remaining = dayjs
-            .utc(est_completed_seconds * 1000)
-            .format(
-              [est_completed_seconds > 86400 && 'D:', 'HH:mm:ss']
-                .filter((t) => t)
-                .join('')
-            );
+          const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
           const estimated_final_kb =
             (progress.targetSize / progress.percent) * 100;
           const output = JSON.stringify(
@@ -293,6 +301,8 @@ export default function transcode (file) {
               pct_remaining,
               time_remaining,
               est_completed_seconds,
+              computeScore: video_record.computeScore,
+              priority: video_record.sortFields.priority,
               size: {
                 progress: {
                   kb: progress.targetSize,
@@ -365,10 +375,11 @@ export default function transcode (file) {
             logger.info(`${scratch_file} found by nodejs`);
 
             // rename the scratch file to the destination file name
-            await fs.promises.rename(scratch_file, dest_file);
+            await moveFile(scratch_file, dest_file);
 
-            // update the timestamp on the destination file so that it's picked up scans
+            // update the timestamp on the destination file so that it's picked up in scans
             await fs.promises.utimes(dest_file, new Date(), new Date());
+            global.processed_files_delta += 1;
 
             // delete the original file if the transcoded filename is different
             if (dest_file !== file) {
@@ -411,8 +422,14 @@ export default function transcode (file) {
             )
           );
           await trash(scratch_file, false);
-          await upsert_video({
-            path: file,
+          // if the error message contains '251' disable the hardware acceleration
+          if (/251/i.test(err.message)) {
+            logger.warn(
+              'FFmpeg error 251 detected. Disabling hardware acceleration for this video.'
+            );
+            video_record.permitHWDecode = false;
+          }
+          Object.assign(video_record, {
             error: {
               error: err.message,
               stdout,
@@ -422,6 +439,7 @@ export default function transcode (file) {
             },
             hasError: true
           });
+          await video_record.saveDebounce();
           await video_record.clearLock('transcode');
 
           await ErrorLog.create({

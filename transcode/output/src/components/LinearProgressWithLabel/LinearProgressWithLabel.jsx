@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import LinearProgress from '@mui/material/LinearProgress';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
+import './LinearProgressWithLabel.scss';
 
 export default function LinearProgressWithLabel (props) {
   return (
@@ -11,7 +12,7 @@ export default function LinearProgressWithLabel (props) {
         <LinearProgress variant="determinate" {...props} />
       </Box>
       <Box sx={{ minWidth: 35 }}>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" className="progress-label">
           {`${Math.round(
           props.value
         )}%`}

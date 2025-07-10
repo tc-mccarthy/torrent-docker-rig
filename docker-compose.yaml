@@ -236,10 +236,8 @@ services:
       - redis
       - mongo
       - rabbitmq
-    deploy:
-      resources:
-        limits:
-          memory: 56G # 56GB
+    mem_limit: 56g
+    memswap_limit: 64g
     logging: 
       driver: "json-file"
       options: 
