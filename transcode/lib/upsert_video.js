@@ -35,12 +35,12 @@ export function default_priority (video) {
   try {
     // if the size is more than 20GB in kilobytes
     if (convertKilobytes(video.probe.format.size, 'GB') >= 20) {
-      return 97;
+      return 96;
     }
 
     // if the size is less than 500 MB in kilobytes
     if (convertKilobytes(video.probe.format.size, 'MB') <= 500) {
-      return 98;
+      return 97;
     }
 
     // if the size is less than 1GB in kilobytes
@@ -80,12 +80,16 @@ export default async function upsert_video (video) {
     }
 
     // get the highest priority from the video or file sortfields and default priority
-    const priority = Math.min(
-      video.sortFields?.priority ||
-        file?.sortFields?.priority ||
-        default_priority(video),
-      default_priority(video)
-    );
+
+    // if the priority is already set on the video or the file, and it's less than 90, preserve it, otherwise set it to the default priority
+    const preset_priority = video.sortFields?.priority || file?.sortFields?.priority;
+
+    let priority = default_priority(video);
+
+    if (preset_priority && preset_priority < 90) {
+      // if the preset priority is less than 90, use it
+      priority = preset_priority;
+    }
 
     // merge the sortFields object with the priority
     const sortFields = { ...(video.sortFields || file.sortFields), priority };
