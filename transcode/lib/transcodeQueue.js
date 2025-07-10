@@ -54,14 +54,13 @@ export default class TranscodeQueue {
 
   async startMemoryPressureMonitor () {
     try {
-      const [mem, cpu] = await Promise.all([
-        si.mem(),
-        si.currentLoad()
+      const [mem] = await Promise.all([
+        si.mem()
       ]);
 
       const availableRamMB = mem.available / 1024 / 1024;
       const usedSwapMB = mem.swapused / 1024 / 1024;
-      const cpuLoadPct = cpu.currentLoad; // Average across all cores
+      // const cpuLoadPct = cpu.currentLoad; // Average across all cores
 
       let penalty = 0;
 
@@ -73,17 +72,17 @@ export default class TranscodeQueue {
       if (usedSwapMB > 1024) penalty += 0.25;
       if (usedSwapMB > 2048) penalty += 0.25;
 
-      // 🔵 CPU pressure
-      if (cpuLoadPct > 85) penalty += 0.25;
-      if (cpuLoadPct > 95) penalty += 0.25;
+      // // 🔵 CPU pressure
+      // if (cpuLoadPct > 85) penalty += 0.25;
+      // if (cpuLoadPct > 95) penalty += 0.25;
 
       this.computePenalty = penalty;
 
       logger.info(penalty, {
         label: 'ResourceMonitor compute penalty',
         ram: `${Math.round(availableRamMB)}MB`,
-        swap: `${Math.round(usedSwapMB)}MB`,
-        cpu: `${Math.round(cpuLoadPct)}%`
+        swap: `${Math.round(usedSwapMB)}MB`
+        // cpu: `${Math.round(cpuLoadPct)}%`
       });
     } catch (err) {
       console.error('[ResourceMonitor] Error:', err);
