@@ -22,6 +22,7 @@ export default async function update_active () {
 
   const output = {
     availableCompute: global.transcodeQueue.getAvailableCompute(),
+    computePenalty: global.transcodeQueue.computePenalty,
     active: active_data
   };
 

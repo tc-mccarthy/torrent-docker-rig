@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'timers/promises';
+import si from 'systeminformation'; // For system resource monitoring
 import transcode from './transcode';
 import logger from './logger';
 import generate_filelist from './generate_filelist';
@@ -10,6 +11,8 @@ export default class TranscodeQueue {
     // start the transcode loops
     logger.info(`Initiating transcode queue for a max compute of ${maxScore}...`);
     this.maxScore = maxScore; // Max compute units allowed simultaneously
+    this.computePenalty = 0; // Current compute penalty based on system resource utilization
+    this.memoryPollIntervalMs = 5000; // Interval for memory pressure checks (ms)
     this.pollDelay = pollDelay; // Delay between scheduling attempts (ms)
     this.runningJobs = []; // In-memory list of currently active jobs
     this._isRunning = false; // Flag for controlling the loop
@@ -37,7 +40,7 @@ export default class TranscodeQueue {
 
   // Returns available compute capacity
   getAvailableCompute () {
-    return this.maxScore - this.getUsedCompute();
+    return this.maxScore - this.computePenalty - this.getUsedCompute();
   }
 
   // Main loop: tries to schedule jobs and waits before the next run
@@ -45,6 +48,47 @@ export default class TranscodeQueue {
     while (this._isRunning) {
       await this.scheduleJobs();
       await delay(this.pollDelay); // Wait before checking again
+    }
+  }
+
+  async startMemoryPressureMonitor () {
+    try {
+      const [mem, cpu] = await Promise.all([
+        si.mem(),
+        si.currentLoad()
+      ]);
+
+      const availableRamMB = mem.available / 1024 / 1024;
+      const usedSwapMB = mem.swapused / 1024 / 1024;
+      const cpuLoadPct = cpu.currentLoad; // Average across all cores
+
+      let penalty = 0;
+
+      // 🔴 RAM pressure
+      if (availableRamMB < 8192) penalty += 0.5;
+      if (availableRamMB < 4096) penalty += 0.5;
+
+      // 🟠 Swap pressure
+      if (usedSwapMB > 1024) penalty += 0.25;
+      if (usedSwapMB > 2048) penalty += 0.25;
+
+      // 🔵 CPU pressure
+      if (cpuLoadPct > 85) penalty += 0.25;
+      if (cpuLoadPct > 95) penalty += 0.25;
+
+      this.computePenalty = penalty;
+
+      logger.info(penalty, {
+        label: 'ResourceMonitor compute penalty',
+        ram: `${Math.round(availableRamMB)}MB`,
+        swap: `${Math.round(usedSwapMB)}MB`,
+        cpu: `${Math.round(cpuLoadPct)}%`
+      });
+    } catch (err) {
+      console.error('[ResourceMonitor] Error:', err);
+    } finally {
+      await delay(this.memoryPollIntervalMs);
+      this.startMemoryPressureMonitor(); // Restart the monitor
     }
   }
 
