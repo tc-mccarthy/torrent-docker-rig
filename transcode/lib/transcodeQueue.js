@@ -24,6 +24,7 @@ export default class TranscodeQueue {
     this._isRunning = true;
     logger.info('Transcode queue started.');
     update_active();
+    this.startMemoryPressureMonitor(); // Start monitoring system resources
     await this.loop();
   }
 
