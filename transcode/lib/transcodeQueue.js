@@ -69,8 +69,8 @@ export default class TranscodeQueue {
       if (availableRamMB < 4096) penalty += 0.5;
 
       // 🟠 Swap pressure
-      if (usedSwapMB > 1024) penalty += 0.25;
-      if (usedSwapMB > 2048) penalty += 0.25;
+      // if (usedSwapMB > 1024) penalty += 0.25;
+      // if (usedSwapMB > 2048) penalty += 0.25;
 
       // // 🔵 CPU pressure
       // if (cpuLoadPct > 85) penalty += 0.25;
