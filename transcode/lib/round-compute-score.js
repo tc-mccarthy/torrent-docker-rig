@@ -1,4 +1,4 @@
-export const smallest_denominator = 8;
+export const smallest_denominator = process.env.COMPUTE_SCORE_FACTOR || 8;
 
 export function getMinimum () {
   return 1 / smallest_denominator;
