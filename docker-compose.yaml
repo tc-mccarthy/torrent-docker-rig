@@ -11,6 +11,9 @@ services:
       - PRIVATE_KEY=${NORDVPN_PRIVATE_KEY} # Your NordLynx private key. You can obtain this by running the get_nordvpn_private_key script
       # - QUERY="filters\[servers_groups\]\[identifier\]=legacy_p2p&filters\[country_id\]=228" # narrow the list of servers to US-based P2P servers
       - TZ # Timezone used for logging
+      - CONNECT=p2p
+      - CATEGORY=p2p
+      - TECHNOLOGY=nordlynx
     ports:
       - 8088:8088 ## qbittorrent web ui
       - 6881:6881 ## qbittorrent
