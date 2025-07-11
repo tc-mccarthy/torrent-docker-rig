@@ -229,6 +229,7 @@ services:
       - CONCURRENT_INTEGRITY_CHECKS
       - ENV=${ENV:-prod}
       - TMDB_READ_ACCESS_TOKEN
+      - COMPUTE_SCORE_FACTOR # Factor to compute the score for a file. The score is rounded to the nearest 1/COMPUTE_SCORE_FACTOR.
     volumes:
       - ${TRANSCODE_STORAGE}:/source_media # path to my volumes for download storage
       - ./transcode:/usr/app
