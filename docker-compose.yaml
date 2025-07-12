@@ -90,15 +90,14 @@ services:
       - torrent
       - redis
     environment:
-      - QB_API_URL=http://localhost:${QBIT_WEB_UI_PORT}
+      - QB_API_URL=https://${TORRENT_SSL_HOST}/qbt
       - QB_USERNAME        # Replace with actual qBittorrent Web UI user
       - QB_PASSWORD   # Replace with actual password
-      - REDIS_HOST=localhost
+      - REDIS_HOST=torrent-redis-local
       - REDIS_PORT=6379
     volumes:
       - ./torrent-monitor:/app
     restart: unless-stopped
-    network_mode: service:vpn # all traffic goes through vpn
     logging: 
       driver: "json-file"
       options: 
