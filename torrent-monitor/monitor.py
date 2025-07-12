@@ -17,14 +17,26 @@ CHECK_INTERVAL = 60 * 30                         # Run every 30 minutes
 session = requests.Session()
 rdb = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
+def log(message):
+    """Print log message with timestamp."""
+    print(f"[{datetime.utcnow().isoformat()}] {message}", flush=True)
+
 def login():
     """Log into the qBittorrent Web API."""
     r = session.post(f"{QB_URL}/api/v2/auth/login", data={"username": QB_USER, "password": QB_PASS})
+    if r.ok:
+        log("Login to qBittorrent successful.")
+    else:
+        log("Login to qBittorrent failed.")
     return r.ok
 
 def get_torrents():
     """Fetch the list of all torrents from qBittorrent."""
     r = session.get(f"{QB_URL}/api/v2/torrents/info")
+    if r.ok:
+        log(f"Fetched {len(r.json())} torrents.")
+    else:
+        log("Failed to fetch torrents.")
     return r.json() if r.ok else []
 
 def should_delete(torrent_hash, status):
@@ -37,36 +49,40 @@ def should_delete(torrent_hash, status):
     track_states = ["uploading", "stalledUP", "stalledDL", "pausedUP", "queuedUP", "completed"]
 
     if status in track_states:
-        print (f"Tracking torrent {torrent_hash} in state {status}")
         if rdb.exists(key):
             ttl = rdb.ttl(key)
             if ttl == -1:
-                # Key exists but has no TTL, so set one now
                 rdb.expire(key, TTL_HOURS * 3600)
+                log(f"Set TTL for {torrent_hash} ({status})")
             elif ttl <= 0:
-                # Key has expired, meaning torrent has been in state > TTL
+                log(f"{torrent_hash} ({status}) has exceeded TTL. Marked for deletion.")
                 return True
         else:
-            # First time seeing this torrent in a stale state
             rdb.setex(key, TTL_HOURS * 3600, datetime.utcnow().isoformat())
+            log(f"Tracking {torrent_hash} ({status}) for inactivity.")
     else:
-        # Torrent is active or downloading; reset any stored state
-        rdb.delete(key)
+        if rdb.exists(key):
+            rdb.delete(key)
+            log(f"Removed {torrent_hash} from Redis tracking (status: {status})")
     return False
 
 def delete_torrent(torrent_hash):
     """Delete the torrent and its files from qBittorrent."""
-    print(f"Deleting torrent {torrent_hash} and its files")
+    log(f"Deleting torrent {torrent_hash} and its files")
     r = session.post(
         f"{QB_URL}/api/v2/torrents/delete",
         data={"hashes": torrent_hash, "deleteFiles": "true"},
     )
+    if r.ok:
+        log(f"Successfully deleted {torrent_hash}")
+    else:
+        log(f"Failed to delete {torrent_hash}")
     return r.ok
 
 def run():
     """Main routine that checks torrents and deletes stale ones."""
+    log("Starting torrent monitor run...")
     if not login():
-        print("Login failed")
         return
 
     torrents = get_torrents()
@@ -75,8 +91,9 @@ def run():
         torrent_hash = t.get("hash")
         name = t.get("name")
         if should_delete(torrent_hash, status):
-            print(f"[{datetime.now()}] Removing {name} ({status})")
+            log(f"Removing {name} ({torrent_hash}) due to stale status: {status}")
             delete_torrent(torrent_hash)
+    log("Torrent monitor run complete.")
 
 # Loop the process every CHECK_INTERVAL seconds
 if __name__ == "__main__":
@@ -84,5 +101,5 @@ if __name__ == "__main__":
         try:
             run()
         except Exception as e:
-            print("Error:", e)
+            log(f"Unexpected error: {e}")
         time.sleep(CHECK_INTERVAL)
