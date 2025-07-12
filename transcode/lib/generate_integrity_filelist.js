@@ -9,7 +9,7 @@ export default async function generate_integrity_filelist (limit = 1000) {
   const filelist = await File.find({
     status: 'pending',
     integrityCheck: false,
-    $or: [{ 'lock.integrity': { $exists: false } }, { 'lock.integrity': null }, { 'lock.integrity': { $lt: new Date() } }] // exclude files that have a lock for integrity check
+    _id: { $not: { $in: global.integrityQueue?.runningJobs?.map((f) => f._id.toString()) || [] } }
   })
     .sort({
       'sortFields.priority': 1,
