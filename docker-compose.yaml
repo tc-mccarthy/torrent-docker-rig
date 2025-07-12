@@ -83,6 +83,28 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  torrent-monitor:
+    build: ./torrent-monitor
+    container_name: torrent-monitor
+    depends_on:
+      - torrent
+      - redis
+    environment:
+      - QB_API_URL=http://torrent:${QBIT_WEB_UI_PORT}
+      - QB_USERNAME        # Replace with actual qBittorrent Web UI user
+      - QB_PASSWORD   # Replace with actual password
+      - REDIS_HOST=torrent-redis-local
+      - REDIS_PORT=6379
+    volumes:
+      - ./torrent-monitor:/app
+    restart: unless-stopped
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
+
+
   autoheal:
     image: willfarrell/autoheal:latest
     tty: true
