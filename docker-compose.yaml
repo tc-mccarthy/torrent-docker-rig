@@ -93,7 +93,7 @@ services:
       - QB_API_URL=http://localhost:${QBIT_WEB_UI_PORT}
       - QB_USERNAME        # Replace with actual qBittorrent Web UI user
       - QB_PASSWORD   # Replace with actual password
-      - REDIS_HOST=torrent-redis-local
+      - REDIS_HOST=localhost
       - REDIS_PORT=6379
     volumes:
       - ./torrent-monitor:/app
