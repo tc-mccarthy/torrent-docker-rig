@@ -44,13 +44,6 @@ export function default_priority (video) {
       if (video.probe.streams.find((s) => s.codec_type === 'video')?.codec_name === 'hevc') {
         return 97;
       }
-
-      // if the size is less than 500 MB in kilobytes
-      if (convertKilobytes(video.probe.format.size, 'MB') <= 500) {
-        return 98;
-      }
-
-      return 99;
     }
 
     // default priority for other videos
