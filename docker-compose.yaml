@@ -90,7 +90,7 @@ services:
       - torrent
       - redis
     environment:
-      - QB_API_URL=http://qbittorrent:${QBIT_WEB_UI_PORT}
+      - QB_API_URL=http://torrent:${QBIT_WEB_UI_PORT}
       - QB_USERNAME        # Replace with actual qBittorrent Web UI user
       - QB_PASSWORD   # Replace with actual password
       - REDIS_HOST=torrent-redis-local
