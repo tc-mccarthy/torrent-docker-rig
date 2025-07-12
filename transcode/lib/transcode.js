@@ -71,7 +71,7 @@ export default function transcode (file) {
           { label: 'File already encoded' }
         );
         video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
-        await video_record.clearLock('transcode');
+
         await video_record.saveDebounce();
         return resolve({ locked: true }); // mark locked as true so that the loop doesnt' delay the next start
       }
@@ -199,9 +199,6 @@ export default function transcode (file) {
       if (ffprobe_data.chapters.length > 0) {
         input_maps.push(`-map_chapters 0`);
       }
-
-      // need to lock before doing the integrity check
-      await video_record.setLock('transcode');
 
       // if the file hasn't already been integrity checked, do so now
       if (!video_record.integrityCheck) {
@@ -357,7 +354,6 @@ export default function transcode (file) {
         })
         .on('end', async (stdout, stderr) => {
           try {
-            await video_record.clearLock('transcode');
             logger.info('Transcoding succeeded!');
             logger.info(`Confirming existence of ${scratch_file}`);
 
@@ -397,7 +393,6 @@ export default function transcode (file) {
                 duration: dayjs().diff(start_time, 'seconds')
               }
             });
-            await video_record.clearLock('transcode');
           } catch (e) {
             logger.error(e, { label: 'POST TRANSCODE ERROR' });
           } finally {
@@ -405,7 +400,6 @@ export default function transcode (file) {
           }
         })
         .on('error', async (err, stdout, stderr) => {
-          await video_record.clearLock('transcode');
           logger.error(err, { label: 'Cannot process video', stdout, stderr });
           fs.appendFileSync(
             '/usr/app/logs/ffmpeg.log',
@@ -440,7 +434,6 @@ export default function transcode (file) {
             hasError: true
           });
           await video_record.saveDebounce();
-          await video_record.clearLock('transcode');
 
           await ErrorLog.create({
             path: file,

@@ -41,8 +41,6 @@ export default function integrityCheck (file) {
       const video_record = file;
       file = file.path;
 
-      await video_record.setLock('integrity');
-
       const exists = fs.existsSync(file);
 
       if (!exists) {
@@ -72,7 +70,7 @@ export default function integrityCheck (file) {
         video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
         video_record.integrityCheck = true;
         video_record.status = 'complete';
-        await video_record.clearLock('integrity');
+
         await video_record.saveDebounceDebounce();
         return resolve();
       }
@@ -209,12 +207,11 @@ export default function integrityCheck (file) {
         })
         .on('end', async (stdout, stderr) => {
           try {
-            await video_record.clearLock('integrity');
             logger.debug('FFMPEG INTEGRITY CHECK COMPLETE', { stdout, stderr });
             if (integrity_check_pass({ stderr })) {
               logger.debug('No disqualifying errors found');
               video_record.integrityCheck = true;
-              await video_record.clearLock('integrity');
+
               await video_record.saveDebounce();
             } else {
               logger.debug('OUTPUT DETECTED, ERRORS MUST HAVE BEEN FOUND');
@@ -234,7 +231,6 @@ export default function integrityCheck (file) {
           }
         })
         .on('error', async (err, stdout, stderr) => {
-          await video_record.clearLock('verify');
           logger.error(err, {
             label: 'Cannot process video during integrity check',
             stdout,

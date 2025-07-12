@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import dayjs from '../lib/dayjs';
 import roundComputeScore, { getMinimum } from '../lib/round-compute-score';
 import wait, { getRandomDelay } from '../lib/wait';
 import logger from '../lib/logger';
@@ -67,20 +66,7 @@ const schema = new Schema(
       required: false,
       default: false
     },
-    lock: {
-      integrity: {
-        type: Date,
-        required: false,
-        default: null,
-        index: true
-      },
-      transcode: {
-        type: Date,
-        required: false,
-        default: null,
-        index: true
-      }
-    },
+
     computeScore: {
       type: Number,
       required: false,
@@ -111,33 +97,6 @@ const schema = new Schema(
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
-
-schema.methods.setLock = async function (type, sec = 30) {
-  if (!type) {
-    throw new Error('Type is required to set a lock');
-  }
-
-  this.lock[type] = dayjs().add(sec, 'seconds').toDate();
-  await this.saveDebounce();
-
-  schema[`${type}lockTimeout`] = setTimeout(() => {
-    this.setLock(type, sec);
-  }, sec * 0.75 * 1000);
-};
-
-schema.methods.clearLock = async function (type) {
-  if (!type) {
-    throw new Error('Type is required to clear a lock');
-  }
-
-  if (schema[`${type}lockTimeout`]) {
-    clearTimeout(schema[`${type}lockTimeout`]);
-    schema[`${type}lockTimeout`] = null;
-  }
-
-  this.lock[type] = null;
-  await this.saveDebounce();
-};
 
 schema.methods.saveDebounce = async function () {
   if (this.saveTimeout) {

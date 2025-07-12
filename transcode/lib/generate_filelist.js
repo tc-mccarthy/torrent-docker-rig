@@ -13,7 +13,7 @@ export default async function generate_filelist ({ limit = 1, writeToFile = fals
   const filelist = await File.find({
     encode_version: { $ne: encode_version },
     status: 'pending',
-    $or: [{ 'lock.transcode': { $exists: false } }, { 'lock.transcode': null }, { 'lock.transcode': { $lt: new Date() } }] // exclude files that have a lock for integrity check
+    _id: { $not: { $in: global.transcodeQueue?.runningJobs?.map((f) => f._id.toString()) || [] } }
   })
     .sort({
       'sortFields.priority': 1,
