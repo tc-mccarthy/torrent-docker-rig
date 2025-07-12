@@ -37,6 +37,7 @@ def should_delete(torrent_hash, status):
     track_states = ["uploading", "stalledUP", "stalledDL", "pausedUP", "queuedUP", "completed"]
 
     if status in track_states:
+        print (f"Tracking torrent {torrent_hash} in state {status}")
         if rdb.exists(key):
             ttl = rdb.ttl(key)
             if ttl == -1:
