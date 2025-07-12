@@ -98,6 +98,7 @@ services:
     volumes:
       - ./torrent-monitor:/app
     restart: unless-stopped
+    network_mode: service:vpn # all traffic goes through vpn
     logging: 
       driver: "json-file"
       options: 
