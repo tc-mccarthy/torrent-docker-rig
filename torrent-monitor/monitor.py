@@ -32,6 +32,7 @@ TRACKED_STATES = [
     {"state": "stalledDL", "ttl_seconds": 86400},
     {"state": "pausedUP", "ttl_seconds": 86400},
     {"state": "queuedUP", "ttl_seconds": 86400},
+    {"state": "metaDL", "ttl_seconds": 86400}
 ]
 
 # Internal lookup map for quick access to TTLs by state
