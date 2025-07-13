@@ -95,6 +95,7 @@ services:
       - QB_PASSWORD   # Replace with actual password
       - REDIS_HOST=torrent-redis-local
       - REDIS_PORT=6379
+      - TZ
     volumes:
       - ./torrent-monitor:/app
     restart: unless-stopped
