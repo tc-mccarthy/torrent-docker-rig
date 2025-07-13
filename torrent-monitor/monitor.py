@@ -1,29 +1,46 @@
 import os
 import time
+import json
 import requests
 import redis
-from datetime import datetime, timedelta
+from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 # === Configuration ===
 
+# Required environment variables
 QB_URL = os.getenv("QB_API_URL")
 QB_USER = os.getenv("QB_USERNAME")
 QB_PASS = os.getenv("QB_PASSWORD")
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
-MONITOR_CRON = os.getenv("MONITOR_CRON", "*/30 * * * *")  # Every 30 minutes by default
+MONITOR_CRON = os.getenv("MONITOR_CRON", "*/30 * * * *")  # Default: every 30 minutes
 
-CHECK_INTERVAL = 60  # main loop sleep interval, not cron-related
+# Redis key versioning
+KEY_VERSION = "torrent_monitor_20250712c"
 
-KEY_VERSION = "torrent_monitor_20250712b"
-DELETION_THRESHOLD_SECONDS = 24 * 3600
-REDIS_KEY_EXPIRATION_SECONDS = 26 * 3600
+# Sleep time between scheduler ticks (doesn't affect cron)
+CHECK_INTERVAL = 60
 
+# States to track, with TTL (in seconds) for each
+# You can assign different TTLs to each state if needed
 TRACKED_STATES = [
-    "uploading", "stalledUP", "stalledDL", "pausedUP", "queuedUP", "completed"
+    {"state": "completed", "ttl_seconds": 86400},
+    {"state": "uploading", "ttl_seconds": 86400},
+    {"state": "stalledUP", "ttl_seconds": 86400},
+    {"state": "stalledDL", "ttl_seconds": 86400},
+    {"state": "pausedUP", "ttl_seconds": 86400},
+    {"state": "queuedUP", "ttl_seconds": 86400},
 ]
+
+# Internal lookup map for quick access to TTLs by state
+TRACKED_STATE_LOOKUP = {s["state"]: s["ttl_seconds"] for s in TRACKED_STATES}
+
+# Redis expiration buffer (seconds) to keep key around after TTL expires (for cleanup tolerance)
+REDIS_EXPIRY_BUFFER = 7200  # 2 hours
+
+# === Services and State ===
 
 session = requests.Session()
 rdb = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
@@ -31,19 +48,24 @@ rdb = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 # === Logging ===
 
 def log(message):
-    """Log messages with local time."""
+    """Print a timestamped log message using local time."""
     local_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{local_time}] {message}", flush=True)
 
-# === Helper ===
+# === Helpers ===
 
 def get_cache_key(torrent_hash):
+    """Construct a versioned Redis key for a torrent."""
     return f"torrent:{KEY_VERSION}:{torrent_hash}"
 
-# === Core ===
+def format_ts(ts):
+    """Convert UNIX timestamp to local string for logging."""
+    return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
+
+# === Core Logic ===
 
 def login():
-    """Authenticate with qBittorrent API."""
+    """Authenticate with the qBittorrent Web API."""
     r = session.post(f"{QB_URL}/api/v2/auth/login", data={"username": QB_USER, "password": QB_PASS})
     if r.ok:
         log("Login successful.")
@@ -52,7 +74,7 @@ def login():
     return r.ok
 
 def get_torrents():
-    """Retrieve list of all torrents."""
+    """Retrieve the list of torrents from qBittorrent."""
     r = session.get(f"{QB_URL}/api/v2/torrents/info")
     if r.ok:
         torrents = r.json()
@@ -63,50 +85,72 @@ def get_torrents():
         return []
 
 def should_delete(torrent_hash, status):
-    """Determine whether a torrent should be deleted based on tracked state and Redis expiry."""
+    """
+    Evaluate whether the torrent should be deleted based on its state and tracked TTL.
+
+    - If state is not tracked: remove tracking key (if any).
+    - If state is tracked:
+        - If key doesn't exist: create it with expiration.
+        - If state changed: reset expiration and update state.
+        - If expired: delete key and mark for deletion.
+    """
     now = int(time.time())
     key = get_cache_key(torrent_hash)
 
-    if status in TRACKED_STATES:
-        expires_at_raw = rdb.get(key)
-
-        if expires_at_raw is None:
-            expires_at = now + DELETION_THRESHOLD_SECONDS
-            rdb.setex(key, REDIS_KEY_EXPIRATION_SECONDS, str(expires_at))
-            exp_local = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
-            log(f"Started tracking {torrent_hash} in state '{status}'; expires at {exp_local}")
-            return False
-
-        try:
-            expires_at = int(expires_at_raw)
-            exp_local = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
-            if now >= expires_at:
-                rdb.delete(key)
-                log(f"{torrent_hash} in state '{status}' expired at {exp_local}. Marked for deletion.")
-                return True
-            else:
-                log(f"{torrent_hash} still in state '{status}'; expires at {exp_local}")
-                return False
-        except ValueError:
-            expires_at = now + DELETION_THRESHOLD_SECONDS
-            rdb.setex(key, REDIS_KEY_EXPIRATION_SECONDS, str(expires_at))
-            exp_local = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
-            log(f"Corrupt Redis value for {torrent_hash}. Reset expiry to {exp_local}")
-            return False
-
-    else:
-        expires_at_raw = rdb.get(key)
-        if expires_at_raw is not None:
+    if status not in TRACKED_STATE_LOOKUP:
+        # Torrent is not in a tracked state → remove Redis key if exists
+        raw = rdb.get(key)
+        if raw:
             rdb.delete(key)
             try:
-                exp_local = datetime.fromtimestamp(int(expires_at_raw)).strftime("%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                exp_local = "unknown"
-            log(f"{torrent_hash} left tracked state '{status}'. Stopped tracking (was to expire at {exp_local})")
+                cached = json.loads(raw)
+                exp_ts = int(cached.get("expires_at", 0))
+                exp_str = format_ts(exp_ts)
+            except Exception:
+                exp_str = "unknown"
+            log(f"{torrent_hash} left tracked state '{status}'. Removed key (was set to expire at {exp_str}).")
         return False
 
+    current_ttl = TRACKED_STATE_LOOKUP[status]
+    new_expiry = now + current_ttl
+    raw = rdb.get(key)
+
+    if not raw:
+        # First time seeing torrent in this state
+        payload = {"expires_at": new_expiry, "state": status}
+        rdb.setex(key, current_ttl + REDIS_EXPIRY_BUFFER, json.dumps(payload))
+        log(f"Started tracking {torrent_hash} in '{status}'; expires at {format_ts(new_expiry)}")
+        return False
+
+    try:
+        data = json.loads(raw)
+        cached_state = data.get("state")
+        cached_expiry = int(data.get("expires_at", 0))
+    except Exception:
+        # Malformed data → reset
+        rdb.setex(key, current_ttl + REDIS_EXPIRY_BUFFER, json.dumps({"expires_at": new_expiry, "state": status}))
+        log(f"Corrupt Redis value for {torrent_hash}. Reset expiry for state '{status}' to {format_ts(new_expiry)}")
+        return False
+
+    if cached_state != status:
+        # Torrent changed to a new tracked state → reset expiry
+        payload = {"expires_at": new_expiry, "state": status}
+        rdb.setex(key, current_ttl + REDIS_EXPIRY_BUFFER, json.dumps(payload))
+        log(f"{torrent_hash} state changed from '{cached_state}' to '{status}'. Reset expiry to {format_ts(new_expiry)}")
+        return False
+
+    if now >= cached_expiry:
+        # Torrent has been in this state too long → delete
+        rdb.delete(key)
+        log(f"{torrent_hash} in state '{status}' expired at {format_ts(cached_expiry)}. Marked for deletion.")
+        return True
+
+    # Still within TTL
+    log(f"{torrent_hash} in state '{status}'; expires at {format_ts(cached_expiry)}")
+    return False
+
 def delete_torrent(torrent_hash):
-    """Send delete request for torrent and its files."""
+    """Request qBittorrent to delete the torrent and its files."""
     log(f"Deleting torrent {torrent_hash} and its files")
     r = session.post(
         f"{QB_URL}/api/v2/torrents/delete",
@@ -119,25 +163,26 @@ def delete_torrent(torrent_hash):
     return r.ok
 
 def run():
-    """Perform a single monitoring pass."""
+    """Run a full monitoring cycle: check all torrents and delete expired ones."""
     log("=== Running monitor pass ===")
     if not login():
         return
 
-    for t in get_torrents():
-        status = t.get("state")
-        torrent_hash = t.get("hash")
-        name = t.get("name")
+    torrents = get_torrents()
+    for torrent in torrents:
+        status = torrent.get("state")
+        torrent_hash = torrent.get("hash")
+        name = torrent.get("name")
         if should_delete(torrent_hash, status):
             log(f"Removing torrent '{name}' ({torrent_hash})")
             delete_torrent(torrent_hash)
 
     log("=== Monitor pass complete ===")
 
-# === Scheduler ===
+# === Scheduler Setup ===
 
 def schedule_monitor():
-    """Set up cron-based scheduler and initial run."""
+    """Configure the cron-based scheduler and trigger the initial run."""
     log(f"Scheduling monitor with cron: '{MONITOR_CRON}'")
     scheduler = BackgroundScheduler()
     try:
@@ -148,7 +193,7 @@ def schedule_monitor():
         log(f"Failed to schedule monitor: {e}")
         exit(1)
 
-    # Immediate run at startup
+    # Immediate run on startup
     run()
 
     try:
@@ -157,6 +202,8 @@ def schedule_monitor():
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
         log("Scheduler shutdown cleanly.")
+
+# === Entrypoint ===
 
 if __name__ == "__main__":
     schedule_monitor()
