@@ -17,7 +17,7 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 CHECK_INTERVAL = 60 * 30  # 30 minutes
 
 # Versioning for Redis keys to allow for future logic changes
-KEY_VERSION = "torrent_monitor_20250712a"
+KEY_VERSION = "torrent_monitor_20250712b"
 
 # Deletion logic:
 #   - Track torrents for 24 hours
