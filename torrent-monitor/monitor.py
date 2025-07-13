@@ -17,7 +17,7 @@ MONITOR_CRON = os.getenv("MONITOR_CRON", "*/30 * * * *")  # Every 30 minutes by 
 
 CHECK_INTERVAL = 60  # main loop sleep interval, not cron-related
 
-KEY_VERSION = "v1"
+KEY_VERSION = "torrent_monitor_20250712b"
 DELETION_THRESHOLD_SECONDS = 24 * 3600
 REDIS_KEY_EXPIRATION_SECONDS = 26 * 3600
 
