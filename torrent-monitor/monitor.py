@@ -16,37 +16,37 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 # Interval to check qBittorrent (in seconds)
 CHECK_INTERVAL = 60 * 30  # 30 minutes
 
-# Versioning for Redis keys to allow for future logic changes
+# Redis key versioning to support future changes
 KEY_VERSION = "torrent_monitor_20250712b"
 
-# Deletion logic:
-#   - Track torrents for 24 hours
-#   - Redis key lives for 26 hours to allow margin for script downtime
-DELETION_THRESHOLD_SECONDS = 24 * 3600
-REDIS_KEY_EXPIRATION_SECONDS = 26 * 3600
+# Deletion tracking windows
+DELETION_THRESHOLD_SECONDS = 24 * 3600  # 24 hours
+REDIS_KEY_EXPIRATION_SECONDS = 26 * 3600  # key expires after 26 hours
 
-# === Initialization ===
+# Track these states
+TRACKED_STATES = [
+    "uploading", "stalledUP", "stalledDL", "pausedUP", "queuedUP", "completed"
+]
 
-# qBittorrent HTTP session
+# === Setup ===
+
 session = requests.Session()
-
-# Redis client
 rdb = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
-# === Utilities ===
 
 def log(message):
-    """Standard logging format with UTC timestamp."""
-    print(f"[{datetime.utcnow().isoformat()}] {message}", flush=True)
+    """Print a timestamped log message using local time."""
+    local_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{local_time}] {message}", flush=True)
+
 
 def get_cache_key(torrent_hash):
-    """Construct a namespaced and versioned Redis key for a torrent."""
+    """Return a namespaced Redis key."""
     return f"torrent:{KEY_VERSION}:{torrent_hash}"
 
-# === Core Logic ===
 
 def login():
-    """Log into the qBittorrent Web API and return True if successful."""
+    """Log into qBittorrent Web API."""
     r = session.post(f"{QB_URL}/api/v2/auth/login", data={"username": QB_USER, "password": QB_PASS})
     if r.ok:
         log("Login successful.")
@@ -54,8 +54,9 @@ def login():
         log("Login failed.")
     return r.ok
 
+
 def get_torrents():
-    """Fetch torrent data from qBittorrent."""
+    """Fetch the current list of torrents."""
     r = session.get(f"{QB_URL}/api/v2/torrents/info")
     if r.ok:
         torrents = r.json()
@@ -65,57 +66,64 @@ def get_torrents():
         log("Failed to fetch torrents.")
         return []
 
+
 def should_delete(torrent_hash, status):
     """
-    Evaluate whether the given torrent should be deleted.
-    - If the torrent is in a tracked state and has no key, create one that expires in 24 hours.
-    - If the torrent has a key and the time has passed, delete it.
-    - If the torrent leaves a tracked state, remove any existing tracking key.
+    Determine whether to delete the torrent.
+    If the torrent enters a tracked state:
+      - Create a Redis key with expiry timestamp (24h from now) if one doesn't exist.
+      - If the timestamp is in the past, mark for deletion and delete the key.
+    If the torrent leaves the tracked state:
+      - Remove the key if it exists.
     """
     now = int(time.time())
     key = get_cache_key(torrent_hash)
 
-    # States that we want to monitor for long-term inactivity
-    tracked_states = {
-        "uploading", "stalledUP", "stalledDL", "pausedUP", "queuedUP", "completed"
-    }
-
-    if status in tracked_states:
+    if status in TRACKED_STATES:
         expires_at_raw = rdb.get(key)
 
         if expires_at_raw is None:
-            # First time seeing this torrent in a tracked state
+            # Start tracking: set deletion time 24 hours from now
             expires_at = now + DELETION_THRESHOLD_SECONDS
             rdb.setex(key, REDIS_KEY_EXPIRATION_SECONDS, str(expires_at))
-            log(f"Started tracking {torrent_hash} in {status}; expires at {datetime.utcfromtimestamp(expires_at)}")
+            exp_local = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+            log(f"Started tracking {torrent_hash} in state '{status}'; expires at {exp_local}")
             return False
 
         else:
             try:
                 expires_at = int(expires_at_raw)
+                exp_local = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+
                 if now >= expires_at:
                     rdb.delete(key)
-                    log(f"{torrent_hash} has exceeded threshold in {status}. Marked for deletion.")
+                    log(f"{torrent_hash} in state '{status}' expired at {exp_local}. Marked for deletion.")
                     return True
                 else:
-                    log(f"{torrent_hash} is still within threshold in {status}.")
+                    log(f"{torrent_hash} still in state '{status}'; expires at {exp_local}")
                     return False
             except ValueError:
-                # Handle corrupted or non-integer Redis value
-                log(f"Corrupted Redis value for {torrent_hash}. Resetting.")
-                new_expires = now + DELETION_THRESHOLD_SECONDS
-                rdb.setex(key, REDIS_KEY_EXPIRATION_SECONDS, str(new_expires))
+                # Corrupted value in Redis
+                expires_at = now + DELETION_THRESHOLD_SECONDS
+                rdb.setex(key, REDIS_KEY_EXPIRATION_SECONDS, str(expires_at))
+                exp_local = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+                log(f"Corrupt tracking data for {torrent_hash}. Reset expiry to {exp_local}")
                 return False
-
     else:
-        # Torrent is no longer in a tracked state — clean up Redis key
-        if rdb.get(key) is not None:
+        # Not a tracked state: remove any lingering tracking key
+        expires_at_raw = rdb.get(key)
+        if expires_at_raw is not None:
             rdb.delete(key)
-            log(f"{torrent_hash} left tracked state ({status}). Stopped tracking.")
+            try:
+                exp_local = datetime.fromtimestamp(int(expires_at_raw)).strftime("%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                exp_local = "unknown"
+            log(f"{torrent_hash} left tracked state '{status}'. Stopped tracking (was set to expire at {exp_local})")
         return False
 
+
 def delete_torrent(torrent_hash):
-    """Send a delete request to qBittorrent for the given torrent and its files."""
+    """Send request to delete the torrent and its files."""
     log(f"Deleting torrent {torrent_hash} and its files")
     r = session.post(
         f"{QB_URL}/api/v2/torrents/delete",
@@ -127,9 +135,10 @@ def delete_torrent(torrent_hash):
         log(f"Failed to delete {torrent_hash}")
     return r.ok
 
+
 def run():
-    """Main loop that performs a single pass of the monitor check."""
-    log("Starting monitor run...")
+    """Run one full check of the torrent queue."""
+    log("=== Starting monitor run ===")
     if not login():
         return
 
@@ -139,12 +148,11 @@ def run():
         torrent_hash = torrent.get("hash")
         name = torrent.get("name")
         if should_delete(torrent_hash, status):
-            log(f"Removing {name} ({torrent_hash}) from qBittorrent.")
+            log(f"Removing torrent '{name}' ({torrent_hash})")
             delete_torrent(torrent_hash)
 
-    log("Monitor run complete.")
+    log("=== Monitor run complete ===")
 
-# === Entrypoint ===
 
 if __name__ == "__main__":
     while True:
