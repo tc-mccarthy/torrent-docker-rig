@@ -61,39 +61,50 @@ export default class TranscodeQueue {
    * Applies half of maxScore as a penalty when 10-minute avg memory > 85%.
    * Applies full maxScore penalty when 10-minute avg memory > 90%.
    */
+  /**
+   * Starts monitoring memory usage over a rolling 10-minute window.
+   * Applies penalties based on average memory usage / total memory.
+   */
   async startMemoryPressureMonitor () {
     while (true) {
       try {
         const mem = await si.mem();
-        const usedRamMB = mem.used / 1024 / 1024;
-        const totalRamMB = mem.total / 1024 / 1024;
 
-        const memoryUsagePercent = (usedRamMB / totalRamMB) * 100;
-
-        // Track memory usage samples (rolling buffer)
-        this.memoryUsageSamples.push(memoryUsagePercent);
-        if (this.memoryUsageSamples.length > this.maxMemorySamples) {
-          this.memoryUsageSamples.shift(); // remove oldest sample
+        // Set total memory once (constant)
+        if (!this.totalMemoryMB) {
+          this.totalMemoryMB = mem.total / 1024 / 1024;
         }
 
-        // Calculate 10-minute average memory usage
-        const averageMemUsage = this.memoryUsageSamples.reduce((sum, val) => sum + val, 0) / this.memoryUsageSamples.length;
+        // Capture current *used* memory in MB
+        const usedMemoryMB = mem.used / 1024 / 1024;
 
+        // Update rolling buffer
+        this.memoryUsedSamples.push(usedMemoryMB);
+        if (this.memoryUsedSamples.length > this.maxMemorySamples) {
+          this.memoryUsedSamples.shift();
+        }
+
+        // Compute rolling average of memory used
+        const avgUsedMemoryMB = this.memoryUsedSamples.reduce((sum, val) => sum + val, 0) / this.memoryUsedSamples.length;
+
+        // Now calculate average % used
+        const memoryUsagePercent = (avgUsedMemoryMB / this.totalMemoryMB) * 100;
+
+        // Apply penalties
         let penalty = 0;
-
-        if (averageMemUsage > 85) penalty += this.maxScore / 2;
-        if (averageMemUsage > 90) penalty += this.maxScore / 2; // total penalty = full maxScore if > 90%
+        if (memoryUsagePercent > 85) penalty += this.maxScore / 2;
+        if (memoryUsagePercent > 90) penalty += this.maxScore / 2;
 
         this.computePenalty = penalty;
 
         console.log(
-          `[ResourceMonitor] Penalty: ${penalty.toFixed(2)} | Avg Mem: ${averageMemUsage.toFixed(1)}%`
+          `[ResourceMonitor] Penalty: ${penalty.toFixed(2)} | 10-min Avg Mem: ${avgUsedMemoryMB.toFixed(1)}MB (${memoryUsagePercent.toFixed(1)}%)`
         );
       } catch (err) {
         console.error('[ResourceMonitor] Error:', err);
       }
 
-      await new Promise((resolve) => setTimeout(resolve, this.memoryPollIntervalMs));
+      await delay(this.memoryPollIntervalMs);
     }
   }
 
