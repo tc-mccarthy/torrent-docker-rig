@@ -53,42 +53,37 @@ export default class TranscodeQueue {
   }
 
   async startMemoryPressureMonitor () {
-    try {
-      const [mem] = await Promise.all([
-        si.mem()
-      ]);
+    while (true) {
+      try {
+        const mem = await si.mem(); // includes total, used, available, etc.
+        const usedRamMB = mem.used / 1024 / 1024;
+        const totalRamMB = mem.total / 1024 / 1024;
 
-      const availableRamMB = mem.available / 1024 / 1024;
-      const usedSwapMB = mem.swapused / 1024 / 1024;
-      // const cpuLoadPct = cpu.currentLoad; // Average across all cores
+        // half total compute
+        const halfTotalCompute = this.maxScore / 2;
 
-      let penalty = 0;
+        let penalty = 0;
 
-      // 🔴 RAM pressure
-      if (availableRamMB < 8192) penalty += 0.5;
-      if (availableRamMB < 4096) penalty += 0.5;
+        // 🔴 Total memory usage penalty
+        const memoryUsagePercent = (usedRamMB / totalRamMB) * 100;
+        if (memoryUsagePercent > 85) {
+          penalty += halfTotalCompute; // 50% penalty if memory usage is above 85%
+        }
 
-      // 🟠 Swap pressure
-      // if (usedSwapMB > 1024) penalty += 0.25;
-      // if (usedSwapMB > 2048) penalty += 0.25;
+        if (memoryUsagePercent > 90) {
+          penalty += halfTotalCompute; // Another 50% penalty if memory usage is above 90%. This will ensure there is 0 available compute when memory usage is above 90%
+        }
 
-      // // 🔵 CPU pressure
-      // if (cpuLoadPct > 85) penalty += 0.25;
-      // if (cpuLoadPct > 95) penalty += 0.25;
+        this.computePenalty = penalty;
 
-      this.computePenalty = penalty;
+        console.log(
+          `[ResourceMonitor] Penalty: ${penalty.toFixed(2)} | Mem: ${Math.round(memoryUsagePercent)}%`
+        );
+      } catch (err) {
+        console.error('[ResourceMonitor] Error:', err);
+      }
 
-      logger.info(penalty, {
-        label: 'ResourceMonitor compute penalty',
-        ram: `${Math.round(availableRamMB)}MB`,
-        swap: `${Math.round(usedSwapMB)}MB`
-        // cpu: `${Math.round(cpuLoadPct)}%`
-      });
-    } catch (err) {
-      console.error('[ResourceMonitor] Error:', err);
-    } finally {
-      await delay(this.memoryPollIntervalMs);
-      this.startMemoryPressureMonitor(); // Restart the monitor
+      await new Promise((resolve) => setTimeout(resolve, this.memoryPollIntervalMs));
     }
   }
 
