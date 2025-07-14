@@ -66,6 +66,7 @@ export default class TranscodeQueue {
 
         // 🔴 Total memory usage penalty
         const memoryUsagePercent = (usedRamMB / totalRamMB) * 100;
+
         if (memoryUsagePercent > 85) {
           penalty += halfTotalCompute; // 50% penalty if memory usage is above 85%
         }
