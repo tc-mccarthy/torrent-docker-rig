@@ -104,7 +104,7 @@ export default class TranscodeQueue {
         console.error('[ResourceMonitor] Error:', err);
       }
 
-      await new Promise((resolve) => setTimeout(resolve, this.memoryPollIntervalMs));
+      await delay(this.memoryPollIntervalMs);
     }
   }
 
