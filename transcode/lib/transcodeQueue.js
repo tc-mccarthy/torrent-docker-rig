@@ -56,16 +56,22 @@ export default class TranscodeQueue {
     while (true) {
       try {
         const mem = await si.mem(); // includes total, used, available, etc.
-
         const usedRamMB = mem.used / 1024 / 1024;
         const totalRamMB = mem.total / 1024 / 1024;
+
+        // half total compute
+        const halfTotalCompute = this.maxScore / 2;
 
         let penalty = 0;
 
         // 🔴 Total memory usage penalty
         const memoryUsagePercent = (usedRamMB / totalRamMB) * 100;
         if (memoryUsagePercent > 85) {
-          penalty += 1.0;
+          penalty += halfTotalCompute; // 50% penalty if memory usage is above 85%
+        }
+
+        if (memoryUsagePercent > 90) {
+          penalty += halfTotalCompute; // Another 50% penalty if memory usage is above 90%. This will ensure there is 0 available compute when memory usage is above 90%
         }
 
         this.computePenalty = penalty;
