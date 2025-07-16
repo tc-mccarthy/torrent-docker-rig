@@ -53,7 +53,7 @@ async function run () {
     update_queue();
     generate_filelist({ limit: 1000, writeToFile: true });
 
-    const transcodeQueue = new TranscodeQueue({ maxScore: concurrent_transcodes, pollDelay: 10000 });
+    const transcodeQueue = new TranscodeQueue({ maxScore: concurrent_transcodes, pollDelay: 30000 });
     transcodeQueue.start();
 
     global.transcodeQueue = transcodeQueue; // Make the queue globally accessible

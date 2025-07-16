@@ -13,6 +13,7 @@ import wait from './wait';
 import integrityCheck from './integrityCheck';
 import generate_filelist from './generate_filelist';
 import moveFile from './moveFile';
+import update_status from './update_status';
 
 const { encode_version } = config;
 
@@ -398,6 +399,8 @@ export default function transcode (file) {
               },
               reclaimedSpace: original_size - dest_file_size // calculate reclaimed space
             });
+
+            await update_status();
           } catch (e) {
             logger.error(e, { label: 'POST TRANSCODE ERROR' });
           } finally {
