@@ -8,8 +8,8 @@ const { encode_version } = config;
 
 export default async function update_status () {
   try {
-    clearTimeout(global.updateStatusTimeout);
     logger.info('Updating status metrics...');
+    clearTimeout(global.updateStatusTimeout);
     const data = {
       processed_files: await File.countDocuments({ status: 'complete' }),
       total_files: await File.countDocuments(),
