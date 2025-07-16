@@ -51,11 +51,11 @@ export function get_disk_space () {
 export async function get_utilization () {
   clearTimeout(global.utilization_timeout);
 
-  const [mem, cpu] = await Promise.all([si.mem(), si.cpu()]);
+  const [mem, cpu] = await Promise.all([si.mem(), si.currentLoad()]);
 
   const data = {
     memory: Math.round(mem.used / mem.total * 100),
-    cpu: Math.round(cpu.loadAverage),
+    cpu: Math.round(cpu),
     last_updated: new Date()
   };
 
