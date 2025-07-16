@@ -69,14 +69,14 @@ export default class TranscodeQueue {
       try {
         const mem = await si.mem();
 
-        this.memoryUsageSamples.push(mem.used);
+        this.memoryUsageSamples.push(mem.available);
 
         if (this.memoryUsageSamples.length > this.maxMemorySamples) {
           this.memoryUsageSamples.shift(); // Maintain a rolling buffer of samples
         }
 
-        const memoryUsedAverage = this.memoryUsageSamples.reduce((sum, val) => sum + val, 0) / this.memoryUsageSamples.length;
-        const memoryUsagePercent = memoryUsedAverage / mem.total * 100;
+        const memoryAvailableAverage = this.memoryUsageSamples.reduce((sum, val) => sum + val, 0) / this.memoryUsageSamples.length;
+        const memoryUsagePercent = 100 - (memoryAvailableAverage / mem.total * 100);
 
         // Apply penalties
         let penalty = 0;
