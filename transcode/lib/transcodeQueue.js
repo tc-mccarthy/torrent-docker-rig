@@ -70,25 +70,14 @@ export default class TranscodeQueue {
       try {
         const mem = await si.mem();
 
-        // Set total memory once (constant)
-        if (!this.totalMemoryMB) {
-          this.totalMemoryMB = mem.total / 1024 / 1024;
-        }
+        this.memoryUsageSamples.push(mem.used);
 
-        // Capture current *used* memory in MB
-        const usedMemoryMB = mem.used / 1024 / 1024;
-
-        // Update rolling buffer
-        this.memoryUsageSamples.push(usedMemoryMB);
         if (this.memoryUsageSamples.length > this.maxMemorySamples) {
-          this.memoryUsageSamples.shift();
+          this.memoryUsageSamples.shift(); // Maintain a rolling buffer of samples
         }
 
-        // Compute rolling average of memory used
-        const avgUsedMemoryMB = this.memoryUsageSamples.reduce((sum, val) => sum + val, 0) / this.memoryUsageSamples.length;
-
-        // Now calculate average % used
-        const memoryUsagePercent = (avgUsedMemoryMB / this.totalMemoryMB) * 100;
+        const memoryUsedAverage = this.memoryUsageSamples.reduce((sum, val) => sum + val, 0) / this.memoryUsageSamples.length;
+        const memoryUsagePercent = memoryUsedAverage / mem.total * 100;
 
         // Apply penalties
         let penalty = 0;
@@ -98,7 +87,7 @@ export default class TranscodeQueue {
         this.computePenalty = penalty;
 
         console.log(
-          `[ResourceMonitor] Penalty: ${penalty.toFixed(2)} | 10-min Avg Mem: ${avgUsedMemoryMB.toFixed(1)}MB (${memoryUsagePercent.toFixed(1)}%)`
+          `[ResourceMonitor] Penalty: ${penalty.toFixed(2)} | 10-min Avg Mem: ${memoryUsagePercent.toFixed(1)}%`
         );
       } catch (err) {
         console.error('[ResourceMonitor] Error:', err);
