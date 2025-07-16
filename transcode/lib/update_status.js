@@ -1,4 +1,5 @@
 import { writeFile } from 'fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 import File from '../models/files';
 import config from './config';
 import { formatSecondsToHHMMSS } from './transcode';
@@ -9,7 +10,6 @@ const { encode_version } = config;
 export default async function update_status () {
   try {
     logger.info('Updating status metrics...');
-    clearTimeout(global.updateStatusTimeout);
     const data = {
       processed_files: await File.countDocuments({ status: 'complete' }),
       total_files: await File.countDocuments(),
@@ -35,11 +35,13 @@ export default async function update_status () {
     );
     data.serviceStartTime = global.serviceStartTime;
 
-    writeFile('/usr/app/output/status.json', JSON.stringify(data));
+    await writeFile('/usr/app/output/status.json', JSON.stringify(data));
   } catch (e) {
     logger.error(e, { label: 'UPDATE STATUS ERROR' });
   } finally {
     // Ensure the function runs again after a delay
-    global.updateStatusTimeout = setTimeout(() => { update_status(); }, 1000 * 5); // Run every minute
+    logger.info('Requeuing status metrics...');
+    delay(5000); // Wait for 5 seconds before the next run
+    update_status();
   }
 }
