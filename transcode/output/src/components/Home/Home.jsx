@@ -308,7 +308,7 @@ function Home () {
       <div className="flex">
         <div className="widget">
           <strong>Service Uptime</strong>
-          {formatSecondsToHHMMSS(Date.now() - status.serviceStartTime)}
+          {formatSecondsToHHMMSS(Math.floor((Date.now() - status.serviceStartTime) / 1000))}
         </div>
         <div className="widget">
           <strong>Reclaimed Space</strong>
