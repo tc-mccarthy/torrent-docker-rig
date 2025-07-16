@@ -20,7 +20,7 @@ export default async function update_status () {
       ((await File.countDocuments({ encode_version })) /
         (await File.countDocuments())) *
       100,
-      reclaimedSpace: (await File.find({ encode_version }).lean()).reduce((total, file) => total + (file.reclaimedSpace || 0), 0)
+      // reclaimedSpace: (await File.find({ encode_version }).lean()).reduce((total, file) => total + (file.reclaimedSpace || 0), 0)
     };
 
     logger.info('Status data complete');
@@ -43,7 +43,7 @@ export default async function update_status () {
   } finally {
     // Ensure the function runs again after a delay
     logger.info('Requeuing status metrics...');
-    delay(5000); // Wait for 5 seconds before the next run
+    await delay(5000); // Wait for 5 seconds before the next run
     update_status();
   }
 }
