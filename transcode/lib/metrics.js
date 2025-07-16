@@ -1,9 +1,9 @@
 import fs from 'fs';
 import { exec } from 'child_process';
-import exec_promise from './exec_promise';
+import si from 'systeminformation';
 import config from './config';
 
-const { encode_version, get_paths } = config;
+const { get_paths } = config;
 
 const PATHS = get_paths(config);
 
@@ -51,36 +51,17 @@ export function get_disk_space () {
 export async function get_utilization () {
   clearTimeout(global.utilization_timeout);
 
+  const [mem, cpu] = await Promise.all([si.mem(), si.cpu()]);
+
   const data = {
-    memory: await exec_promise("free | grep Mem | awk '{print $3/$2 * 100.0}'"),
-    cpu: await exec_promise("echo $(vmstat 1 2|tail -1|awk '{print $15}')"),
+    memory: Math.round(mem.used / mem.total * 100),
+    cpu: Math.round(cpu.loadAverage),
     last_updated: new Date()
   };
-
-  data.memory = Math.round(parseFloat(data.memory.stdout));
-  data.cpu = Math.round(
-    100 - parseFloat(data.cpu.stdout.replace(/[^0-9]+/g, ''))
-  );
 
   fs.writeFileSync('/usr/app/output/utilization.json', JSON.stringify(data));
 
   global.utilization_timeout = setTimeout(() => {
     get_utilization();
   }, 10 * 1000);
-}
-
-export async function update_status () {
-  const data = {
-    processed_files: await File.countDocuments({ encode_version }),
-    total_files: await File.countDocuments(),
-    unprocessed_files: await File.countDocuments({
-      encode_version: { $ne: encode_version }
-    }),
-    library_coverage:
-      ((await File.countDocuments({ encode_version })) /
-        (await File.countDocuments())) *
-      100
-  };
-
-  fs.writeFileSync('/usr/app/output/status.json', JSON.stringify(data));
 }
