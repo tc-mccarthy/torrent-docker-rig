@@ -53,10 +53,8 @@ export async function get_utilization () {
 
   const [mem, cpu] = await Promise.all([si.mem(), si.currentLoad()]);
 
-  console.log('Memory:', mem);
-
   const data = {
-    memory: Math.round(mem.used / mem.total * 100),
+    memory: 100 - Math.round(mem.available / mem.total * 100),
     cpu: Math.round(cpu.currentLoad),
     last_updated: new Date()
   };
