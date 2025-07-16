@@ -1,5 +1,4 @@
 import { writeFile } from 'fs/promises';
-import { setTimeout as delay } from 'node:timers/promises';
 import File from '../models/files';
 import config from './config';
 import { formatSecondsToHHMMSS } from './transcode';
@@ -16,7 +15,7 @@ export async function getReclaimedSpace () {
     return reclaimedSpace;
   }
 
-  logger.info("Reclaimed space value not found in cache, calculating...");
+  logger.info('Reclaimed space value not found in cache, calculating...');
 
   // if we don't have a number in cache, calculate it
   reclaimedSpace = (await File.find({ encode_version }).lean()).reduce((total, file) => total + (file.reclaimedSpace || 0), 0);
@@ -60,10 +59,5 @@ export default async function update_status () {
     await writeFile('/usr/app/output/status.json', JSON.stringify(data));
   } catch (e) {
     logger.error(e, { label: 'UPDATE STATUS ERROR' });
-  } finally {
-    // Ensure the function runs again after a delay
-    logger.info('Requeuing status metrics...');
-    await delay(5000); // Wait for 5 seconds before the next run
-    update_status();
   }
 }

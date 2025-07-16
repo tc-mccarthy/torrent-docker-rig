@@ -7,6 +7,19 @@ import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWi
 // import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 import Nav from '../Navigation/Nav';
 
+export function formatSecondsToHHMMSS (totalSeconds) {
+  if (Number.isNaN(totalSeconds)) return 'calculating';
+
+  const total = Math.ceil(Number(totalSeconds)); // round up
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+
+  const pad = (n) => String(n).padStart(2, '0');
+
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
 /**
  * Converts a number of bytes into a human-readable string with appropriate units.
  *
@@ -295,7 +308,7 @@ function Home () {
       <div className="flex">
         <div className="widget">
           <strong>Service Uptime</strong>
-          {status.service_up_time}
+          {formatSecondsToHHMMSS(Date.now() - status.serviceStartTime)}
         </div>
         <div className="widget">
           <strong>Reclaimed Space</strong>
