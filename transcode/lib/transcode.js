@@ -1,6 +1,7 @@
 import fs from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
 import dayjs from 'dayjs';
+import { stat } from 'fs/promises';
 import ffprobe from './ffprobe';
 import config from './config';
 import logger from './logger';
@@ -247,8 +248,8 @@ export default function transcode (file) {
       cmd = cmd.outputOptions(`-metadata encode_version=${encode_version}`);
 
       let ffmpeg_cmd;
-
       let start_time;
+      const original_size = (await stat(file)).size;
 
       cmd = cmd
         .on('start', async (commandLine) => {
@@ -377,6 +378,9 @@ export default function transcode (file) {
             await fs.promises.utimes(dest_file, new Date(), new Date());
             global.processed_files_delta += 1;
 
+            // get the destination file size
+            const dest_file_size = (await stat(dest_file)).size;
+
             // delete the original file if the transcoded filename is different
             if (dest_file !== file) {
               logger.info(
@@ -391,7 +395,8 @@ export default function transcode (file) {
                 ...video_record.transcode_details,
                 end_time: dayjs().toDate(),
                 duration: dayjs().diff(start_time, 'seconds')
-              }
+              },
+              reclaimedSpace: original_size - dest_file_size // calculate reclaimed space
             });
           } catch (e) {
             logger.error(e, { label: 'POST TRANSCODE ERROR' });

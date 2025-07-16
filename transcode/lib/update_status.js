@@ -16,7 +16,8 @@ export default async function update_status () {
     library_coverage:
       ((await File.countDocuments({ encode_version })) /
         (await File.countDocuments())) *
-      100
+      100,
+    reclaimedSpace: (await File.find({ status: 'complete', encode_version })).reduce((total, file) => total + (file.reclaimedSpace || 0), 0)
   };
 
   if (typeof global.processedOnStart === 'undefined') {

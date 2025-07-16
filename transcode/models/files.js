@@ -93,6 +93,11 @@ const schema = new Schema(
       type: Boolean,
       required: false,
       default: true
+    },
+    reclaimedSpace: {
+      type: Number,
+      required: false,
+      default: 0
     }
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
