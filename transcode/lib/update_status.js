@@ -1,11 +1,13 @@
-import fs from 'fs';
+import { writeFile } from 'fs/promises';
 import File from '../models/files';
 import config from './config';
 import { formatSecondsToHHMMSS } from './transcode';
+import logger from './logger';
 
 const { encode_version } = config;
 
 export default async function update_status () {
+  logger.info('Updating status metrics...');
   clearTimeout(global.updateStatusTimeout);
   const data = {
     processed_files: await File.countDocuments({ status: 'complete' }),
@@ -32,7 +34,7 @@ export default async function update_status () {
   );
   data.serviceStartTime = global.serviceStartTime;
 
-  fs.writeFileSync('/usr/app/output/status.json', JSON.stringify(data));
+  writeFile('/usr/app/output/status.json', JSON.stringify(data));
 
   global.updateStatusTimeout = setTimeout(update_status, 1000 * 5);
 }
