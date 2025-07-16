@@ -79,13 +79,13 @@ export default class TranscodeQueue {
         const usedMemoryMB = mem.used / 1024 / 1024;
 
         // Update rolling buffer
-        this.memoryUsedSamples.push(usedMemoryMB);
-        if (this.memoryUsedSamples.length > this.maxMemorySamples) {
-          this.memoryUsedSamples.shift();
+        this.memoryUsageSamples.push(usedMemoryMB);
+        if (this.memoryUsageSamples.length > this.maxMemorySamples) {
+          this.memoryUsageSamples.shift();
         }
 
         // Compute rolling average of memory used
-        const avgUsedMemoryMB = this.memoryUsedSamples.reduce((sum, val) => sum + val, 0) / this.memoryUsedSamples.length;
+        const avgUsedMemoryMB = this.memoryUsageSamples.reduce((sum, val) => sum + val, 0) / this.memoryUsageSamples.length;
 
         // Now calculate average % used
         const memoryUsagePercent = (avgUsedMemoryMB / this.totalMemoryMB) * 100;
