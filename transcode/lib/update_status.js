@@ -20,9 +20,11 @@ export default async function update_status () {
       ((await File.countDocuments({ encode_version })) /
         (await File.countDocuments())) *
       100,
-      reclaimedSpace: (await File.find({ status: 'complete', encode_version })).reduce((total, file) => total + (file.reclaimedSpace || 0), 0)
+      reclaimedSpace: (await File.find({ encode_version }).lean()).reduce((total, file) => total + (file.reclaimedSpace || 0), 0)
     };
 
+    logger.info('Status data complete');
+    
     if (typeof global.processedOnStart === 'undefined') {
       global.processedOnStart = data.processed_files;
       global.serviceStartTime = Date.now();
