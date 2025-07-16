@@ -40,6 +40,6 @@ export default async function update_status () {
     logger.error(e, { label: 'UPDATE STATUS ERROR' });
   } finally {
     // Ensure the function runs again after a delay
-    global.updateStatusTimeout = setTimeout(update_status, 1000 * 5); // Run every minute
+    global.updateStatusTimeout = setTimeout(() => { update_status(); }, 1000 * 5); // Run every minute
   }
 }
