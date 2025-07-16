@@ -9,12 +9,14 @@ import memcached from './memcached';
 const { encode_version } = config;
 
 export async function getReclaimedSpace () {
-  let reclaimedSpace = await memcached.get('reclaimed_space');
+  let reclaimedSpace = await memcached.get('transcode_reclaimed_space');
 
   // if reclaimed space is a number, return it
   if (typeof reclaimedSpace === 'number') {
     return reclaimedSpace;
   }
+
+  logger.info("Reclaimed space value not found in cache, calculating...");
 
   // if we don't have a number in cache, calculate it
   reclaimedSpace = (await File.find({ encode_version }).lean()).reduce((total, file) => total + (file.reclaimedSpace || 0), 0);
