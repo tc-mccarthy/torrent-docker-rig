@@ -7,6 +7,41 @@ import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWi
 // import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 import Nav from '../Navigation/Nav';
 
+/**
+ * Converts a number of bytes into a human-readable string with appropriate units.
+ *
+ * @param {number} bytes - The number of bytes to format.
+ * @param {number} decimals - Number of decimal places to include (default is 2).
+ * @returns {string} A string representing the human-readable format (e.g., "1.23 MB").
+ */
+function formatBytes (bytes, decimals = 2) {
+  // If the input is 0, return immediately
+  if (bytes === 0) return '0 Bytes';
+
+  const k = 1024; // Base value for kilobyte (using binary convention)
+  const dm = decimals < 0 ? 0 : decimals; // Ensure decimals is not negative
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']; // Unit suffixes
+
+  /**
+   * Determine the index of the appropriate unit (KB, MB, GB, etc.)
+   *
+   * Explanation:
+   * - Math.log(bytes) gives the logarithm (base e) of the byte value.
+   * - Math.log(k) gives the logarithm of 1024.
+   * - Dividing log(bytes) by log(1024) is equivalent to taking log base 1024 of bytes.
+   *   This tells us how many times the value can be divided by 1024 before falling below 1.
+   * - Math.floor() ensures we get the largest whole number index,
+   *   which corresponds to the unit size just below the actual value.
+   */
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  // Divide the byte value by the appropriate power of 1024 to get the converted size
+  const size = bytes / k ** i;
+
+  // Round to the desired number of decimal places and append the unit label
+  return `${parseFloat(size.toFixed(dm))} ${sizes[i]}`;
+}
+
 function fetchData (src, cache_buster = true) {
   try {
     const timestamp = Date.now();
@@ -261,6 +296,10 @@ function Home () {
         <div className="widget">
           <strong>Service Uptime</strong>
           {status.service_up_time}
+        </div>
+        <div className="widget">
+          <strong>Reclaimed Space</strong>
+          {formatBytes(status.reclaimedSpace)}
         </div>
         <div className="widget">
           <strong>Library Coverage</strong>
