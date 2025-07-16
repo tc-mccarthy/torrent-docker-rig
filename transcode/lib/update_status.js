@@ -4,8 +4,26 @@ import File from '../models/files';
 import config from './config';
 import { formatSecondsToHHMMSS } from './transcode';
 import logger from './logger';
+import memcached from './memcached';
 
 const { encode_version } = config;
+
+export async function getReclaimedSpace () {
+  let reclaimedSpace = await memcached.get('reclaimed_space');
+
+  // if reclaimed space is a number, return it
+  if (typeof reclaimedSpace === 'number') {
+    return reclaimedSpace;
+  }
+
+  // if we don't have a number in cache, calculate it
+  reclaimedSpace = (await File.find({ encode_version }).lean()).reduce((total, file) => total + (file.reclaimedSpace || 0), 0);
+
+  // store the reclaimed space in cache for 15 minutes
+  await memcached.set('transcode_reclaimed_space', reclaimedSpace, 15 * 60);
+
+  return reclaimedSpace;
+}
 
 export default async function update_status () {
   try {
@@ -19,8 +37,8 @@ export default async function update_status () {
       library_coverage:
       ((await File.countDocuments({ encode_version })) /
         (await File.countDocuments())) *
-      100
-      // reclaimedSpace: (await File.find({ encode_version }).lean()).reduce((total, file) => total + (file.reclaimedSpace || 0), 0)
+      100,
+      reclaimedSpace: await getReclaimedSpace()
     };
 
     logger.info('Status data complete');
