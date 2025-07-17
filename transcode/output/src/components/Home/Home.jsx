@@ -341,11 +341,11 @@ function Home () {
       </div>
 
       <div className="widget list">
-        {!filelist?.map && <em>Loading...</em>}
+        {!filelist?.data?.map && <em>Loading...</em>}
         <strong>
           Next
           {' '}
-          {filelist.length.toLocaleString()}
+          {filelist?.data?.length.toLocaleString()}
           {' '}
           queued files
           {' '}
