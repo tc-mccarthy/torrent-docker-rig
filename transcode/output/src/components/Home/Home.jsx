@@ -369,7 +369,7 @@ function Home () {
                 <th>Codec</th>
                 <th>Encode version</th>
               </tr>
-              {filelist.map((f, idx) => (
+              {filelist?.data?.map((f, idx) => (
                 <tr>
                   <td>{idx + 1}</td>
                   <td>{f.priority}</td>
