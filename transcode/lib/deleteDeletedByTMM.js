@@ -26,7 +26,7 @@ async function scanAndDelete (currentPath) {
       if (entry.isDirectory() && entry.name === '.deletedByTMM') {
         try {
           await rm(path.join(currentPath, entry.name), { recursive: true, force: true });
-          logger.info(`Deleted: ${path.join(currentPath, entry.name)}`);
+          logger.debug(`Deleted: ${path.join(currentPath, entry.name)}`);
         } catch (err) {
           logger.error(`Failed to delete ${path.join(currentPath, entry.name)}: ${err.message}`);
         }

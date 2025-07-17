@@ -21,28 +21,28 @@ const {
 
 async function run () {
   try {
-    logger.info('Starting transcode service...', {
+    logger.debug('Starting transcode service...', {
       label: 'STARTUP',
       application_version
     });
-    logger.info('Connecting to MongoDB');
+    logger.debug('Connecting to MongoDB');
     // connect to mongo
     await mongo_connect();
 
-    logger.info('Connecting to Redis');
+    logger.debug('Connecting to Redis');
     // connect to redis
     await redisClient.connect();
 
     // create scratch disks
-    logger.info('Creating scratch space');
+    logger.debug('Creating scratch space');
     await create_scratch_disks();
 
     // getting system utilization values
-    logger.info('Getting system utilization values');
+    logger.debug('Getting system utilization values');
     get_utilization();
 
     // getting disk space
-    logger.info('Getting disk space');
+    logger.debug('Getting disk space');
     get_disk_space();
 
     // start the file monitor
@@ -63,7 +63,7 @@ async function run () {
     integrityQueue.start();
 
     // generate the filelist every 5 minutes
-    cron.schedule('*/5 * * * *', async () => {
+    cron.schedule('*/5 * * * *', () => {
       generate_filelist({ limit: 1000, writeToFile: true });
     });
 

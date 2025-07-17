@@ -202,6 +202,6 @@ const config = {
 
 config.build_profiles(config);
 
-logger.info(config.profiles, { label: 'CALCULATED PROFILES' });
+logger.debug(config.profiles, { label: 'CALCULATED PROFILES' });
 
 export default config;

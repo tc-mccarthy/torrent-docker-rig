@@ -6,7 +6,7 @@ import config from './config';
 import exec_promise from './exec_promise';
 
 export default async function db_cleanup () {
-  logger.info('Cleaning up the database...');
+  logger.debug('Cleaning up the database...');
   // first purge any files marked for delete
   await File.deleteMany({ status: 'deleted' });
 
@@ -24,7 +24,7 @@ export default async function db_cleanup () {
   // purge aging scratch files from the scratch directories
   const scratch_paths = config.sources.map((p) => p.scratch);
 
-  logger.info(
+  logger.debug(
     `find ${scratch_paths.join(' ')} -type f -mtime +7 -exec rm {} \\;`,
     { label: 'PURGING SCRATCH FILES' }
   );
