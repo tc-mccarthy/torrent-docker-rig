@@ -151,9 +151,16 @@ function Home () {
   if (mvp.length > 0) {
     getData(setData, setFileList, setDisks, setUtilization, setStatus, setAvailableCompute);
     return (
-      <Box sx={{ display: 'flex' }}>
-        <CircularProgress />
-      </Box>
+      <div className="container image">
+        <div className="overline" />
+        <h1>BitForge</h1>
+        <em>AV1 at full throttle—without burning the rig.</em>
+        <div className="loader">
+          <Box sx={{ display: 'flex' }}>
+            <CircularProgress />
+          </Box>
+        </div>
+      </div>
     );
   }
 
@@ -170,7 +177,8 @@ function Home () {
   return (
     <div className="container image">
       <div className="overline" />
-      <h1>Optimized video encoding</h1>
+      <h1>BitForge</h1>
+      <em>AV1 at full throttle—without burning the rig.</em>
       {dataSource && dataSource.length > 0 && <Nav data={dataSource} availableCompute={availableCompute} dataSelection={dataSelection} setDataSelection={setDataSelection} />}
       {data && (
         <div className="widget center">
@@ -340,9 +348,15 @@ function Home () {
           {filelist.length.toLocaleString()}
           {' '}
           queued files
+          {' '}
+          <em>
+            (Updated:
+            {filelist?.updated}
+            )
+          </em>
         </strong>
         <div className="overflow">
-          {filelist?.map && (
+          {filelist?.data?.map && (
             <table>
               <tr>
                 <th>#</th>

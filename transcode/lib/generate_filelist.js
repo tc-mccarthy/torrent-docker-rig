@@ -2,6 +2,7 @@ import fs from 'fs';
 import logger from './logger';
 import config from './config';
 import File from '../models/files';
+import dayjs from './dayjs';
 
 const { encode_version } = config;
 
@@ -23,23 +24,22 @@ export default async function generate_filelist ({ limit = 1, writeToFile = fals
     .limit(limit + config.concurrent_transcodes);
 
   if (writeToFile) {
-    fs.writeFileSync(
-      './output/filelist.json',
-      JSON.stringify(
-        filelist.slice(1, 1001).map((f) => ({
-          path: f.path.split(/\//).pop(),
-          volume: f.path.split(/\//)[2],
-          size: f.sortFields.size,
-          priority: f.sortFields.priority,
-          resolution:
+    const data = filelist.slice(1, 1001).map((f) => ({
+      path: f.path.split(/\//).pop(),
+      volume: f.path.split(/\//)[2],
+      size: f.sortFields.size,
+      priority: f.sortFields.priority,
+      resolution:
           f.probe.streams.find((v) => v.codec_type === 'video').width * 0.5625, // use width at 56.25% to calculate resolution
-          codec: `${
+      codec: `${
           f.probe.streams.find((v) => v.codec_type === 'video')?.codec_name
         }/${f.probe.streams.find((v) => v.codec_type === 'audio')?.codec_name}`,
-          encode_version: f.encode_version,
-          computeScore: f.computeScore
-        }))
-      )
+      encode_version: f.encode_version,
+      computeScore: f.computeScore
+    }));
+    fs.writeFileSync(
+      './output/filelist.json',
+      JSON.stringify({ data, refreshed: dayjs().utc().local().format('MM-DD-YYYY HH:mm:ss') })
     );
   }
 
