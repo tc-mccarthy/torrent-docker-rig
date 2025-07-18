@@ -1,9 +1,10 @@
 import fs from 'fs';
+import { setTimeout } from 'node:timers/promises';
 import exec_promise from './exec_promise';
 
 export default async function update_active () {
   const active_list = await exec_promise(
-    `find /usr/app/output/ -iname "active-*.json" -type f -mmin -${5 / 60}`
+    `find /usr/app/output/ -iname "active-*.json" -type f -mmin -${30 / 60}`
   );
 
   // purge inactive files
@@ -19,9 +20,15 @@ export default async function update_active () {
     (a, b) => b.output.size.original.kb - a.output.size.original.kb
   );
 
+  const output = {
+    availableCompute: global.transcodeQueue.getAvailableCompute(),
+    computePenalty: global.transcodeQueue.computePenalty,
+    active: active_data
+  };
+
   fs.writeFileSync(
     '/usr/app/output/pending-active.json',
-    JSON.stringify(active_data)
+    JSON.stringify(output)
   );
   await exec_promise(
     'mv /usr/app/output/pending-active.json /usr/app/output/active.json'
@@ -31,6 +38,8 @@ export default async function update_active () {
   await exec_promise(
     'find /usr/app/output/ -iname "active-*.json" -type f -mmin +300 -exec rm {} \\;'
   );
+
+  await setTimeout(1 * 1000); // wait 1 second before next run
 
   update_active();
 }

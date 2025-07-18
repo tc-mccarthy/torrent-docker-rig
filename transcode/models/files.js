@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
-import memcached from '../lib/memcached';
-import dayjs from '../lib/dayjs';
+import roundComputeScore, { getMinimum } from '../lib/round-compute-score';
+import wait, { getRandomDelay } from '../lib/wait';
+import logger from '../lib/logger';
 
 const { Schema, model } = mongoose;
 
@@ -65,64 +66,42 @@ const schema = new Schema(
       required: false,
       default: false
     },
-    lock: {
-      integrity: {
-        type: Date,
-        required: false,
-        default: null,
-        index: true
-      },
-      transcode: {
-        type: Date,
-        required: false,
-        default: null,
-        index: true
+
+    computeScore: {
+      type: Number,
+      required: false,
+      get (value) {
+        try {
+        // return the stored value.
+          if (value && value >= getMinimum()) {
+            return value;
+          }
+          const video_stream = this.probe?.streams?.find((s) => s.codec_type === 'video');
+          if (!video_stream) {
+            throw new Error('No video stream found in probe data');
+          }
+          const calculatedScore = (video_stream.width * video_stream.height) / (3840 * 2160); // take the video area and divide it by 4K resolution area
+          return roundComputeScore(calculatedScore);
+        } catch (e) {
+          logger.error(e, { label: 'COMPUTE SCORE ERROR' });
+          logger.debug(this, { label: 'COMPUTE SCORE ERROR FILE' });
+          return 1; // default to 100 if there's an error
+        }
       }
+    },
+    permitHWDecode: {
+      type: Boolean,
+      required: false,
+      default: true
+    },
+    reclaimedSpace: {
+      type: Number,
+      required: false,
+      default: 0
     }
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
-
-schema.methods.hasLock = async function (type) {
-  let lock;
-  if (!type) {
-    lock =
-      (await memcached.get(`transcode_lock_${this._id}`)) ||
-      (await memcached.get(`integrity_lock_${this._id}`));
-  }
-  lock = await memcached.get(`${type}_lock_${this._id}`);
-  return !!lock;
-};
-
-schema.methods.setLock = async function (type, sec = 30) {
-  if (!type) {
-    throw new Error('Type is required to set a lock');
-  }
-  const lock = await memcached.set(`${type}_lock_${this._id}`, 'locked', sec);
-
-  this.lock[type] = dayjs().add(sec, 'seconds').toDate();
-  await this.saveDebounce();
-
-  schema[`${type}lockTimeout`] = setTimeout(() => {
-    this.setLock(type, sec);
-  }, sec * 0.75 * 1000);
-
-  return lock;
-};
-
-schema.methods.clearLock = async function (type) {
-  if (!type) {
-    throw new Error('Type is required to clear a lock');
-  }
-
-  if (schema.lockTimeout) {
-    clearTimeout(schema.lockTimeout);
-    schema.lockTimeout = null;
-  }
-  await memcached.del(`${type}_lock_${this._id}`);
-  this.lock[type] = null;
-  await this.saveDebounce();
-};
 
 schema.methods.saveDebounce = async function () {
   if (this.saveTimeout) {
@@ -134,10 +113,10 @@ schema.methods.saveDebounce = async function () {
       this.saveTimeout = null;
     } catch (e) {
       if (/parallel/i.test(e.message)) {
-        setTimeout(() => {
-          console.error('Retrying save after parallel error');
-          this.saveDebounce(); // retry saving after an error
-        }, 250);
+        await wait(getRandomDelay(0.25, 0.5)); // wait a random time between 1/4 and 1/2 seconds
+
+        console.error('Retrying save after parallel error');
+        this.saveDebounce(); // retry saving after an error
       }
     }
   }, 250);

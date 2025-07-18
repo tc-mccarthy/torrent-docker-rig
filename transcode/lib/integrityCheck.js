@@ -7,6 +7,7 @@ import config from './config';
 import logger from './logger';
 import { trash } from './fs';
 import IntegrityError from '../models/integrityError';
+import { formatSecondsToHHMMSS } from './transcode';
 
 const { encode_version } = config;
 
@@ -35,20 +36,10 @@ export default function integrityCheck (file) {
   return new Promise(async (resolve, reject) => {
     try {
       // mongo record of the video
-      logger.info(file, { label: 'INTEGRITY CHECKING FILE' });
+      logger.debug(file, { label: 'INTEGRITY CHECKING FILE' });
 
       const video_record = file;
       file = file.path;
-
-      // if the file is locked, short circuit
-      if (await video_record.hasLock()) {
-        logger.info(
-          `File is locked. Skipping integrity check: ${file} - ${video_record._id}`
-        );
-        return resolve();
-      }
-
-      await video_record.setLock('integrity');
 
       const exists = fs.existsSync(file);
 
@@ -79,7 +70,7 @@ export default function integrityCheck (file) {
         video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
         video_record.integrityCheck = true;
         video_record.status = 'complete';
-        await video_record.clearLock('integrity');
+
         await video_record.saveDebounceDebounce();
         return resolve();
       }
@@ -108,7 +99,11 @@ export default function integrityCheck (file) {
       const conversion_profile = {};
 
       ffmpeg(file)
-        .inputOptions(['-v fatal', '-stats'])
+        .inputOptions([
+          '-hwaccel auto',
+          '-v fatal',
+          '-stats'
+        ])
         .outputOptions([
           '-c:v copy',
           '-c:a copy',
@@ -142,13 +137,7 @@ export default function integrityCheck (file) {
           const seconds_pct = 1 / pct_per_second;
           const pct_remaining = 100 - progress.percent;
           const est_completed_seconds = pct_remaining * seconds_pct;
-          const time_remaining = dayjs
-            .utc(est_completed_seconds * 1000)
-            .format(
-              [est_completed_seconds > 86400 && 'D:', 'HH:mm:ss']
-                .filter((t) => t)
-                .join('')
-            );
+          const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
           const estimated_final_kb =
                     (progress.targetSize / progress.percent) * 100;
           const output = JSON.stringify(
@@ -162,6 +151,8 @@ export default function integrityCheck (file) {
               pct_remaining,
               time_remaining,
               est_completed_seconds,
+              computeScore: video_record.computeScore,
+              priority: video_record.sortFields.priority,
               size: {
                 progress: {
                   kb: progress.targetSize,
@@ -216,12 +207,11 @@ export default function integrityCheck (file) {
         })
         .on('end', async (stdout, stderr) => {
           try {
-            await video_record.clearLock('integrity');
             logger.debug('FFMPEG INTEGRITY CHECK COMPLETE', { stdout, stderr });
             if (integrity_check_pass({ stderr })) {
               logger.debug('No disqualifying errors found');
               video_record.integrityCheck = true;
-              await video_record.clearLock('integrity');
+
               await video_record.saveDebounce();
             } else {
               logger.debug('OUTPUT DETECTED, ERRORS MUST HAVE BEEN FOUND');
@@ -241,7 +231,6 @@ export default function integrityCheck (file) {
           }
         })
         .on('error', async (err, stdout, stderr) => {
-          await video_record.clearLock('transcode');
           logger.error(err, {
             label: 'Cannot process video during integrity check',
             stdout,

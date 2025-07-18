@@ -46,7 +46,7 @@ const config = {
       aspect: 16 / 9,
       flags: {
         crf: 30,
-        preset: 8,
+        preset: 7,
         tune: 0,
         maxrate: '10M',
         bufsize: '40M'
@@ -60,7 +60,7 @@ const config = {
       aspect: 1.37 / 1,
       flags: {
         crf: 30,
-        preset: 8,
+        preset: 7,
         tune: 0,
         maxrate: '10M',
         bufsize: '40M'
@@ -74,7 +74,7 @@ const config = {
       aspect: 4 / 3,
       flags: {
         crf: 30,
-        preset: 8,
+        preset: 7,
         tune: 0,
         maxrate: '10M',
         bufsize: '40M'
@@ -87,8 +87,8 @@ const config = {
       height: 720,
       aspect: 16 / 9,
       flags: {
-        crf: 30,
-        preset: 8,
+        crf: 35,
+        preset: 7,
         tune: 0,
         maxrate: '10M',
         bufsize: '40M'
@@ -102,8 +102,8 @@ const config = {
       aspect: 4 / 3,
       bitrate: 3.5,
       flags: {
-        crf: 30,
-        preset: 8,
+        crf: 35,
+        preset: 7,
         tune: 0,
         maxrate: '10M',
         bufsize: '40M'
@@ -119,7 +119,7 @@ const config = {
       bitrate: 12,
       flags: {
         crf: 30,
-        preset: 8,
+        preset: 7,
         tune: 0,
         maxrate: '10M',
         bufsize: '40M'
@@ -202,6 +202,6 @@ const config = {
 
 config.build_profiles(config);
 
-logger.info(config.profiles, { label: 'CALCULATED PROFILES' });
+logger.debug(config.profiles, { label: 'CALCULATED PROFILES' });
 
 export default config;

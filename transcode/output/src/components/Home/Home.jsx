@@ -7,26 +7,91 @@ import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWi
 // import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 import Nav from '../Navigation/Nav';
 
-async function getData (setData, setFileList, setDisks, setUtilization, setStatus) {
+export function formatSecondsToHHMMSS (totalSeconds) {
+  if (Number.isNaN(totalSeconds)) return 'calculating';
+
+  const total = Math.ceil(Number(totalSeconds)); // round up
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+
+  const pad = (n) => String(n).padStart(2, '0');
+
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+/**
+ * Converts a number of bytes into a human-readable string with appropriate units.
+ *
+ * @param {number} bytes - The number of bytes to format.
+ * @param {number} decimals - Number of decimal places to include (default is 2).
+ * @returns {string} A string representing the human-readable format (e.g., "1.23 MB").
+ */
+function formatBytes (bytes, decimals = 2) {
+  // If the input is 0, return immediately
+  if (bytes === 0) return '0 Bytes';
+
+  const k = 1024; // Base value for kilobyte (using binary convention)
+  const dm = decimals < 0 ? 0 : decimals; // Ensure decimals is not negative
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']; // Unit suffixes
+
+  /**
+   * Determine the index of the appropriate unit (KB, MB, GB, etc.)
+   *
+   * Explanation:
+   * - Math.log(bytes) gives the logarithm (base e) of the byte value.
+   * - Math.log(k) gives the logarithm of 1024.
+   * - Dividing log(bytes) by log(1024) is equivalent to taking log base 1024 of bytes.
+   *   This tells us how many times the value can be divided by 1024 before falling below 1.
+   * - Math.floor() ensures we get the largest whole number index,
+   *   which corresponds to the unit size just below the actual value.
+   */
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  // Divide the byte value by the appropriate power of 1024 to get the converted size
+  const size = bytes / k ** i;
+
+  // Round to the desired number of decimal places and append the unit label
+  return `${parseFloat(size.toFixed(dm))} ${sizes[i]}`;
+}
+
+function fetchData (src, cache_buster = true) {
+  try {
+    const timestamp = Date.now();
+    let url = src;
+
+    if (cache_buster) {
+      url += `?t=${timestamp}`;
+    }
+
+    return fetch(url).then((r) => r.json());
+  } catch (e) {
+    console.error('Error fetching data:', e);
+    throw e;
+  }
+}
+
+async function getData (setData, setFileList, setDisks, setUtilization, setStatus, setAvailableCompute) {
   try {
     clearTimeout(window.dataTimeout);
-    const d = await fetch('active.json').then((r) => r.json());
+    const d = await fetchData('active.json');
 
-    setData(d);
+    setData(d.active);
+    setAvailableCompute(d.availableCompute);
 
-    const f = await fetch('filelist.json').then((r) => r.json());
+    const f = await fetchData('filelist.json');
 
     setFileList(f);
 
-    const disks = await fetch('disk.json').then((r) => r.json());
+    const disks = await fetchData('disk.json');
 
     setDisks(disks);
 
-    const utilization = await fetch('utilization.json').then((r) => r.json());
+    const utilization = await fetchData('utilization.json');
 
     setUtilization(utilization);
 
-    const status = await fetch('status.json').then((r) => r.json());
+    const status = await fetchData('status.json');
 
     setStatus(status);
 
@@ -73,6 +138,7 @@ function make_human_readable (size) {
 
 function Home () {
   const [dataSource, setData] = useState(false);
+  const [availableCompute, setAvailableCompute] = useState(false);
   const [filelist, setFileList] = useState([]);
   const [disks, setDisks] = useState(false);
   const [utilization, setUtilization] = useState(false);
@@ -83,11 +149,18 @@ function Home () {
 
   // interface waits for all data to be loaded
   if (mvp.length > 0) {
-    getData(setData, setFileList, setDisks, setUtilization, setStatus);
+    getData(setData, setFileList, setDisks, setUtilization, setStatus, setAvailableCompute);
     return (
-      <Box sx={{ display: 'flex' }}>
-        <CircularProgress />
-      </Box>
+      <div className="container image">
+        <div className="overline" />
+        <h1>BitForge</h1>
+        <em>AV1 at full throttle—without burning the rig.</em>
+        <div className="loader">
+          <Box sx={{ display: 'flex' }}>
+            <CircularProgress />
+          </Box>
+        </div>
+      </div>
     );
   }
 
@@ -104,8 +177,9 @@ function Home () {
   return (
     <div className="container image">
       <div className="overline" />
-      <h1>Optimized video encoding</h1>
-      {dataSource && dataSource.length > 0 && <Nav data={dataSource} dataSelection={dataSelection} setDataSelection={setDataSelection} />}
+      <h1>BitForge</h1>
+      <em>AV1 at full throttle—without burning the rig.</em>
+      {dataSource && dataSource.length > 0 && <Nav data={dataSource} availableCompute={availableCompute} dataSelection={dataSelection} setDataSelection={setDataSelection} />}
       {data && (
         <div className="widget center">
           <strong>{data.file}</strong>
@@ -117,16 +191,16 @@ function Home () {
           )
         </div>
       )}
-      <div className="flex">
-        <div className="widget">
-          <strong>CPU</strong>
-          <LinearProgressWithLabel value={utilization.cpu} />
+      {data && (
+        <div className="flex">
+          {data && (
+            <div className="widget">
+              <strong>File Progress</strong>
+              <LinearProgressWithLabel value={data.output.percent} />
+            </div>
+          )}
         </div>
-        <div className="widget">
-          <strong>Memory</strong>
-          <LinearProgressWithLabel value={utilization.memory} />
-        </div>
-      </div>
+      )}
       {data && (
         <div className="flex">
           <div className="widget">
@@ -155,34 +229,36 @@ function Home () {
       {data && (
         <div className="flex">
           <div className="widget">
-            <strong>Expected completed time</strong>
-            {estimated_local_time(data.output.est_completed_seconds)}
+            <strong>FPS</strong>
+            {data.output.currentFps}
+          </div>
+          <div className="widget">
+            <strong>Kbps</strong>
+            {data.output.currentKbps}
           </div>
           <div className="widget">
             <strong>ETA</strong>
             {data.output.time_remaining}
+            <em>
+              (
+              {estimated_local_time(data.output.est_completed_seconds)}
+              )
+            </em>
           </div>
         </div>
       )}
-      <div className="flex">
-        <div className="widget">
-          <strong>Files Remaining</strong>
-          {status.unprocessed_files.toLocaleString()}
-          {/* <CircularProgressWithLabel numerator={numerator} denominator={denominator} /> */}
-        </div>
-        {data && (
+      {data && (
+        <div className="flex">
           <div className="widget">
-            <strong>File Progress</strong>
-            <LinearProgressWithLabel value={data.output.percent} />
+            <strong>Compute Score</strong>
+            {data.output.computeScore}
           </div>
-        )}
-      </div>
-      <div className="flex">
-        <div className="widget">
-          <strong>Library Coverage</strong>
-          <LinearProgressWithLabel value={Math.round(status.library_coverage)} />
+          <div className="widget">
+            <strong>Priority</strong>
+            {data.output.priority}
+          </div>
         </div>
-      </div>
+      )}
 
       {data && (
         <div className="flex">
@@ -213,6 +289,45 @@ function Home () {
         </div>
       )}
 
+      <div className="flex">
+        <div className="widget">
+          <strong>CPU</strong>
+          <LinearProgressWithLabel value={utilization.cpu} />
+        </div>
+        <div className="widget">
+          <strong>Memory</strong>
+          <LinearProgressWithLabel value={utilization.memory} />
+        </div>
+      </div>
+      <div className="flex">
+        <div className="widget">
+          <strong>Files Remaining</strong>
+          {status.unprocessed_files.toLocaleString()}
+        </div>
+        <div className="widget">
+          <strong>Files Processed this session</strong>
+          {status.processed_files_delta.toLocaleString()}
+        </div>
+        <div className="widget">
+          <strong>Files Processed all time</strong>
+          {status.processed_files.toLocaleString()}
+        </div>
+      </div>
+      <div className="flex">
+        <div className="widget">
+          <strong>Service Uptime</strong>
+          {formatSecondsToHHMMSS(Math.floor((Date.now() - status.serviceStartTime) / 1000))}
+        </div>
+        <div className="widget">
+          <strong>Reclaimed Space</strong>
+          {formatBytes(status.reclaimedSpace)}
+        </div>
+        <div className="widget">
+          <strong>Library Coverage</strong>
+          <LinearProgressWithLabel value={Math.round(status.library_coverage)} />
+        </div>
+      </div>
+
       <div className="flex quarter disks">
         {!disks?.map && <div className="widget center">Loading...</div>}
         {disks?.map &&
@@ -226,33 +341,44 @@ function Home () {
       </div>
 
       <div className="widget list">
-        {!filelist?.map && <em>Loading...</em>}
+        {!filelist?.data?.map && <em>Loading...</em>}
         <strong>
           Next
           {' '}
-          {filelist.length.toLocaleString()}
+          {filelist?.data?.length.toLocaleString()}
           {' '}
           queued files
+          {' '}
+          <em>
+            (Updated:
+            {' '}
+            {filelist?.refreshed}
+            )
+          </em>
         </strong>
         <div className="overflow">
-          {filelist?.map && (
+          {filelist?.data?.map && (
             <table>
               <tr>
                 <th>#</th>
                 <th>Priority</th>
-                <th>Path</th>
+                <th>File</th>
+                <th>Storage Volume</th>
                 <th>Size</th>
                 <th>Resolution</th>
+                <th>Compute Score</th>
                 <th>Codec</th>
                 <th>Encode version</th>
               </tr>
-              {filelist.map((f, idx) => (
+              {filelist?.data?.map((f, idx) => (
                 <tr>
                   <td>{idx + 1}</td>
                   <td>{f.priority}</td>
                   <td>{f.path}</td>
+                  <td>{f.volume}</td>
                   <td>{make_human_readable(f.size)}</td>
                   <td>{f.resolution}</td>
+                  <td>{f.computeScore}</td>
                   <td>{f.codec}</td>
                   <td>{f.encode_version}</td>
                 </tr>

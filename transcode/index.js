@@ -1,9 +1,6 @@
 import cron from 'node-cron';
-import dayjs from 'dayjs';
 import mongo_connect from './lib/mongo_connection';
-import update_active from './lib/update_active';
 import update_queue from './lib/update_queue';
-import transcode_loop from './lib/transcode_loop';
 import fs_monitor from './lib/fs_monitor';
 import redisClient from './lib/redis';
 import logger from './lib/logger';
@@ -12,7 +9,9 @@ import pre_sanitize from './lib/pre_sanitize';
 import { create_scratch_disks } from './lib/fs';
 import config from './lib/config';
 import generate_filelist from './lib/generate_filelist';
-import integrity_loop from './lib/integrity_check_loop';
+import IntegrityQueue from './lib/integrityQueue';
+import TranscodeQueue from './lib/transcodeQueue';
+import update_status from './lib/update_status';
 
 const {
   concurrent_transcodes,
@@ -22,71 +21,49 @@ const {
 
 async function run () {
   try {
-    logger.info('Starting transcode service...', {
+    logger.debug('Starting transcode service...', {
       label: 'STARTUP',
       application_version
     });
-    logger.info('Connecting to MongoDB');
+    logger.debug('Connecting to MongoDB');
     // connect to mongo
     await mongo_connect();
 
-    logger.info('Connecting to Redis');
+    logger.debug('Connecting to Redis');
     // connect to redis
     await redisClient.connect();
 
-    // update the active list
-    update_active();
-
     // create scratch disks
-    logger.info('Creating scratch space');
+    logger.debug('Creating scratch space');
     await create_scratch_disks();
 
     // getting system utilization values
-    logger.info('Getting system utilization values');
+    logger.debug('Getting system utilization values');
     get_utilization();
 
     // getting disk space
-    logger.info('Getting disk space');
+    logger.debug('Getting disk space');
     get_disk_space();
 
     // start the file monitor
     fs_monitor();
 
     // update the transcode queue
+    update_status();
     update_queue();
+    generate_filelist({ limit: 1000, writeToFile: true });
 
-    // start the transcode loops
-    logger.info(`Starting ${concurrent_transcodes} transcode loops...`);
+    const transcodeQueue = new TranscodeQueue({ maxScore: concurrent_transcodes, pollDelay: 30000 });
+    transcodeQueue.start();
 
-    Array.from({ length: concurrent_transcodes }).forEach((val, idx) => {
-      transcode_loop(idx);
-    });
+    global.transcodeQueue = transcodeQueue; // Make the queue globally accessible
 
-    const currentHourLocalTime = dayjs().tz(process.env.TZ).hour();
-    logger.info(
-      `Current local time is ${currentHourLocalTime}`
-    );
-    if (currentHourLocalTime >= 0 && currentHourLocalTime < 9) {
-      logger.info(
-        'Starting integrity check loop immediately since it is before 9 AM'
-      );
-      integrity_loop();
-    }
+    const integrityQueue = new IntegrityQueue({ maxScore: concurrent_integrity_checks });
 
-    // start the integrity check loops every day at midnight
-    cron.schedule('0 0 * * *', () => {
-      logger.info(
-        `Starting ${concurrent_integrity_checks} integrity check loops...`
-      );
-      Array.from({ length: concurrent_integrity_checks }).forEach(
-        (val, idx) => {
-          integrity_loop(idx);
-        }
-      );
-    });
+    integrityQueue.start();
 
-    // generate the filelist every 10 minutes
-    cron.schedule('*/5 * * * *', async () => {
+    // generate the filelist every 5 minutes
+    cron.schedule('*/5 * * * *', () => {
       generate_filelist({ limit: 1000, writeToFile: true });
     });
 
