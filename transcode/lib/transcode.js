@@ -110,12 +110,12 @@ export default function transcode (file) {
             (k) => `-${k} ${transcode_instructions.video.arguments[k]}`
           )
         ])
-        .outputOptions([ // Handle the audio output options
-          ...transcode_instructions.audio.map((audio, audio_idx) => [`-c:a:${audio_idx} ${audio.codec}`, audio.bitrate && `-b:a:${audio_idx} ${audio.bitrate}`, `-map_metadata:s:a:${audio_idx} 0:s:a:${audio_idx}`].filter((f) => f).join(' '))
-        ])
-        .outputOptions([ // Handle the subtitle output options
-          ...transcode_instructions.subtitles.map((subtitle, sub_idx) => `-c:s:${sub_idx} ${subtitle.codec} -map_metadata:s:s:${sub_idx} 0:s:s:${sub_idx}`)
-        ])
+        .outputOptions(transcode_instructions.audio
+          .map((audio, audio_idx) => [`-c:a:${audio_idx} ${audio.codec}`, audio.bitrate && `-b:a:${audio_idx} ${audio.bitrate}`, `-map_metadata:s:a:${audio_idx} 0:s:a:${audio_idx}`].filter((f) => f))
+          .reduce((acc, curr) => acc.concat(curr), []))
+        .outputOptions(transcode_instructions.subtitles
+          .map((subtitle, sub_idx) => [`-c:s:${sub_idx} ${subtitle.codec}`, `-map_metadata:s:s:${sub_idx} 0:s:s:${sub_idx}`])
+          .reduce((acc, curr) => acc.concat(curr), []))
         .outputOptions(`-metadata encode_version=${encode_version}`); // Handle the global metadata
 
       let ffmpeg_cmd;
