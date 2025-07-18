@@ -39,6 +39,7 @@ export function generateTranscodeInstructions (mongoDoc) {
   const width = mainVideo.width || 0;
   const isUHD = width >= 3840;
 
+  console.log(`Processing video stream: ${videoCodec}, width: ${width}, size: ${fileSizeGB.toFixed(2)} GB`);
   // If <=1GB and HEVC, copy it; otherwise re-encode to SVT-AV1
   if (fileSizeGB <= 1 && isHEVC) {
     result.video = {

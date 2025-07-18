@@ -90,7 +90,7 @@ export default function transcode (file) {
 
       const source_video_codec = ffprobe_data.streams.find((s) => s.codec_type === 'video')?.codec_name;
       const source_audio_codec = ffprobe_data.streams.find((s) => s.codec_type === 'audio')?.codec_name;
-      const {audio_language} = video_record
+      const { audio_language } = video_record;
 
       // start by mapping in the video stream and then all of the audio streams and then all of the subtitle streams
       const input_maps = [`-map 0:${transcode_instructions.video.stream_index}`]
@@ -111,7 +111,7 @@ export default function transcode (file) {
           )
         ])
         .outputOptions([ // Handle the audio output options
-          ...transcode_instructions.audio.map((audio, audio_idx) => `-c:a:${audio_idx} ${audio.codec} -b:a:${audio_idx} ${audio.bitrate} -map_metadata:s:a:${audio_idx} 0:s:a:${audio_idx}`)
+          ...transcode_instructions.audio.map((audio, audio_idx) => [`-c:a:${audio_idx} ${audio.codec}`, audio.bitrate && `-b:a:${audio_idx} ${audio.bitrate}`, `-map_metadata:s:a:${audio_idx} 0:s:a:${audio_idx}`].filter((f) => f).join(' '))
         ])
         .outputOptions([ // Handle the subtitle output options
           ...transcode_instructions.subtitles.map((subtitle, sub_idx) => `-c:s:${sub_idx} ${subtitle.codec} -map_metadata:s:s:${sub_idx} 0:s:s:${sub_idx}`)
