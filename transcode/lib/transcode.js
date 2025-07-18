@@ -1,3 +1,19 @@
+/**
+ * @module Transcode
+ * @description
+ * This module performs hardware-accelerated, metadata-preserving video transcoding using FFmpeg.
+ * It supports dynamic instruction generation based on source video metadata, including frame-accurate
+ * progress tracking and file sanitation. Transcoding status and metrics are streamed to
+ * disk in JSON for real-time external monitoring.
+ *
+ * This code was developed by TC, with enhancements assisted by ChatGPT from OpenAI, including:
+ * - Frame-based progress percentage
+ * - Modularized transcode instructions
+ * - Improved error tracing and logging
+ *
+ * You are welcome to use, modify, and share. Please keep these comments if you find them helpful.
+ */
+
 import fs from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
 import dayjs from 'dayjs';
@@ -14,10 +30,12 @@ import integrityCheck from './integrityCheck';
 import generate_filelist from './generate_filelist';
 import moveFile from './moveFile';
 import update_status from './update_status';
+import { generateTranscodeInstructions } from './generate_transcode_instructions';
 
 const { encode_version } = config;
+const LOG_THROTTLE_MS = 5000; // Throttle progress updates to every 5 seconds
 
-// function to format seconds to HH:mm:ss
+// Converts seconds into a zero-padded HH:mm:ss string
 export function formatSecondsToHHMMSS (totalSeconds) {
   if (Number.isNaN(totalSeconds)) return 'calculating';
 
@@ -31,363 +49,164 @@ export function formatSecondsToHHMMSS (totalSeconds) {
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
+// Main transcode function exposed by the module
 export default function transcode (file) {
-  return new Promise(async (resolve, reject) => {
+  return new Promise(async (resolve) => {
     try {
-      // mongo record of the video
       const video_record = file;
       file = file.path;
 
+      // Validate input and presence of Mongo record
       if (!video_record || !video_record?._id) {
         throw new Error(`Video record not found for file: ${file}`);
       }
 
-      const { profiles } = config;
-      const exists = fs.existsSync(file);
-
-      if (!exists) {
+      if (!fs.existsSync(file)) {
         throw new Error(`File not found: ${file}`);
       }
 
+      // Probe the input video and attach metadata to record
       const ffprobe_data = await ffprobe(file);
+      video_record.probe = ffprobe_data;
 
-      logger.debug(ffprobe_data, { label: '>> FFPROBE DATA >>' });
+      const transcode_instructions = generateTranscodeInstructions(video_record);
+      console.log('>> Transcode Instructions Generated <<');
+      console.log(transcode_instructions);
 
-      const video_stream = ffprobe_data.streams.find(
-        (s) => s.codec_type === 'video'
-      );
-
-      if (!video_stream) {
+      if (!transcode_instructions.video) {
         throw new Error('No video stream found');
       }
 
       const { scratch_file, dest_file } = generate_file_paths(file);
 
-      // if this file has already been encoded, short circuit
+      // Short-circuit if this encode version already exists
       if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
-        logger.info(
-          {
-            file,
-            encode_version: ffprobe_data.format.tags?.ENCODE_VERSION
-          },
-          { label: 'File already encoded' }
-        );
+        logger.info({ file, encode_version }, { label: 'File already encoded' });
         video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
-
         await video_record.saveDebounce();
-        return resolve({ locked: true }); // mark locked as true so that the loop doesnt' delay the next start
+        return resolve({ locked: true });
       }
 
-      // get the audio stream, in english unless otherwise specified, with the highest channel count
-      const audio_stream_test = new RegExp(
-        (video_record.audio_language || ['und', 'eng']).join('|'),
-        'i'
-      );
-
-      // preserve the audio lines specified in the video record, sorted by channel count
-      const audio_streams = ffprobe_data.streams
-        .filter(
-          (s) =>
-            s.codec_type === 'audio' &&
-            (!s.tags?.language || audio_stream_test.test(s.tags.language))
-        )
-        .sort((a, b) => (a.channels > b.channels ? -1 : 1));
-
-      if (!audio_streams?.length) {
-        throw new Error('No audio stream found');
+      // Check file integrity if not previously validated
+      if (!video_record.integrityCheck) {
+        logger.info("File hasn't been integrity checked. Checking before transcode");
+        await integrityCheck(video_record);
       }
 
-      const map_metadata = [];
-
-      const subtitle_streams = ffprobe_data.streams.filter(
-        (s) =>
-          s.codec_type === 'subtitle' &&
-          s.tags?.language === 'eng' &&
-          /subrip|hdmv_pgs_subtitle|substation/i.test(s.codec_name)
-      );
-      let transcode_video = false;
-      let transcode_audio = false;
       const hwaccel = video_record.permitHWDecode ? 'auto' : 'none';
-      const video_filters = [];
-      const audio_filters = [];
+      const source_video_codec = ffprobe_data.streams.find((s) => s.codec_type === 'video')?.codec_name;
+      const source_audio_codec = ffprobe_data.streams.find((s) => s.codec_type === 'audio')?.codec_name;
+      const { audio_language } = video_record;
 
-      const conversion_profile = config.get_profile(video_stream);
-
-      logger.debug(
-        {
-          video_stream_width: video_stream.width,
-          video_stream_aspect: video_stream.aspect,
-          conversion_profile,
-          profiles
-        },
-        { label: 'Profile debug info' }
-      );
-
-      conversion_profile.width =
-        conversion_profile.dest_width || conversion_profile.width;
-
-      // if the video codec doesn't match the profile
-      if (
-        conversion_profile.output.video.codec_name !== video_stream.codec_name
-      ) {
-        transcode_video = true;
-      }
-
-      // add transcode instructions for any audio streams that don't match the profile
-      audio_streams.forEach((audio_stream, idx) => {
-        map_metadata.push(`-map_metadata:s:a:${idx} 0:s:a:${idx}`); // source the metadata from the original audio stream
-
-        if (
-          conversion_profile.output.audio.codec_name !== audio_stream.codec_name
-        ) {
-          transcode_audio = true;
-          audio_filters.push(
-            `-c:a:${idx} ${conversion_profile.output.audio.codec}`, // specify the codec for this audio stream on the output
-            `-b:a:${idx} ${
-              audio_stream.channels *
-              conversion_profile.output.audio.per_channel_bitrate
-            }k` // set the bitrate for this audio stream
-          );
-        }
-      });
-
-      // if the video codec matches the profile, but the bitrate is higher than the profile
-      if (
-        ffprobe_data.format.bit_rate >
-          conversion_profile.bitrate * 1024 * 1024 &&
-        !transcode_video
-      ) {
-        logger.debug(
-          'Video stream bitrate higher than conversion profile. Transcoding'
-        );
-        transcode_video = true;
-      }
-
-      // if the video is 1gb or less in size and the codec is HEVC, don't transcode
-      if (
-        video_stream.codec_name === 'hevc' &&
-        ffprobe_data.format.size <= 1048576
-      ) {
-        logger.debug(
-          'Video stream codec is HEVC and size is less than 1GB. Not transcoding'
-        );
-        transcode_video = false;
-      }
-
-      // if the video is 350mb or less in size and the codec is h264, don't transcode
-      if (
-        video_stream.codec_name === 'h264' &&
-        ffprobe_data.format.size <= 350000
-      ) {
-        logger.debug(
-          'Video stream codec is h264 and size is less than 350mb. Not transcoding'
-        );
-        transcode_video = false;
-      }
-
-      const input_maps = [`-map 0:${video_stream.index}`].concat(
-        audio_streams.map((s) => `-map 0:${s.index}`)
-      );
-
-      if (subtitle_streams.length > 0) {
-        subtitle_streams.forEach((s, idx) => {
-          input_maps.push(`-map 0:${s.index}`);
-          map_metadata.push(`-map_metadata:s:s:${idx} 0:s:s:${idx}`); // source the metadata from the original audio stream
-        });
-
-        input_maps.push('-c:s copy');
-      }
+      // Build FFmpeg input stream mappings
+      const input_maps = [`-map 0:${transcode_instructions.video.stream_index}`]
+        .concat(transcode_instructions.audio.map((audio) => `-map 0:${audio.stream_index}`))
+        .concat(transcode_instructions.subtitles.map((subtitle) => `-map 0:${subtitle.stream_index}`));
 
       if (ffprobe_data.chapters.length > 0) {
         input_maps.push(`-map_chapters 0`);
       }
 
-      // if the file hasn't already been integrity checked, do so now
-      if (!video_record.integrityCheck) {
-        logger.info(
-          "File hasn't been integrity checked. Checking before transcode"
-        );
-        await integrityCheck(video_record);
-      }
+      const mainVideoStream = ffprobe_data.streams.find((s) => s.codec_type === 'video');
+      const totalFrames = parseInt(mainVideoStream.nb_frames || 0, 10);
 
-      let cmd = ffmpeg(file);
-
-      cmd = cmd
-        .inputOptions(['-v fatal', '-stats', `-hwaccel ${hwaccel}`].filter((f) => f)) // use hardware acceleration if not transcoding video
-        .outputOptions(input_maps);
-
-      if (transcode_video) {
-        // handle HDR
-        if (/arib[-]std[-]b67|smpte2084/i.test(video_stream.color_transfer)) {
-          conversion_profile.name += ` (hdr)`; // add HDR to the profile name
-        }
-
-        cmd = cmd.outputOptions([
-          `-c:v ${conversion_profile.output.video.codec}`,
-          ...Object.keys(conversion_profile.output.video.flags || {}).map(
-            (k) => `-${k} ${conversion_profile.output.video.flags[k]}`
-          ),
-          ...map_metadata
-        ]);
-      } else {
-        cmd = cmd.outputOptions('-c:v copy');
-      }
-
-      if (video_filters.length > 0) {
-        cmd = cmd.outputOptions(['-vf', ...video_filters]);
-      }
-
-      if (!transcode_audio) {
-        cmd = cmd.outputOptions('-c:a copy');
-      } else {
-        // add unique audio filters to output options
-        cmd = cmd.outputOptions(
-          audio_filters.filter((prop, idx, self) => self.indexOf(prop) === idx)
-        );
-      }
-
-      cmd = cmd.outputOptions(`-metadata encode_version=${encode_version}`);
+      let cmd = ffmpeg(file).inputOptions(['-v fatal', '-stats', `-hwaccel ${hwaccel}`].filter(Boolean))
+        .outputOptions(input_maps)
+        .outputOptions([
+          `-c:v ${transcode_instructions.video.codec}`,
+          ...Object.entries(transcode_instructions.video.arguments || {}).map(([k, v]) => `-${k} ${v}`)
+        ])
+        .outputOptions(transcode_instructions.audio
+          .flatMap((audio, idx) => [`-c:a:${idx} ${audio.codec}`, audio.bitrate && `-b:a:${idx} ${audio.bitrate}`, `-map_metadata:s:a:${idx} 0:s:a:${idx}`].filter(Boolean)))
+        .outputOptions(transcode_instructions.subtitles
+          .flatMap((subtitle, idx) => [`-c:s:${idx} ${subtitle.codec}`, `-map_metadata:s:s:${idx} 0:s:s:${idx}`]))
+        .outputOptions(`-metadata encode_version=${encode_version}`);
 
       let ffmpeg_cmd;
       let start_time;
       const original_size = (await stat(file)).size;
+      let lastLogTime = 0;
 
       cmd = cmd
         .on('start', async (commandLine) => {
           logger.info(`Spawned Ffmpeg with command: ${commandLine}`);
           start_time = dayjs();
           ffmpeg_cmd = commandLine;
+          generate_filelist({ limit: 1000, writeToFile: true });
 
-          generate_filelist({
-            limit: 1000,
-            writeToFile: true
-          });
-
-          if (video_record) {
-            logger.debug('>> VIDEO FOUND -- REMOVING ERROR >>', video_record);
-            video_record.error = undefined;
-            video_record.transcode_details = {
-              start_time: start_time.toDate(),
-              source_codec: `${
-                video_record.probe.streams.find((f) => f.codec_type === 'video')
-                  ?.codec_name
-              }_${
-                video_record.probe.streams.find((f) => f.codec_type === 'audio')
-                  ?.codec_name
-              }`
-            };
-            await video_record.saveDebounce();
-          }
+          video_record.error = undefined;
+          video_record.transcode_details = {
+            start_time: start_time.toDate(),
+            source_codec: `${source_video_codec}_${source_audio_codec}`
+          };
+          await video_record.saveDebounce();
         })
         .on('progress', (progress) => {
+          const now = Date.now();
+          if (now - lastLogTime < LOG_THROTTLE_MS) return;
+          lastLogTime = now;
+
           const elapsed = dayjs().diff(start_time, 'seconds');
-          const run_time = dayjs.utc(elapsed * 1000).format('HH:mm:ss');
-          const pct_per_second = progress.percent / elapsed;
-          const seconds_pct = 1 / pct_per_second;
-          const pct_remaining = 100 - progress.percent;
+          const currentFrames = progress.frames || 0;
+          const percent = totalFrames > 0 ? (currentFrames / totalFrames) * 100 : progress.percent;
+          const pct_per_second = percent / elapsed;
+          const seconds_pct = pct_per_second > 0 ? 1 / pct_per_second : Infinity;
+          const pct_remaining = 100 - percent;
           const est_completed_seconds = pct_remaining * seconds_pct;
           const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
-          const estimated_final_kb =
-            (progress.targetSize / progress.percent) * 100;
-          const output = JSON.stringify(
-            {
-              ...progress,
-              video_stream,
-              audio_streams,
-              audio_language: video_record.audio_language,
-              run_time,
-              pct_per_second,
-              pct_remaining,
-              time_remaining,
-              est_completed_seconds,
-              computeScore: video_record.computeScore,
-              priority: video_record.sortFields.priority,
-              size: {
-                progress: {
-                  kb: progress.targetSize,
-                  mb: progress.targetSize / 1024,
-                  gb: progress.targetSize / 1024 / 1024
-                },
-                estimated_final: {
-                  kb: estimated_final_kb,
-                  mb: estimated_final_kb / 1024,
-                  gb: estimated_final_kb / 1024 / 1024,
-                  change: `${
-                    ((estimated_final_kb - ffprobe_data.format.size) /
-                      ffprobe_data.format.size) *
-                    100
-                  }%`
-                },
-                original: {
-                  kb: ffprobe_data.format.size,
-                  mb: ffprobe_data.format.size / 1024,
-                  gb: ffprobe_data.format.size / 1024 / 1024
-                }
+          const estimated_final_kb = (progress.targetSize / percent) * 100;
+
+          const output = JSON.stringify({
+            ...progress,
+            refreshed: Date.now(),
+            percent,
+            source_audio_codec,
+            source_video_codec,
+            audio_language,
+            run_time: dayjs.utc(elapsed * 1000).format('HH:mm:ss'),
+            pct_per_second,
+            pct_remaining,
+            time_remaining,
+            est_completed_seconds,
+            computeScore: video_record.computeScore,
+            priority: video_record.sortFields.priority,
+            size: {
+              progress: {
+                kb: progress.targetSize,
+                mb: progress.targetSize / 1024,
+                gb: progress.targetSize / 1024 / 1024
               },
-              action: 'transcode'
+              estimated_final: {
+                kb: estimated_final_kb,
+                mb: estimated_final_kb / 1024,
+                gb: estimated_final_kb / 1024 / 1024,
+                change: `${((estimated_final_kb - ffprobe_data.format.size) / ffprobe_data.format.size) * 100}%`
+              },
+              original: {
+                kb: ffprobe_data.format.size,
+                mb: ffprobe_data.format.size / 1024,
+                gb: ffprobe_data.format.size / 1024 / 1024
+              }
             },
-            true,
-            4
-          );
-          console.clear();
-          logger.debug(
-            {
-              ...conversion_profile,
-              ffmpeg_cmd,
-              file
-            },
-            { label: 'Job' }
-          );
+            action: 'transcode'
+          }, null, 4);
 
-          logger.debug(output);
-
-          fs.writeFileSync(
-            `/usr/app/output/active-${video_record._id}.json`,
-            JSON.stringify({
-              ...conversion_profile,
-              ffmpeg_cmd,
-              audio_streams,
-              video_stream,
-              audio_language: video_record.audio_language,
-              file,
-              output: JSON.parse(output)
-            })
-          );
+          fs.writeFileSync(`/usr/app/output/active-${video_record._id}.json`, JSON.stringify({ ffmpeg_cmd, audio_language, file, ...(JSON.parse(output)) }));
         })
-        .on('end', async (stdout, stderr) => {
+        .on('end', async () => {
           try {
             logger.info('Transcoding succeeded!');
-            logger.info(`Confirming existence of ${scratch_file}`);
-
             await wait(5);
             if (!fs.existsSync(scratch_file)) {
-              fs.writeFileSync(
-                `/usr/app/output/final-${video_record._id}.json`,
-                JSON.stringify({ stdout, stderr }, true, 4)
-              );
-              throw new Error(
-                `Scratch file ${scratch_file} not found after transcode complete. View log /usr/app/output/final-${video_record._id}.json`
-              );
+              throw new Error(`Scratch file ${scratch_file} not found after transcode complete.`);
             }
 
-            logger.info(`${scratch_file} found by nodejs`);
-
-            // rename the scratch file to the destination file name
             await moveFile(scratch_file, dest_file);
-
-            // update the timestamp on the destination file so that it's picked up in scans
             await fs.promises.utimes(dest_file, new Date(), new Date());
             global.processed_files_delta += 1;
-
-            // get the destination file size
             const dest_file_size = (await stat(dest_file)).size;
 
-            // delete the original file if the transcoded filename is different
             if (dest_file !== file) {
-              logger.info(
-                'Destination filename and file name differ. Deleting original file',
-                { dest_file, file }
-              );
               await trash(file, false);
             }
 
@@ -397,7 +216,7 @@ export default function transcode (file) {
                 end_time: dayjs().toDate(),
                 duration: dayjs().diff(start_time, 'seconds')
               },
-              reclaimedSpace: original_size - dest_file_size // calculate reclaimed space
+              reclaimedSpace: original_size - dest_file_size
             });
 
             await update_status();
@@ -409,74 +228,38 @@ export default function transcode (file) {
         })
         .on('error', async (err, stdout, stderr) => {
           logger.error(err, { label: 'Cannot process video', stdout, stderr });
-          fs.appendFileSync(
-            '/usr/app/logs/ffmpeg.log',
-            JSON.stringify(
-              {
-                error: err.message,
-                stdout,
-                stderr,
-                ffmpeg_cmd,
-                trace: err.stack
-              },
-              true,
-              4
-            )
-          );
+          fs.appendFileSync('/usr/app/logs/ffmpeg.log', JSON.stringify({ error: err.message, stdout, stderr, ffmpeg_cmd, trace: err.stack }, null, 4));
           await trash(scratch_file, false);
-          // if the error message contains '251' disable the hardware acceleration
+
+          // FFmpeg error 251 typically means a hardware decoder failed to initialize (e.g., unsupported GPU or corrupted driver).
+          // Disabling hardware decode ensures fallback to software on retry.
           if (/251/i.test(err.message)) {
-            logger.warn(
-              'FFmpeg error 251 detected. Disabling hardware acceleration for this video.'
-            );
+            logger.warn('FFmpeg error 251 detected. Disabling hardware acceleration for this video.');
             video_record.permitHWDecode = false;
           }
+
           Object.assign(video_record, {
-            error: {
-              error: err.message,
-              stdout,
-              stderr,
-              ffmpeg_cmd,
-              trace: err.stack
-            },
+            error: { error: err.message, stdout, stderr, ffmpeg_cmd, trace: err.stack },
             hasError: true
           });
           await video_record.saveDebounce();
 
           await ErrorLog.create({
             path: file,
-            error: {
-              error: err.message,
-              stdout,
-              stderr,
-              ffmpeg_cmd,
-              trace: err.stack
-            }
+            error: { error: err.message, stdout, stderr, ffmpeg_cmd, trace: err.stack }
           });
 
           resolve({});
         });
+
       cmd.save(scratch_file);
     } catch (e) {
       logger.error(e, { label: 'TRANSCODE ERROR' });
-      await upsert_video({
-        path: file,
-        error: { error: e.message, trace: e.stack },
-        hasError: true
-      });
+      await upsert_video({ path: file, error: { error: e.message, trace: e.stack }, hasError: true });
+      await ErrorLog.create({ path: file, error: { error: e.message, trace: e.stack } });
 
-      await ErrorLog.create({
-        path: file,
-        error: { error: e.message, trace: e.stack }
-      });
-
-      if (/no\s+(video|audio)\s+stream\s+found/gi.test(e.message)) {
-        await trash(file);
-      }
-
-      if (/file\s+not\s+found/gi.test(e.message)) {
-        await trash(file);
-      }
+      if (/no\s+(video|audio)\s+stream\s+found/gi.test(e.message)) await trash(file);
+      if (/file\s+not\s+found/gi.test(e.message)) await trash(file);
 
       resolve({});
     }

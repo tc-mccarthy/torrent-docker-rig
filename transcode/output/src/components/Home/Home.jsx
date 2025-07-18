@@ -185,9 +185,9 @@ function Home () {
           <strong>{data.file}</strong>
           {' '}
           (
-          {data.video_stream.codec_name}
+          {data.source_video_codec}
           /
-          {data.audio_streams[0].codec_name}
+          {data.source_audio_codec}
           )
         </div>
       )}
@@ -196,7 +196,7 @@ function Home () {
           {data && (
             <div className="widget">
               <strong>File Progress</strong>
-              <LinearProgressWithLabel value={data.output.percent} />
+              <LinearProgressWithLabel value={data.percent} />
             </div>
           )}
         </div>
@@ -205,11 +205,11 @@ function Home () {
         <div className="flex">
           <div className="widget">
             <strong>Elapsed</strong>
-            {data.output.run_time}
+            {data.run_time}
           </div>
           <div className="widget">
             <strong>Timecode</strong>
-            {data.output.timemark}
+            {data.timemark}
           </div>
           <div className="widget">
             <strong>Profile</strong>
@@ -217,12 +217,7 @@ function Home () {
           </div>
           <div className="widget">
             <strong>Audio Languages</strong>
-            {data.audio_streams.map((stream) => stream.tags?.language).reduce((a, c) => {
-              if (!a.includes(c)) {
-                a.push(c);
-              }
-              return a;
-            }, []).join(', ')}
+            {data.audio_language.filter((lang) => lang.length > 2 && !/und/.test(lang)).join(', ')}
           </div>
         </div>
       )}
@@ -230,18 +225,18 @@ function Home () {
         <div className="flex">
           <div className="widget">
             <strong>FPS</strong>
-            {data.output.currentFps}
+            {data.currentFps}
           </div>
           <div className="widget">
             <strong>Kbps</strong>
-            {data.output.currentKbps}
+            {data.currentKbps}
           </div>
           <div className="widget">
             <strong>ETA</strong>
-            {data.output.time_remaining}
+            {data.time_remaining}
             <em>
               (
-              {estimated_local_time(data.output.est_completed_seconds)}
+              {estimated_local_time(data.est_completed_seconds)}
               )
             </em>
           </div>
@@ -251,11 +246,11 @@ function Home () {
         <div className="flex">
           <div className="widget">
             <strong>Compute Score</strong>
-            {data.output.computeScore}
+            {data.computeScore}
           </div>
           <div className="widget">
             <strong>Priority</strong>
-            {data.output.priority}
+            {data.priority}
           </div>
         </div>
       )}
@@ -264,20 +259,20 @@ function Home () {
         <div className="flex">
           <div className="widget">
             <strong>Original Size</strong>
-            {human_size(data.output.size.original)}
+            {human_size(data.size.original)}
           </div>
           <div className="widget">
             <strong>Current Size</strong>
-            {human_size(data.output.size.progress)}
+            {human_size(data.size.progress)}
           </div>
           <div className="widget">
             <strong>Est. Final Size</strong>
             <em>
               {`${
-              Math.round(+data.output.size.estimated_final.change.replace('%', '') * 100) / 100
+              Math.round(+data.size.estimated_final.change.replace('%', '') * 100) / 100
             }%`}
             </em>
-            {human_size(data.output.size.estimated_final)}
+            {human_size(data.size.estimated_final)}
           </div>
         </div>
       )}

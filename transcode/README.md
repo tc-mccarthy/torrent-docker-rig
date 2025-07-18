@@ -1,36 +1,112 @@
-# Newsday ExpressJS/Docker template
+# Transcode Service
 
-Microservices are becoming the name of the game. Much what we are building are API-only microservices. Here's a template to get started quickly!
+The `transcode` directory provides a modular, resource-aware video transcoding service designed for automated media workflows. It manages job scheduling, system resource monitoring, and integration with external tools (like ffmpeg), making it suitable for use in media server stacks or automated pipelines.
 
-## Getting started
+## Features
 
-Search and replace `express-docker-template` with the name of your service (slugified). Then run `bash ./rebuild` to start up. Then begin development!
+- **Job Queue Management:** Schedules and executes transcoding jobs based on system resource availability and job priority.
+- **Resource Monitoring:** Dynamically adjusts job concurrency based on real-time system memory usage to prevent overload.
+- **Extensible Architecture:** Easily integrates with custom job generators, logging, and external processing logic.
+- **Web Interface (Optional):** Includes a simple web UI for monitoring and control (see `output/`).
 
-## File descriptions
+## Running in Docker
 
-**build-image** | This script will bake a fresh docker image with all of your code and push it to docker hub using the current timestamp as a tag. Modify this file to reflect the username/repo_name of your image's repo and it will do the rest
+A `Dockerfile` is provided for containerized deployments. Ensure your media files are accessible to the container via a volume mount.
 
-**rebuild** | Helpful for rebuilding your docker container locally to rule out issues with missing packages or scrambled mounts due to branch changes.
-
-## To access your microservice
-
-One of two ways to do this is to add an `nginx` rule to the `local.tools.newsday.com.conf` (assuming the microservice lives in `devsign/tools` file in the nginx `sites-available` directory).
-
-1. Go to the `sites-available` directory located in `<your virtual_machines directory->/proxy/nginx-config/`
-2. Open the file `local.tools.newsday.com.conf` in your preferred text editor.
-
-   To open the file in `nano` for example use the command `nano local.tools.newsday.conf`
-
-3. Inside the file you will find various rules for different microservices that follow a similar format. Use the format below to add an additional rule for your microservice, note the braces mark the rule blocks so ensure your rule isn't placed inside another rule block.
-
-```nginx
-location ~ /<preferred URL for microservice>(.*) {
-    proxy_set_header HTTP_X_FORWARDED_PROTO https;
-    set $upstream http://<hostname>:3000$1$is_args$args;
-    proxy_pass  $upstream;
-}
+```sh
+docker build -t transcode-service .
+docker run -v /path/to/media:/media transcode-service
 ```
 
-where `hostname` is the `hostname` for your microservice as defined in its `docker-compose.yaml` file. 4. Save, exit and then restart Docker (one is to click the docker icon in the menu bar on the tip and click "Restart").
+---
 
-Ensure your microservice is running (execute the `bash rebuild` command) then navigate to `local.tools.newsday.com/<your microservice endpoint>` and you should be able to see some message indicating the microservice is online.
+# File Reference
+
+Below is a detailed description of the key files and directories in the `transcode` project:
+
+## bin/
+- **server.js**: Entry point for starting the transcode service. Sets up the job queue and any required listeners or web interfaces.
+
+## lib/
+- **transcodeQueue.js**: Implements the main job queue and scheduler. Monitors system resources, applies compute penalties, and schedules jobs based on priority and available compute. Handles job execution and cleanup.
+- **transcode.js**: Contains the core transcoding logic, typically invoking ffmpeg or similar tools to process media files. Receives jobs from the queue and manages the transcoding process.
+- **generate_filelist.js**: Scans for files needing transcoding and generates a list of jobs. Can be customized to define job discovery logic.
+- **generate_transcode_instructions.js**: Generates detailed instructions or command-line arguments for transcoding jobs, ensuring the correct parameters are passed to the transcoder based on job requirements and media metadata.
+- **logger.mjs**: Provides logging utilities for info, debug, and error messages throughout the service.
+- **update_active.js**: Updates the status of active jobs in the system, ensuring the queue and job list remain in sync.
+- **dayjs.js**: Utility for date and time manipulation, used for timestamping and scheduling.
+- **db_cleanup.js**: Handles cleanup of database records related to completed or failed jobs.
+- **deleteDeletedByTMM.js**: Removes files or records that have been deleted by the TinyMediaManager (TMM) integration.
+- **exec_promise.js**: Utility for executing shell commands as promises, used for running external tools like ffmpeg.
+- **ffprobe.js**: Integrates with ffprobe to extract media metadata for job analysis and validation.
+- **fs_monitor.js**: Monitors filesystem changes to trigger job generation or updates.
+- **fs.js**: Filesystem utility functions used throughout the service.
+- **generate_integrity_filelist.js**: Generates file lists for integrity checking.
+- **integrityCheck.js**: Performs integrity checks on media files to ensure successful processing.
+- **integrityQueue.js**: Manages a queue for integrity check jobs, similar to the transcode queue.
+- **lang.js**: Handles language and localization utilities.
+- **memcached.js**: Integrates with Memcached for caching job or file metadata.
+- **metrics.js**: Collects and reports service metrics (e.g., job throughput, errors).
+- **mongo_connection.js**: Manages MongoDB connections for job and file metadata storage.
+- **moveFile.js**: Handles moving files as part of the transcoding or post-processing workflow.
+- **pre_sanitize.js**: Pre-processes and sanitizes job inputs before transcoding.
+- **probe_and_upsert.js**: Probes files for metadata and upserts records into the database.
+- **rabbitmq.js**: Integrates with RabbitMQ for distributed job queueing (if used).
+- **redis.js**: Integrates with Redis for caching or queue management.
+- **round-compute-score.js**: Utility for rounding compute scores for job scheduling.
+- **sqs_poller.js.sample**: Sample integration for polling AWS SQS for jobs.
+- **tmdb_api.js**: Integrates with The Movie Database (TMDb) API for metadata enrichment.
+- **update_queue.js**: Updates the job queue state.
+- **update_status.js**: Updates the status of individual jobs.
+- **upsert_video.js**: Inserts or updates video records in the database.
+- **wait.js**: Utility for introducing delays in async workflows.
+
+## models/
+- **cleanup.js**: Handles cleanup logic for job and file models.
+- **error.js**: Defines error models for job processing.
+- **files.js**: Models for file metadata and job tracking.
+- **integrityError.js**: Models for integrity check errors.
+
+## output/
+- **index.html**: Main entry point for the web UI.
+- **src/**: Contains React components and styles for the web interface.
+
+## Dockerfile
+Defines the build steps for containerizing the transcode service.
+
+## package.json
+Lists Node.js dependencies and scripts for building and running the service.
+
+## webpack.config.js
+Configuration for building the web UI with Webpack.
+
+---
+
+# Detailed File Sections
+
+## lib/transcode.js
+This file contains the core transcoding logic for the service. It is responsible for:
+- Invoking ffmpeg (or similar tools) to process media files according to job specifications.
+- Handling input and output file paths, transcoding parameters, and error management.
+- Integrating with the job queue to receive jobs and report completion or failure.
+- Supporting extensibility for custom transcoding workflows or additional processing steps.
+
+## lib/transcodeQueue.js
+This file implements the main job queue and scheduler. Its responsibilities include:
+- Managing a pool of active transcoding jobs and tracking their compute usage.
+- Monitoring system resources (especially memory) and applying penalties to reduce concurrency under high load.
+- Scheduling jobs based on priority, available compute, and job requirements.
+- Preventing duplicate jobs and ensuring high-priority jobs are not starved.
+- Handling job execution, cleanup, and file list regeneration after job completion.
+
+## lib/generate_transcode_instructions.js
+This file generates detailed instructions or command-line arguments for each transcoding job. It is responsible for:
+- Translating job requirements and media metadata into the correct ffmpeg (or other transcoder) command-line options.
+- Ensuring that the transcoding process receives all necessary parameters for codecs, bitrates, resolutions, and other settings.
+- Supporting customization for different media types, target formats, or workflow needs.
+
+---
+
+# License
+
+MIT License
