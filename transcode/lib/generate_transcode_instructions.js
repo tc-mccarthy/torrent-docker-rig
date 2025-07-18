@@ -7,7 +7,7 @@
  */
 export function generateTranscodeInstructions (mongoDoc) {
   const {
-    ffprobe,
+    probe: ffprobe,
     audio_language = []
   } = mongoDoc;
 
