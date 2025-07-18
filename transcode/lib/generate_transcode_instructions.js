@@ -52,7 +52,7 @@ export function generateTranscodeInstructions (mongoDoc) {
     if (mainVideo.color_transfer?.includes('2084')) {
       hdrProps.color_primaries = mainVideo.color_primaries;
       hdrProps.color_transfer = mainVideo.color_transfer;
-      hdrProps.colorspace = mainVideo.colorspace;
+      hdrProps.color_space = mainVideo.color_space;
 
       const sideData = mainVideo.side_data_list || [];
       const masteringDisplay = sideData.find((d) => d.side_data_type === 'Mastering display metadata');
