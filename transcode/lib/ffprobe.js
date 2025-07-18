@@ -6,67 +6,125 @@ import { trash } from './fs';
 import logger from './logger';
 
 /**
- * Runs ffprobe on the given media file and returns parsed JSON data.
- * - Uses `child_process.spawn` to stream output line-by-line.
- * - Avoids memory overload by not including -show_frames or -show_packets.
- * - Includes container, stream, chapter, and program metadata.
- *
- * @param {string} filePath - Absolute or relative path to a video/audio file.
- * @returns {Promise<Object>} - Resolves with the parsed ffprobe output as a JSON object.
+ * Parses a frame rate string like "30000/1001" into a float.
+ * @param {string} ratio - Frame rate as a string ratio.
+ * @returns {number|null} - Parsed frame rate or null if invalid.
  */
-export function ffprobe_promise (filePath) {
+function parseFrameRate (ratio) {
+  try {
+    if (typeof ratio !== 'string') return null;
+    const [num, den] = ratio.split('/').map((v) => parseInt(v, 10));
+    if (!den || Number.isNaN(num)) return null;
+    return num / den;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fallback slow ffprobe call using -count_frames for accurate nb_frames.
+ * @param {string} filePath - Media file path.
+ * @returns {Promise<Object>} - Full ffprobe JSON output.
+ */
+async function ffprobe_with_count_frames (filePath) {
   return new Promise((resolve, reject) => {
-    // ffprobe arguments to collect detailed, but safe, metadata
     const args = [
-      '-v', 'error', // suppress non-error logs
-      '-count_frames', // force counting actual frame numbers
-      '-show_format', // return format/container-level info
-      '-show_streams', // return data for video/audio/subtitle streams
-      '-show_chapters', // include chapter metadata if present
-      '-show_programs', // useful for MPEG-TS or complex containers
-      '-print_format', 'json', // output as structured JSON
-      filePath // input media file
+      '-v', 'error',
+      '-count_frames',
+      '-show_format',
+      '-show_streams',
+      '-show_chapters',
+      '-show_programs',
+      '-print_format', 'json',
+      filePath
     ];
 
-    // Start ffprobe as a child process
     const ffprobe = spawn('ffprobe', args);
-
-    // Buffer lines one-by-one to safely assemble JSON
     const lines = [];
 
-    // Read stdout line-by-line using readline
     const rl = readline.createInterface({
       input: ffprobe.stdout,
       crlfDelay: Infinity
     });
 
-    // Accumulate each line
-    rl.on('line', (line) => {
-      lines.push(line);
-    });
-
-    // When stream ends, parse full JSON
+    rl.on('line', (line) => lines.push(line));
     rl.on('close', () => {
       try {
+        resolve(JSON.parse(lines.join('\n')));
+      } catch (err) {
+        reject(new Error(`Failed to parse ffprobe output: ${err.message}`));
+      }
+    });
+
+    ffprobe.stderr.on('data', () => {});
+    ffprobe.on('error', (err) => reject(new Error(`Failed to start ffprobe: ${err.message}`)));
+    ffprobe.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`ffprobe exited with code ${code}`));
+      }
+    });
+  });
+}
+
+/**
+ * Runs ffprobe on the given media file and returns parsed JSON data.
+ * Attempts to avoid -count_frames unless necessary.
+ *
+ * @param {string} filePath - Path to a media file.
+ * @returns {Promise<Object>} - Parsed ffprobe data.
+ */
+export function ffprobe_promise (filePath) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-v', 'error',
+      '-show_format',
+      '-show_streams',
+      '-show_chapters',
+      '-show_programs',
+      '-print_format', 'json',
+      filePath
+    ];
+
+    const ffprobe = spawn('ffprobe', args);
+    const lines = [];
+
+    const rl = readline.createInterface({
+      input: ffprobe.stdout,
+      crlfDelay: Infinity
+    });
+
+    rl.on('line', (line) => lines.push(line));
+
+    rl.on('close', async () => {
+      try {
         const json = JSON.parse(lines.join('\n'));
+
+        const needsFallback = (json.streams || []).some((stream) => {
+          if (stream.codec_type !== 'video') return false;
+          if (!stream.nb_frames || stream.nb_frames === 'N/A') {
+            const fps = parseFrameRate(stream.avg_frame_rate || stream.r_frame_rate);
+            const duration = parseFloat(stream.duration);
+
+            if (!fps || Number.isNaN(duration)) return true;
+
+            stream.nb_frames = Math.round(fps * duration).toString();
+          }
+          return false;
+        });
+
+        if (needsFallback) {
+          const detailed = await ffprobe_with_count_frames(filePath);
+          return resolve(detailed);
+        }
+
         resolve(json);
       } catch (err) {
         reject(new Error(`Failed to parse ffprobe output: ${err.message}`));
       }
     });
 
-    // Optional: collect stderr output (ignored here)
-    ffprobe.stderr.on('data', (data) => {
-      // Uncomment for debugging:
-      // console.warn('ffprobe stderr:', data.toString());
-    });
-
-    // Handle spawn errors (e.g., binary not found)
-    ffprobe.on('error', (err) => {
-      reject(new Error(`Failed to start ffprobe: ${err.message}`));
-    });
-
-    // Handle non-zero exit codes
+    ffprobe.stderr.on('data', () => {});
+    ffprobe.on('error', (err) => reject(new Error(`Failed to start ffprobe: ${err.message}`)));
     ffprobe.on('close', (code) => {
       if (code !== 0) {
         reject(new Error(`ffprobe exited with code ${code}`));
@@ -77,7 +135,6 @@ export function ffprobe_promise (filePath) {
 
 export default async function ffprobe_func (file) {
   try {
-    // confirm the file exists
     if (!fs.existsSync(file)) {
       return new Error(`File does not exist: ${file}`);
     }
@@ -102,7 +159,6 @@ export default async function ffprobe_func (file) {
       video.aspect = aspect_round(video.width / video.height);
     }
 
-    // mark the video as unsupported if it has a dv_profile value and that value is less than 8
     if (video.side_data_list?.dv_profile && video.side_data_list?.dv_profile < 8) {
       throw new Error(`Video not supported: Dolby Vision profile version is less than 8`);
     }
