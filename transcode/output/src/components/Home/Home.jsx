@@ -189,10 +189,6 @@ function Home () {
             {data.timemark}
           </div>
           <div className="widget">
-            <strong>Profile</strong>
-            {data.name}
-          </div>
-          <div className="widget">
             <strong>Audio Languages</strong>
             {data.audio_language.filter((lang) => lang.length > 2 && !/und/.test(lang)).join(', ')}
           </div>
