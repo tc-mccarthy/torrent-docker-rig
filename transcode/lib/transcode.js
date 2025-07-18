@@ -125,7 +125,7 @@ export default function transcode (file) {
       let ffmpeg_cmd;
       let start_time;
       const original_size = (await stat(file)).size;
-      let lastLogTime = 0;
+      let lastLogTime = Date.now();
 
       cmd = cmd
         .on('start', async (commandLine) => {
@@ -143,6 +143,7 @@ export default function transcode (file) {
         })
         .on('progress', (progress) => {
           const now = Date.now();
+
           if (now - lastLogTime < LOG_THROTTLE_MS) return;
           lastLogTime = now;
 
