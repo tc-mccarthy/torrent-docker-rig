@@ -13,8 +13,8 @@ export function generateTranscodeInstructions (mongoDoc) {
 
   const streams = ffprobe.streams || [];
   const format = ffprobe.format || {};
-  const fileSizeBytes = parseInt(format.size || 0, 10);
-  const fileSizeGB = fileSizeBytes / (1024 ** 3);
+  const fileSizeKB = parseInt(format.size || 0, 10);
+  const fileSizeGB = fileSizeKB / (1024 ** 2);
 
   // Split streams by type
   const videoStreams = streams.filter((s) => s.codec_type === 'video');
