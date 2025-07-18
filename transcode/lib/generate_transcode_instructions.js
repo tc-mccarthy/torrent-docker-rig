@@ -43,14 +43,35 @@ export function generateTranscodeInstructions (mongoDoc) {
   if (fileSizeGB <= 1 && isHEVC) {
     result.video = {
       stream_index: mainVideo.index,
-      codec: 'copy'
+      codec: 'copy',
+      arguments: {}
     };
   } else {
+    const hdrProps = {};
+    if (mainVideo.color_transfer?.includes('2084')) {
+      hdrProps.color_primaries = mainVideo.color_primaries;
+      hdrProps.color_transfer = mainVideo.color_transfer;
+      hdrProps.colorspace = mainVideo.colorspace;
+
+      const sideData = mainVideo.side_data_list || [];
+      const masteringDisplay = sideData.find((d) => d.side_data_type === 'Mastering display metadata');
+      const contentLightLevel = sideData.find((d) => d.side_data_type === 'Content light level metadata');
+
+      if (masteringDisplay) {
+        hdrProps.master_display = masteringDisplay.mastering_display_metadata;
+      }
+      if (contentLightLevel) {
+        hdrProps.cll = contentLightLevel.content_light_level_metadata;
+      }
+    }
     result.video = {
       stream_index: mainVideo.index,
       codec: 'libsvtav1',
-      profile: 7,
-      crf: isUHD ? 28 : 30
+      arguments: {
+        profile: 7,
+        crf: isUHD ? 28 : 30,
+        ...hdrProps // Spread HDR properties if available
+      }
     };
   }
 
@@ -92,7 +113,7 @@ export function generateTranscodeInstructions (mongoDoc) {
     const lang = (stream.tags?.language || 'und').toLowerCase();
     const codec = stream.codec_name.toLowerCase();
 
-    return (['en', 'eng', 'und'].includes(lang) && ['subrip', 'pgs', 'ass'].includes(codec));
+    return (['en', 'eng', 'und'].includes(lang) && /subrip|hdmv_pgs_subtitle|substation/i.test(codec));
   }).map((stream) => ({
     stream_index: stream.index,
     codec: 'copy'
