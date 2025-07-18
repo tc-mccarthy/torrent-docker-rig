@@ -84,7 +84,7 @@ export default async function ffprobe_func (file) {
 
     const data = await ffprobe_promise(file);
 
-    logger.debug(data, { label: 'FFProbe complete' });
+    logger.info(data, { label: 'FFProbe complete' });
 
     data.format.duration = +data.format.duration;
     data.format.size = +data.format.size;
