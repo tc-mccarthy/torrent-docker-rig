@@ -185,9 +185,9 @@ function Home () {
           <strong>{data.file}</strong>
           {' '}
           (
-          {data.video_stream.codec_name}
+          {data.source_video_codec}
           /
-          {data.audio_streams[0].codec_name}
+          {data.source_audio_codec}
           )
         </div>
       )}
@@ -217,12 +217,7 @@ function Home () {
           </div>
           <div className="widget">
             <strong>Audio Languages</strong>
-            {data.audio_streams.map((stream) => stream.tags?.language).reduce((a, c) => {
-              if (!a.includes(c)) {
-                a.push(c);
-              }
-              return a;
-            }, []).join(', ')}
+            {data.audio_languages.join(', ')}
           </div>
         </div>
       )}

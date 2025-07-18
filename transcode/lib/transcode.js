@@ -2,7 +2,6 @@ import fs from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
 import dayjs from 'dayjs';
 import { stat } from 'fs/promises';
-import { setTimeout as delay } from 'timers/promises';
 import ffprobe from './ffprobe';
 import config from './config';
 import logger from './logger';
@@ -44,7 +43,6 @@ export default function transcode (file) {
         throw new Error(`Video record not found for file: ${file}`);
       }
 
-      const { profiles } = config;
       const exists = fs.existsSync(file);
 
       if (!exists) {
@@ -56,19 +54,10 @@ export default function transcode (file) {
 
       const transcode_instructions = generateTranscodeInstructions(video_record);
 
-      if (transcode_instructions) {
-        console.log('>> Transcode Instructions Generated <<');
-        console.log(transcode_instructions);
-        await delay(300 * 1000); // wait for 1 second to simulate processing
-      }
+      console.log('>> Transcode Instructions Generated <<');
+      console.log(transcode_instructions);
 
-      logger.debug(ffprobe_data, { label: '>> FFPROBE DATA >>' });
-
-      const video_stream = ffprobe_data.streams.find(
-        (s) => s.codec_type === 'video'
-      );
-
-      if (!video_stream) {
+      if (!transcode_instructions.video) {
         throw new Error('No video stream found');
       }
 
@@ -89,130 +78,6 @@ export default function transcode (file) {
         return resolve({ locked: true }); // mark locked as true so that the loop doesnt' delay the next start
       }
 
-      // get the audio stream, in english unless otherwise specified, with the highest channel count
-      const audio_stream_test = new RegExp(
-        (video_record.audio_language || ['und', 'eng']).join('|'),
-        'i'
-      );
-
-      // preserve the audio lines specified in the video record, sorted by channel count
-      const audio_streams = ffprobe_data.streams
-        .filter(
-          (s) =>
-            s.codec_type === 'audio' &&
-            (!s.tags?.language || audio_stream_test.test(s.tags.language))
-        )
-        .sort((a, b) => (a.channels > b.channels ? -1 : 1));
-
-      if (!audio_streams?.length) {
-        throw new Error('No audio stream found');
-      }
-
-      const map_metadata = [];
-
-      const subtitle_streams = ffprobe_data.streams.filter(
-        (s) =>
-          s.codec_type === 'subtitle' &&
-          s.tags?.language === 'eng' &&
-          /subrip|hdmv_pgs_subtitle|substation/i.test(s.codec_name)
-      );
-      let transcode_video = false;
-      let transcode_audio = false;
-      const hwaccel = video_record.permitHWDecode ? 'auto' : 'none';
-      const video_filters = [];
-      const audio_filters = [];
-
-      const conversion_profile = config.get_profile(video_stream);
-
-      logger.debug(
-        {
-          video_stream_width: video_stream.width,
-          video_stream_aspect: video_stream.aspect,
-          conversion_profile,
-          profiles
-        },
-        { label: 'Profile debug info' }
-      );
-
-      conversion_profile.width =
-        conversion_profile.dest_width || conversion_profile.width;
-
-      // if the video codec doesn't match the profile
-      if (
-        conversion_profile.output.video.codec_name !== video_stream.codec_name
-      ) {
-        transcode_video = true;
-      }
-
-      // add transcode instructions for any audio streams that don't match the profile
-      audio_streams.forEach((audio_stream, idx) => {
-        map_metadata.push(`-map_metadata:s:a:${idx} 0:s:a:${idx}`); // source the metadata from the original audio stream
-
-        if (
-          conversion_profile.output.audio.codec_name !== audio_stream.codec_name
-        ) {
-          transcode_audio = true;
-          audio_filters.push(
-            `-c:a:${idx} ${conversion_profile.output.audio.codec}`, // specify the codec for this audio stream on the output
-            `-b:a:${idx} ${
-              audio_stream.channels *
-              conversion_profile.output.audio.per_channel_bitrate
-            }k` // set the bitrate for this audio stream
-          );
-        }
-      });
-
-      // if the video codec matches the profile, but the bitrate is higher than the profile
-      if (
-        ffprobe_data.format.bit_rate >
-          conversion_profile.bitrate * 1024 * 1024 &&
-        !transcode_video
-      ) {
-        logger.debug(
-          'Video stream bitrate higher than conversion profile. Transcoding'
-        );
-        transcode_video = true;
-      }
-
-      // if the video is 1gb or less in size and the codec is HEVC, don't transcode
-      if (
-        video_stream.codec_name === 'hevc' &&
-        ffprobe_data.format.size <= 1048576
-      ) {
-        logger.debug(
-          'Video stream codec is HEVC and size is less than 1GB. Not transcoding'
-        );
-        transcode_video = false;
-      }
-
-      // if the video is 350mb or less in size and the codec is h264, don't transcode
-      if (
-        video_stream.codec_name === 'h264' &&
-        ffprobe_data.format.size <= 350000
-      ) {
-        logger.debug(
-          'Video stream codec is h264 and size is less than 350mb. Not transcoding'
-        );
-        transcode_video = false;
-      }
-
-      const input_maps = [`-map 0:${video_stream.index}`].concat(
-        audio_streams.map((s) => `-map 0:${s.index}`)
-      );
-
-      if (subtitle_streams.length > 0) {
-        subtitle_streams.forEach((s, idx) => {
-          input_maps.push(`-map 0:${s.index}`);
-          map_metadata.push(`-map_metadata:s:s:${idx} 0:s:s:${idx}`); // source the metadata from the original audio stream
-        });
-
-        input_maps.push('-c:s copy');
-      }
-
-      if (ffprobe_data.chapters.length > 0) {
-        input_maps.push(`-map_chapters 0`);
-      }
-
       // if the file hasn't already been integrity checked, do so now
       if (!video_record.integrityCheck) {
         logger.info(
@@ -221,43 +86,39 @@ export default function transcode (file) {
         await integrityCheck(video_record);
       }
 
-      let cmd = ffmpeg(file);
+      const hwaccel = video_record.permitHWDecode ? 'auto' : 'none';
 
-      cmd = cmd
-        .inputOptions(['-v fatal', '-stats', `-hwaccel ${hwaccel}`].filter((f) => f)) // use hardware acceleration if not transcoding video
-        .outputOptions(input_maps);
+      const source_video_codec = ffprobe_data.streams.find((s) => s.codec_type === 'video')?.codec_name;
+      const source_audio_codec = ffprobe_data.streams.find((s) => s.codec_type === 'audio')?.codec_name;
+      const {audio_language} = video_record
 
-      if (transcode_video) {
-        // handle HDR
-        if (/arib[-]std[-]b67|smpte2084/i.test(video_stream.color_transfer)) {
-          conversion_profile.name += ` (hdr)`; // add HDR to the profile name
-        }
+      // start by mapping in the video stream and then all of the audio streams and then all of the subtitle streams
+      const input_maps = [`-map 0:${transcode_instructions.video.stream_index}`]
+        .concat(transcode_instructions.audio.map((audio) => `-map 0:${audio.stream_index}`))
+        .concat(transcode_instructions.subtitles.map((subtitle) => `-map 0:${subtitle.stream_index}`));
 
-        cmd = cmd.outputOptions([
-          `-c:v ${conversion_profile.output.video.codec}`,
-          ...Object.keys(conversion_profile.output.video.flags || {}).map(
-            (k) => `-${k} ${conversion_profile.output.video.flags[k]}`
-          ),
-          ...map_metadata
+      // if there are chapters, map them in
+      if (ffprobe_data.chapters.length > 0) {
+        input_maps.push(`-map_chapters 0`);
+      }
+
+      let cmd = ffmpeg(file).inputOptions(['-v fatal', '-stats', `-hwaccel ${hwaccel}`].filter((f) => f))
+        .outputOptions(input_maps) // Map out the streams we want to preserve
+        .outputOptions([ // Handle the video output options
+          `-c:v ${transcode_instructions.video.codec}`,
+          ...Object.keys(transcode_instructions.video.arguments || {}).map(
+            (k) => `-${k} ${transcode_instructions.video.arguments[k]}`
+          )
+        ])
+        .outputOptions([ // Handle the audio output options
+          ...transcode_instructions.audio.map((audio, audio_idx) => `-c:a:${audio_idx} ${audio.codec} -b:a:${audio_idx} ${audio.bitrate} -map_metadata:s:a:${audio_idx} 0:s:a:${audio_idx}`)
+        ])
+        .outputOptions([ // Handle the subtitle output options
+          ...transcode_instructions.subtitles.map((subtitle, sub_idx) => `-c:s:${sub_idx} ${subtitle.codec} -map_metadata:s:s:${sub_idx} 0:s:s:${sub_idx}`)
+        ])
+        .outputOptions([ // Handle the global metadata
+          `-metadata encode_version=${encode_version}`
         ]);
-      } else {
-        cmd = cmd.outputOptions('-c:v copy');
-      }
-
-      if (video_filters.length > 0) {
-        cmd = cmd.outputOptions(['-vf', ...video_filters]);
-      }
-
-      if (!transcode_audio) {
-        cmd = cmd.outputOptions('-c:a copy');
-      } else {
-        // add unique audio filters to output options
-        cmd = cmd.outputOptions(
-          audio_filters.filter((prop, idx, self) => self.indexOf(prop) === idx)
-        );
-      }
-
-      cmd = cmd.outputOptions(`-metadata encode_version=${encode_version}`);
 
       let ffmpeg_cmd;
       let start_time;
@@ -303,9 +164,9 @@ export default function transcode (file) {
           const output = JSON.stringify(
             {
               ...progress,
-              video_stream,
-              audio_streams,
-              audio_language: video_record.audio_language,
+              source_audio_codec,
+              source_video_codec,
+              audio_language,
               run_time,
               pct_per_second,
               pct_remaining,
@@ -343,7 +204,6 @@ export default function transcode (file) {
           console.clear();
           logger.debug(
             {
-              ...conversion_profile,
               ffmpeg_cmd,
               file
             },
@@ -355,10 +215,7 @@ export default function transcode (file) {
           fs.writeFileSync(
             `/usr/app/output/active-${video_record._id}.json`,
             JSON.stringify({
-              ...conversion_profile,
               ffmpeg_cmd,
-              audio_streams,
-              video_stream,
               audio_language: video_record.audio_language,
               file,
               output: JSON.parse(output)
