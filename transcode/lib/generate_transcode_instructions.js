@@ -109,6 +109,8 @@ export function generateTranscodeInstructions (mongoDoc) {
         instruction.codec = 'eac3';
         instruction.bitrate = 128000 * channels;
       }
+
+      instruction.bitrate = `${instruction.bitrate / 1000}k`; // Convert to kbps
     }
 
     return instruction;
