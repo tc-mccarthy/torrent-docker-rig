@@ -39,6 +39,7 @@ export default class TranscodeQueue {
 
   // Returns total compute in use
   getUsedCompute () {
+    logger.info(this.runningJobs, { label: 'Running Jobs' });
     return this.runningJobs.reduce((sum, job) => sum + job.computeScore, 0);
   }
 

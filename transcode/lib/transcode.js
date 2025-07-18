@@ -129,7 +129,6 @@ export default function transcode (file) {
       const startTime = Date.now();
       let lastLogTime = startTime;
 
-
       cmd = cmd
         .on('start', async (commandLine) => {
           logger.info(`Spawned Ffmpeg with command: ${commandLine}`);
