@@ -185,9 +185,9 @@ function Home () {
           <strong>{data.file}</strong>
           {' '}
           (
-          {data.source_video_codec}
+          {data.output.source_video_codec}
           /
-          {data.source_audio_codec}
+          {data.output.source_audio_codec}
           )
         </div>
       )}
@@ -217,7 +217,7 @@ function Home () {
           </div>
           <div className="widget">
             <strong>Audio Languages</strong>
-            {data.audio_language.filter((lang) => lang.length > 2).join(', ')}
+            {data.audio_language.filter((lang) => lang.length > 2 && !/und/.test(lang)).join(', ')}
           </div>
         </div>
       )}
