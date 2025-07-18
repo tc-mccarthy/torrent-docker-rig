@@ -56,6 +56,8 @@ export default function transcode (file) {
       const video_record = file;
       file = file.path;
 
+      logger.info(`Transcoding file: ${file}`, { label: 'Transcode' });
+
       // Validate input and presence of Mongo record
       if (!video_record || !video_record?._id) {
         throw new Error(`Video record not found for file: ${file}`);
@@ -70,8 +72,7 @@ export default function transcode (file) {
       video_record.probe = ffprobe_data;
 
       const transcode_instructions = generateTranscodeInstructions(video_record);
-      console.log('>> Transcode Instructions Generated <<');
-      console.log(transcode_instructions);
+      logger.info(transcode_instructions, { label: 'Transcode Instructions' });
 
       if (!transcode_instructions.video) {
         throw new Error('No video stream found');
