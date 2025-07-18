@@ -68,8 +68,13 @@ export default function transcode (file) {
       }
 
       // Probe the input video and attach metadata to record
-      const ffprobe_data = await ffprobe(file);
-      video_record.probe = ffprobe_data;
+      let ffprobe_data = video_record.probe;
+
+      if (!ffprobe_data) {
+        ffprobe_data = await ffprobe(file);
+        video_record.probe = ffprobe_data;
+        await video_record.saveDebounce();
+      }
 
       const transcode_instructions = generateTranscodeInstructions(video_record);
       logger.info(transcode_instructions, { label: 'Transcode Instructions' });
@@ -109,7 +114,11 @@ export default function transcode (file) {
       }
 
       const mainVideoStream = ffprobe_data.streams.find((s) => s.codec_type === 'video');
-      const totalFrames = parseInt(mainVideoStream.nb_frames || 0, 10);
+      let totalFrames = parseInt(mainVideoStream.nb_frames || 0, 10);
+
+      if (Number.isNaN(totalFrames) || totalFrames <= 0) {
+        totalFrames = 0;
+      }
 
       let cmd = ffmpeg(file).inputOptions(['-v fatal', '-stats', `-hwaccel ${hwaccel}`].filter(Boolean))
         .outputOptions(input_maps)
