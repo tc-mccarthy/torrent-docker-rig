@@ -126,7 +126,9 @@ export default function transcode (file) {
       let ffmpeg_cmd;
       let start_time;
       const original_size = (await stat(file)).size;
-      let lastLogTime = Date.now();
+      const startTime = Date.now();
+      let lastLogTime = startTime;
+
 
       cmd = cmd
         .on('start', async (commandLine) => {
@@ -161,6 +163,7 @@ export default function transcode (file) {
 
           const output = JSON.stringify({
             ...progress,
+            startTime,
             refreshed: Date.now(),
             percent,
             source_audio_codec,

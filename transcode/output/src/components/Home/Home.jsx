@@ -26,7 +26,7 @@ export function time_remaining (timestamp) {
   const seconds = Math.floor(diff / 1000);
   return {
     formatted: formatSecondsToHHMMSS(seconds),
-    datetime: dayjs().unix(timestamp).local().format('MM/DD/YYYY HH:mm:ss')
+    datetime: estimated_local_time(seconds)
   };
 }
 
@@ -243,10 +243,10 @@ function Home () {
           </div>
           <div className="widget">
             <strong>ETA</strong>
-            {estimated_local_time(data.est_completed_timestamp).formatted}
+            {time_remaining(data.est_completed_timestamp).formatted}
             <em>
               (
-              {estimated_local_time(data.est_completed_timestamp).datetime}
+              {time_remaining(data.est_completed_timestamp).datetime}
               )
             </em>
           </div>
