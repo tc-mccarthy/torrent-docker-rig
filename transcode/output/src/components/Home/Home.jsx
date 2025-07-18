@@ -217,7 +217,7 @@ function Home () {
           </div>
           <div className="widget">
             <strong>Audio Languages</strong>
-            {data.audio_languages.join(', ')}
+            {data.audio_language.filter((lang) => lang.length > 2).join(', ')}
           </div>
         </div>
       )}
