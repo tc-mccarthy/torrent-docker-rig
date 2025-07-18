@@ -93,7 +93,7 @@ export function generateTranscodeInstructions (mongoDoc) {
         max_muxing_queue_size: 9999,
         tune: 0,
         usage: 0, // Low latency good quality (0 = best quality)
-        tier: 0,  // Main tier
+        tier: 0, // Main tier
         avoid_negative_ts: 'make_zero', // Fix for Plex timestamp handling
         g: calculateGOP(mainVideo), // Dynamically determined GOP size
         preset: determinePreset(isUHD, fileSizeGB),
