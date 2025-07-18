@@ -6,14 +6,14 @@
  * @param {string} command - The raw FFmpeg command string.
  * @returns {string} - A human-readable, line-separated version of the command.
  */
-export default function formatFFmpegCommandSimple(command) {
+export default function formatFFmpegCommandSimple (command) {
   if (!command.trim().startsWith('ffmpeg')) return command;
 
   const tokens = command.trim().match(/(?:[^\s"]+|"[^"]*")+/g) || [];
   const output = ['ffmpeg \\'];
 
   // Skip the first token ("ffmpeg")
-  for (let i = 1; i < tokens.length; i++) {
+  for (let i = 1; i < tokens.length; i += 1) {
     const token = tokens[i];
 
     if (token.startsWith('-')) {
@@ -23,7 +23,7 @@ export default function formatFFmpegCommandSimple(command) {
         output.push(`  ${token} \\`);
       } else {
         output.push(`  ${token} ${next} \\`);
-        i++; // Skip next token
+        i += 1; // Skip next token
       }
     } else {
       // Positional argument (e.g., input or output file)
