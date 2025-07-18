@@ -51,7 +51,7 @@ export function generateTranscodeInstructions (mongoDoc) {
     const hdrProps = {};
     if (mainVideo.color_transfer?.includes('2084')) {
       hdrProps.color_primaries = mainVideo.color_primaries;
-      hdrProps.color_transfer = mainVideo.color_transfer;
+      hdrProps.color_trc = mainVideo.color_transfer;
       hdrProps.colorspace = mainVideo.color_space;
 
       const sideData = mainVideo.side_data_list || [];
