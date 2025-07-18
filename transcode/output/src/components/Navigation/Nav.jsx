@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import md5 from 'crypto-js/md5';
 import './Nav.scss';
+import { time_remaining } from '../../time_functions';
 
 export default function Nav ({ data, setDataSelection, dataSelection, availableCompute }) {
   function display_file_name (file) {
@@ -37,7 +38,7 @@ export default function Nav ({ data, setDataSelection, dataSelection, availableC
                   %)
                 </strong>
                 <div>
-                  {item.time_remaining}
+                  {time_remaining((item.est_completed_timestamp - Date.now()) / 1000).formatted}
                   {' '}
                   {item.name && `- ${item.name}`}
                 </div>

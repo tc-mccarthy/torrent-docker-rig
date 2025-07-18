@@ -2,33 +2,10 @@ import React, { useState } from 'react';
 import './Home.scss';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
-import dayjs from '../../dayjs';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
 // import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 import Nav from '../Navigation/Nav';
-
-export function formatSecondsToHHMMSS (totalSeconds) {
-  if (Number.isNaN(totalSeconds)) return 'calculating';
-
-  const total = Math.ceil(Number(totalSeconds)); // round up
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const seconds = total % 60;
-
-  const pad = (n) => String(n).padStart(2, '0');
-
-  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
-}
-
-export function time_remaining (timestamp) {
-  const now = Date.now();
-  const diff = timestamp - now;
-  const seconds = Math.floor(diff / 1000);
-  return {
-    formatted: formatSecondsToHHMMSS(seconds),
-    datetime: estimated_local_time(seconds)
-  };
-}
+import { time_remaining, formatSecondsToHHMMSS } from '../../time_functions';
 
 /**
  * Converts a number of bytes into a human-readable string with appropriate units.
@@ -113,16 +90,6 @@ async function getData (setData, setFileList, setDisks, setUtilization, setStatu
       getData(...arguments);
     }, 1 * 1000);
   }
-}
-
-function estimated_local_time (seconds) {
-  const final_time = dayjs().add(seconds, 'seconds');
-  let fmt_string = 'MM/DD/YYYY HH:mm:ss';
-
-  if (final_time.isSame(dayjs(), 'day')) {
-    fmt_string = 'HH:mm:ss';
-  }
-  return final_time.format(fmt_string);
 }
 
 function human_size (size) {
