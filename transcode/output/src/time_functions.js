@@ -23,6 +23,13 @@ export function time_remaining (timestamp) {
   };
 }
 
+export function elapsed (timestamp) {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  return formatSecondsToHHMMSS(seconds);
+}
+
 export function estimated_local_time (seconds) {
   const final_time = dayjs().add(seconds, 'seconds');
   let fmt_string = 'MM/DD/YYYY HH:mm:ss';

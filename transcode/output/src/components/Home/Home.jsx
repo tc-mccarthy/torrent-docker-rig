@@ -5,7 +5,7 @@ import Box from '@mui/material/Box';
 import LinearProgressWithLabel from '../LinearProgressWithLabel/LinearProgressWithLabel';
 // import CircularProgressWithLabel from '../CircularProgressWithLabel/CircularProgressWithLabel';
 import Nav from '../Navigation/Nav';
-import { time_remaining, formatSecondsToHHMMSS } from '../../time_functions';
+import { time_remaining, formatSecondsToHHMMSS, elapsed } from '../../time_functions';
 
 /**
  * Converts a number of bytes into a human-readable string with appropriate units.
@@ -182,7 +182,7 @@ function Home () {
         <div className="flex">
           <div className="widget">
             <strong>Elapsed</strong>
-            {data.run_time}
+            {elapsed(data.startTime)}
           </div>
           <div className="widget">
             <strong>Timecode</strong>
