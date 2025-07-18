@@ -31,7 +31,6 @@ import generate_filelist from './generate_filelist';
 import moveFile from './moveFile';
 import update_status from './update_status';
 import { generateTranscodeInstructions } from './generate_transcode_instructions';
-import display_ffmpeg_cmd from './ffmpeg_formatter';
 
 const { encode_version } = config;
 const LOG_THROTTLE_MS = 10000; // Throttle progress updates to every 10 seconds
@@ -143,7 +142,7 @@ export default function transcode (file) {
         .on('start', async (commandLine) => {
           logger.info(`Spawned Ffmpeg with command: ${commandLine}`);
           start_time = dayjs();
-          ffmpeg_cmd = display_ffmpeg_cmd(commandLine);
+          ffmpeg_cmd = commandLine;
           generate_filelist({ limit: 1000, writeToFile: true });
 
           video_record.error = undefined;
