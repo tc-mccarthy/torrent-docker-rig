@@ -20,6 +20,16 @@ export function formatSecondsToHHMMSS (totalSeconds) {
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
+export function time_remaining (timestamp) {
+  const now = Date.now();
+  const diff = timestamp - now;
+  const seconds = Math.floor(diff / 1000);
+  return {
+    formatted: formatSecondsToHHMMSS(seconds),
+    datetime: dayjs().unix(timestamp).local().format('MM/DD/YYYY HH:mm:ss')
+  };
+}
+
 /**
  * Converts a number of bytes into a human-readable string with appropriate units.
  *
@@ -233,10 +243,10 @@ function Home () {
           </div>
           <div className="widget">
             <strong>ETA</strong>
-            {data.time_remaining}
+            {estimated_local_time(data.est_completed_timestamp).formatted}
             <em>
               (
-              {estimated_local_time(data.est_completed_seconds)}
+              {estimated_local_time(data.est_completed_timestamp).datetime}
               )
             </em>
           </div>
