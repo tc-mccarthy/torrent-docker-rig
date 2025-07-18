@@ -71,7 +71,7 @@ export function generateTranscodeInstructions (mongoDoc) {
       arguments: {
         profile: 7,
         crf: isUHD ? 28 : 30,
-        tune: 0,
+        // tune: 0,
         maxrate: '10M',
         bufsize: '40M',
         max_muxing_queue_size: 9999,
