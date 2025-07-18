@@ -2,6 +2,7 @@ import fs from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
 import dayjs from 'dayjs';
 import { stat } from 'fs/promises';
+import { setTimeout as delay } from 'timers/promises';
 import ffprobe from './ffprobe';
 import config from './config';
 import logger from './logger';
@@ -14,6 +15,7 @@ import integrityCheck from './integrityCheck';
 import generate_filelist from './generate_filelist';
 import moveFile from './moveFile';
 import update_status from './update_status';
+import { generateTranscodeInstructions } from './generate_transcode_instructions';
 
 const { encode_version } = config;
 
@@ -50,6 +52,15 @@ export default function transcode (file) {
       }
 
       const ffprobe_data = await ffprobe(file);
+      video_record.probe = ffprobe_data;
+
+      const transcode_instructions = generateTranscodeInstructions(video_record);
+
+      if (transcode_instructions) {
+        console.log('>> Transcode Instructions Generated <<');
+        console.log(transcode_instructions);
+        await delay(300 * 1000); // wait for 1 second to simulate processing
+      }
 
       logger.debug(ffprobe_data, { label: '>> FFPROBE DATA >>' });
 
