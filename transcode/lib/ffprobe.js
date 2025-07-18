@@ -101,14 +101,20 @@ export function ffprobe_promise (filePath) {
 
         const needsFallback = (json.streams || []).some((stream) => {
           if (stream.codec_type !== 'video') return false;
+
           if (!stream.nb_frames || stream.nb_frames === 'N/A') {
             const fps = parseFrameRate(stream.avg_frame_rate || stream.r_frame_rate);
-            const duration = parseFloat(stream.duration);
+            let duration = parseFloat(stream.duration);
+
+            if (Number.isNaN(duration) && json.format?.duration) {
+              duration = parseFloat(json.format.duration);
+            }
 
             if (!fps || Number.isNaN(duration)) return true;
 
             stream.nb_frames = Math.round(fps * duration).toString();
           }
+
           return false;
         });
 
