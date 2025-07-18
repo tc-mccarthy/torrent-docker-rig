@@ -16,6 +16,11 @@ export function formatSecondsToHHMMSS (totalSeconds) {
 export function time_remaining (timestamp) {
   const now = Date.now();
   const diff = timestamp - now;
+
+  if (diff <= 0) {
+    return { formatted: 'Calculating...', datetime: '-' };
+  }
+
   const seconds = Math.floor(diff / 1000);
   return {
     formatted: formatSecondsToHHMMSS(seconds),
