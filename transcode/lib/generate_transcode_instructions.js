@@ -1,5 +1,12 @@
 /**
  * Generates transcoding instructions based on ffprobe and metadata (TMDb/TVDb) in a mongo document.
+ *
+ * This function analyzes video, audio, and subtitle streams and determines whether to copy or transcode
+ * based on stream characteristics (e.g., codec, size, resolution, HDR metadata). This version includes:
+ * - Dynamic GOP size calculation for improved Plex compatibility
+ * - Usage of `-avoid_negative_ts make_zero` to fix negative timestamps
+ * - SVT-AV1 `usage` and `tier` tuning for better encode control
+ *
  * @param {Object} mongoDoc - The Mongo document containing ffprobe and metadata info.
  * @returns {{
  *   video: {
@@ -37,14 +44,12 @@ export function generateTranscodeInstructions (mongoDoc) {
 
   const spokenLangs = audio_language.map((lang) => lang.toLowerCase());
 
-  // Final result object
   const result = {
     video: null,
     audio: [],
     subtitles: []
   };
 
-  // === VIDEO INSTRUCTION ===
   const mainVideo = videoStreams[0];
   if (!mainVideo) throw new Error('No video stream found');
 
@@ -55,7 +60,6 @@ export function generateTranscodeInstructions (mongoDoc) {
 
   console.log(`Processing video stream: ${videoCodec}, width: ${width}, size: ${fileSizeGB.toFixed(2)} GB`);
 
-  // If <=1GB and HEVC, copy the stream directly; otherwise re-encode to SVT-AV1
   if (fileSizeGB <= 1 && isHEVC) {
     result.video = {
       stream_index: mainVideo.index,
@@ -63,15 +67,12 @@ export function generateTranscodeInstructions (mongoDoc) {
       arguments: {}
     };
   } else {
-    // HDR properties (if present) for preserving Dolby Vision or HDR10+ info
     const hdrProps = {};
     if (mainVideo.color_transfer?.includes('2084')) {
-      // Color properties for HDR
       hdrProps.color_primaries = mainVideo.color_primaries;
       hdrProps.color_trc = mainVideo.color_transfer;
       hdrProps.colorspace = mainVideo.color_space;
 
-      // Optional mastering display metadata
       const sideData = mainVideo.side_data_list || [];
       const masteringDisplay = sideData.find((d) => d.side_data_type === 'Mastering display metadata');
       const contentLightLevel = sideData.find((d) => d.side_data_type === 'Content light level metadata');
@@ -91,21 +92,24 @@ export function generateTranscodeInstructions (mongoDoc) {
         pix_fmt: 'yuv420p10le',
         max_muxing_queue_size: 9999,
         tune: 0,
+        usage: 0, // Low latency good quality (0 = best quality)
+        tier: 0,  // Main tier
+        avoid_negative_ts: 'make_zero', // Fix for Plex timestamp handling
+        g: calculateGOP(mainVideo), // Dynamically determined GOP size
         preset: determinePreset(isUHD, fileSizeGB),
         crf: getCrfForResolution(width),
         ...getRateControl(width),
-        ...hdrProps // Spread HDR properties if available
+        ...hdrProps
       }
     };
   }
 
-  // === AUDIO INSTRUCTIONS ===
   const filteredAudio = audioStreams
     .filter((s) => {
       const lang = (s.tags?.language || 'und').toLowerCase();
       return spokenLangs.includes(lang);
     })
-    .sort((a, b) => (b.bit_rate || 0) - (a.bit_rate || 0)); // Sort by bitrate descending
+    .sort((a, b) => (b.bit_rate || 0) - (a.bit_rate || 0));
 
   result.audio = filteredAudio.map((stream) => {
     const lang = (stream.tags?.language || 'und').toLowerCase();
@@ -116,11 +120,9 @@ export function generateTranscodeInstructions (mongoDoc) {
     };
   });
 
-  // === SUBTITLE INSTRUCTIONS ===
   result.subtitles = subtitleStreams.filter((stream) => {
     const lang = (stream.tags?.language || 'und').toLowerCase();
     const codec = stream.codec_name.toLowerCase();
-
     return (['en', 'eng', 'und'].includes(lang) && /subrip|hdmv_pgs_subtitle|substation/i.test(codec));
   }).map((stream) => ({
     stream_index: stream.index,
@@ -130,23 +132,13 @@ export function generateTranscodeInstructions (mongoDoc) {
   return result;
 }
 
-/**
- * Chooses the best CRF based on resolution.
- * @param {number} width - The width of the video.
- * @returns {number} - Appropriate CRF value.
- */
 function getCrfForResolution (width) {
-  if (width >= 3840) return 28; // UHD
-  if (width >= 1920) return 30; // HD
-  if (width >= 1280) return 32; // 720p
-  return 34; // SD
+  if (width >= 3840) return 28;
+  if (width >= 1920) return 30;
+  if (width >= 1280) return 32;
+  return 34;
 }
 
-/**
- * Chooses maxrate and bufsize based on resolution.
- * @param {number} width - The width of the video.
- * @returns {{ maxrate: string, bufsize: string }} - Rate control settings.
- */
 function getRateControl (width) {
   let maxrate;
   if (width >= 3840) maxrate = '10M';
@@ -154,27 +146,16 @@ function getRateControl (width) {
   else if (width >= 1280) maxrate = '4M';
   else maxrate = '2M';
 
-  const maxrateValue = parseInt(maxrate, 10); // value in M
+  const maxrateValue = parseInt(maxrate, 10);
   const bufsize = `${maxrateValue * 3}M`;
 
   return { maxrate, bufsize };
 }
 
-/**
- * Determines the optimal SVT-AV1 preset for a given file.
- * @param {boolean} isUHD - Whether the video is UHD resolution.
- * @param {number} fileSizeGB - The file size in gigabytes.
- * @returns {number} - The encoder preset to use (lower is slower).
- */
 function determinePreset (isUHD, fileSizeGB) {
   return (isUHD || fileSizeGB > 10) ? 7 : 6;
 }
 
-/**
- * Determines appropriate audio codec and bitrate based on input stream.
- * @param {Object} stream - An audio stream object from ffprobe.
- * @returns {{ codec: string, bitrate?: string }} - Audio encoding settings.
- */
 function determineAudioCodec (stream) {
   const codec = stream.codec_name.toLowerCase();
   const channels = parseInt(stream.channels || 2, 10);
@@ -188,4 +169,17 @@ function determineAudioCodec (stream) {
   }
 
   return { codec: 'eac3', bitrate: `${(128000 * channels) / 1000}k` };
+}
+
+/**
+ * Dynamically calculates GOP size (group of pictures interval).
+ * Target is 2 seconds worth of frames.
+ * @param {Object} stream - The video stream.
+ * @returns {number} - GOP size in frames.
+ */
+function calculateGOP (stream) {
+  const fpsStr = stream.avg_frame_rate || stream.r_frame_rate;
+  const [num, den] = fpsStr.split('/').map((n) => parseInt(n, 10));
+  if (!den || Number.isNaN(num)) return 48; // fallback default
+  return Math.round((num / den) * 2); // 2-second GOP
 }
