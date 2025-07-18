@@ -110,8 +110,7 @@ export function generateTranscodeInstructions (mongoDoc) {
     .filter((s) => {
       const lang = (s.tags?.language || 'und').toLowerCase();
       return spokenLangs.includes(lang);
-    })
-    .sort((a, b) => (b.bit_rate || 0) - (a.bit_rate || 0));
+    });
 
   result.audio = filteredAudio.map((stream) => {
     const lang = (stream.tags?.language || 'und').toLowerCase();
