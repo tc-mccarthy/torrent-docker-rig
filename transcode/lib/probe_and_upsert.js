@@ -1,4 +1,5 @@
 import fs from 'fs';
+import crypto from 'crypto';
 import dayjs from './dayjs';
 import ffprobe from './ffprobe';
 import upsert_video from './upsert_video';
@@ -10,19 +11,58 @@ import config from './config';
 
 const { encode_version } = config;
 
+/**
+ * Computes a SHA-256 hash of the given file as a hex string.
+ * @param {string} filePath - Path to the file to hash.
+ * @returns {Promise<string>} - Hex-encoded hash string.
+ */
+function hashFile (filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(filePath);
+
+    stream.on('error', reject);
+
+    stream.on('data', (chunk) => {
+      hash.update(chunk);
+    });
+
+    stream.on('end', () => {
+      resolve(hash.digest('hex'));
+    });
+  });
+}
+
+/**
+ * Probes the video file, collects language and metadata, and upserts it into MongoDB.
+ * If the file has already been processed and its hash hasn't changed, probing is skipped.
+ *
+ * @param {string} file - Path to the video file.
+ * @param {string} record_id - Optional known record ID to associate with.
+ * @param {Object} opts - Optional additional properties to attach to the record.
+ * @returns {Promise<Object|false>} - ffprobe result or false if failed/skipped.
+ */
 export default async function probe_and_upsert (file, record_id, opts = {}) {
   file = file.replace(/\n+$/, '');
   try {
     const current_time = dayjs();
 
-    // check if the file exists
     if (!fs.existsSync(file)) {
       throw new Error('File not found');
     }
 
     const video_record = await File.findOne({ path: file });
 
+    // Hash the current file contents
+    const current_hash = await hashFile(file);
+
+    // If the file has already been processed and hash matches, skip probing
+    if (video_record?.file_hash === current_hash && video_record?.probe) {
+      return video_record.probe;
+    }
+
     const ffprobe_data = await ffprobe(file);
+    const tmdb_data = await tmdb_api(file);
 
     let languages = ['en', 'und'];
 
@@ -30,38 +70,28 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
       languages = languages.concat(video_record.audio_language);
     }
 
-    const tmdb_data = await tmdb_api(file);
-
     if (tmdb_data.spoken_languages) {
       languages = languages.concat(
         tmdb_data.spoken_languages.map((l) => l.iso_639_1)
       );
     }
 
-    // map the ISO 639-1 language codes to 639-2 but preserve the original as well
+    // Normalize and deduplicate languages
     languages = languages
-      .map((l) => {
-        const response = [l];
-
-        if (language_map[l]) {
-          response.push(language_map[l]);
-        }
-
-        return response;
-      })
-      .reduce((acc, val) => acc.concat(val), [])
-      .reduce((acc, val) => (acc.includes(val) ? acc : acc.concat(val)), []);
+      .map((l) => [l, language_map[l]].filter(Boolean))
+      .flat()
+      .filter((v, i, arr) => arr.indexOf(v) === i);
 
     await upsert_video({
       record_id,
       path: file,
+      file_hash: current_hash, // Save the hash to detect future changes
       probe: ffprobe_data,
       encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
       status: ffprobe_data.format.tags?.ENCODE_VERSION === encode_version ? 'complete' : 'pending',
       last_probe: current_time,
       sortFields: {
-        width: ffprobe_data.streams.find((s) => s.codec_type === 'video')
-          ?.width,
+        width: ffprobe_data.streams.find((s) => s.codec_type === 'video')?.width,
         size: ffprobe_data.format.size
       },
       audio_language: languages,
@@ -70,7 +100,6 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
 
     return ffprobe_data;
   } catch (e) {
-    // if the file wasn't found
     if (/file\s+not\s+found/gi.test(e.message)) {
       await trash(file);
     }
