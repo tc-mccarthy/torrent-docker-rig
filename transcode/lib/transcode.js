@@ -116,9 +116,7 @@ export default function transcode (file) {
         .outputOptions([ // Handle the subtitle output options
           ...transcode_instructions.subtitles.map((subtitle, sub_idx) => `-c:s:${sub_idx} ${subtitle.codec} -map_metadata:s:s:${sub_idx} 0:s:s:${sub_idx}`)
         ])
-        .outputOptions([ // Handle the global metadata
-          `-metadata encode_version=${encode_version}`
-        ]);
+        .outputOptions(`-metadata encode_version=${encode_version}`); // Handle the global metadata
 
       let ffmpeg_cmd;
       let start_time;
