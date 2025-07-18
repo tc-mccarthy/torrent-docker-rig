@@ -38,7 +38,7 @@ export default function Nav ({ data, setDataSelection, dataSelection, availableC
                   %)
                 </strong>
                 <div>
-                  {time_remaining((item.est_completed_timestamp - Date.now()) / 1000).formatted}
+                  {time_remaining(item.est_completed_timestamp).formatted}
                   {' '}
                   {item.name && `- ${item.name}`}
                 </div>
