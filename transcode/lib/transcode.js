@@ -33,7 +33,7 @@ import update_status from './update_status';
 import { generateTranscodeInstructions } from './generate_transcode_instructions';
 
 const { encode_version } = config;
-const LOG_THROTTLE_MS = 5000; // Throttle progress updates to every 5 seconds
+const LOG_THROTTLE_MS = 10000; // Throttle progress updates to every 10 seconds
 
 // Converts seconds into a zero-padded HH:mm:ss string
 export function formatSecondsToHHMMSS (totalSeconds) {
@@ -153,6 +153,7 @@ export default function transcode (file) {
           const seconds_pct = pct_per_second > 0 ? 1 / pct_per_second : Infinity;
           const pct_remaining = 100 - percent;
           const est_completed_seconds = pct_remaining * seconds_pct;
+          const est_completed_timestamp = Date.now() + (est_completed_seconds * 1000);
           const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
           const estimated_final_kb = (progress.targetSize / percent) * 100;
 
@@ -168,6 +169,7 @@ export default function transcode (file) {
             pct_remaining,
             time_remaining,
             est_completed_seconds,
+            est_completed_timestamp,
             computeScore: video_record.computeScore,
             priority: video_record.sortFields.priority,
             size: {
