@@ -158,6 +158,7 @@ export default function transcode (file) {
 
           const output = JSON.stringify({
             ...progress,
+            refreshed: Date.now(),
             percent,
             source_audio_codec,
             source_video_codec,
@@ -190,7 +191,7 @@ export default function transcode (file) {
             action: 'transcode'
           }, null, 4);
 
-          fs.writeFileSync(`/usr/app/output/active-${video_record._id}.json`, JSON.stringify({ ffmpeg_cmd, audio_language, file, output: JSON.parse(output) }));
+          fs.writeFileSync(`/usr/app/output/active-${video_record._id}.json`, JSON.stringify({ ffmpeg_cmd, audio_language, file, ...(JSON.parse(output)) }));
         })
         .on('end', async () => {
           try {
