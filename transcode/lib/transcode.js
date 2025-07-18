@@ -102,7 +102,7 @@ export default function transcode (file) {
         input_maps.push(`-map_chapters 0`);
       }
 
-      let cmd = ffmpeg(file).inputOptions(['-v fatal', '-stats', `-hwaccel ${hwaccel}`].filter((f) => f))
+      let cmd = ffmpeg(file).inputOptions(['-v debug', '-stats', `-hwaccel ${hwaccel}`].filter((f) => f))
         .outputOptions(input_maps) // Map out the streams we want to preserve
         .outputOptions([ // Handle the video output options
           `-c:v ${transcode_instructions.video.codec}`,
