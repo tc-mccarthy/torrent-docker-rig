@@ -203,8 +203,6 @@ export default function transcode (file) {
           const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
 
           Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], { ffmpeg_cmd, audio_language, file, ...output });
-
-          // fs.writeFileSync(`/usr/app/output/active-${video_record._id}.json`, JSON.stringify({ ffmpeg_cmd, audio_language, file, ...(JSON.parse(output)) }));
         })
         .on('end', async () => {
           try {
