@@ -162,7 +162,7 @@ export default function transcode (file) {
           const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
           const estimated_final_kb = (progress.targetSize / percent) * 100;
 
-          const output = JSON.stringify({
+          const output = {
             ...progress,
             startTime,
             refreshed: Date.now(),
@@ -197,12 +197,14 @@ export default function transcode (file) {
               }
             },
             action: 'transcode'
-          }, null, 4);
+          };
 
           // find the job in the transcodeQueue and update it
           const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
 
-          Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], { ffmpeg_cmd, audio_language, file, ...(JSON.parse(output)) });
+          console.log('>> RUNNING JOB INDEX', runningJobIndex, global.transcodeQueue.runningJobs[runningJobIndex]);
+
+          Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], { ffmpeg_cmd, audio_language, file, ...output });
 
           // fs.writeFileSync(`/usr/app/output/active-${video_record._id}.json`, JSON.stringify({ ffmpeg_cmd, audio_language, file, ...(JSON.parse(output)) }));
         })
