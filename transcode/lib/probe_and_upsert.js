@@ -8,6 +8,7 @@ import tmdb_api from './tmdb_api';
 import File from '../models/files';
 import language_map from './lang';
 import config from './config';
+import logger from './logger';
 
 const { encode_version } = config;
 
@@ -45,23 +46,30 @@ function hashFile (filePath) {
 export default async function probe_and_upsert (file, record_id, opts = {}) {
   file = file.replace(/\n+$/, '');
   try {
+    logger.info(`Probe and upsert on file`, { file });
     const current_time = dayjs();
 
     if (!fs.existsSync(file)) {
       throw new Error('File not found');
     }
 
+    logger.info(`Getting video record`, { file });
     const video_record = await File.findOne({ path: file });
 
     // Hash the current file contents
+    logger.info(`Hashing file`, { file });
     const current_hash = await hashFile(file);
 
     // If the file has already been processed and hash matches, skip probing
     if (video_record?.file_hash === current_hash && video_record?.probe) {
+      logger.info(`File record already exists and hash hasn't changed. Skipping probe`);
       return video_record.probe;
     }
 
+    logger.info(`Probing file`, { file });
     const ffprobe_data = await ffprobe(file);
+
+    logger.info(`Getting API data`, { file });
     const tmdb_data = await tmdb_api(file);
 
     let languages = ['en', 'und'];
@@ -82,6 +90,8 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
       .flat()
       .filter((v, i, arr) => arr.indexOf(v) === i);
 
+    logger.info(`Upserting file`, { file });
+
     await upsert_video({
       record_id,
       path: file,
@@ -98,12 +108,14 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
       ...opts
     });
 
+    logger.info(`File upserted successfully`, { file });
     return ffprobe_data;
   } catch (e) {
     if (/file\s+not\s+found/gi.test(e.message)) {
       await trash(file);
     }
 
+    logger.error(`Probe and upsert failed for ${file}`, { error: e });
     return false;
   }
 }

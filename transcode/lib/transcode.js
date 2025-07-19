@@ -213,17 +213,17 @@ export default function transcode (file) {
             }
 
             await moveFile(scratch_file, dest_file);
-            logger.info('Updating timestamp on destination file', dest_file);
+            logger.info('Updating timestamp on destination file', { dest_file });
             await fs.promises.utimes(dest_file, new Date(), new Date());
             global.processed_files_delta += 1;
-            logger.info('Getting destination filesize', dest_file);
+            logger.info('Getting destination filesize', { dest_file });
             const dest_file_size = (await stat(dest_file)).size;
 
             if (dest_file !== file) {
               await trash(file, false);
             }
 
-            logger.info('Running probe and upsert on', dest_file);
+            logger.info('Running probe and upsert on', { dest_file });
             await probe_and_upsert(dest_file, video_record._id, {
               transcode_details: {
                 ...video_record.transcode_details,
@@ -233,7 +233,7 @@ export default function transcode (file) {
               reclaimedSpace: original_size - dest_file_size
             });
 
-            logger.info('Updating status');
+            logger.info('Probe and upsert complete. Updating status');
             await update_status();
           } catch (e) {
             logger.error(e, { label: 'POST TRANSCODE ERROR' });
