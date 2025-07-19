@@ -9,6 +9,7 @@ export default async function moveFile (oldPath, newPath) {
     // Attempt to rename (move) the file
     await fs.rename(oldPath, newPath);
     console.log(`File moved successfully from ${oldPath} to ${newPath}`);
+    return true;
   } catch (error) {
     if (error.code === 'EXDEV') {
       // Handle cross-device moves by copying and then deleting the original
@@ -16,9 +17,9 @@ export default async function moveFile (oldPath, newPath) {
       await fs.copyFile(oldPath, newPath);
       await fs.unlink(oldPath);
       console.log(`File copied and original deleted successfully.`);
-    } else {
-      console.error(`Error moving file: ${error.message}`);
-      throw error; // Re-throw other errors
+      return true;
     }
+    console.error(`Error moving file: ${error.message}`);
+    throw error; // Re-throw other errors
   }
 }
