@@ -20,7 +20,7 @@ export default async function update_queue () {
 
     // short circuit the function if the lock is set
     if (lock) {
-      logger.info('Update queue locked. Exiting...');
+      logger.debug('Update queue locked. Exiting...');
       return;
     }
 
@@ -55,7 +55,7 @@ export default async function update_queue () {
       .subtract(30, 'minutes')
       .format('MM/DD/YYYY HH:mm:ss')}" -print0 | sort -z | xargs -0`;
 
-    logger.info(findCMD, { label: 'FIND COMMAND' });
+    logger.debug(findCMD, { label: 'FIND COMMAND' });
 
     const { stdout, stderr } = await exec_promise(findCMD);
 
@@ -65,11 +65,11 @@ export default async function update_queue () {
       .map((p) => `/source_media${p}`.replace('\x00', ''))
       .slice(1);
 
-    logger.info('', { label: 'NEW FILES IDENTIFIED. PROBING...' });
+    logger.debug('', { label: 'NEW FILES IDENTIFIED. PROBING...' });
 
     await async.eachLimit(filelist, concurrent_file_checks, asyncify(async (file) => {
       const file_idx = filelist.indexOf(file);
-      logger.info('Processing file', {
+      logger.debug('Processing file', {
         file,
         file_idx,
         total: filelist.length,
@@ -105,7 +105,7 @@ export default async function update_queue () {
           // if this is an unreadable file, trash it.
           const ext_expression = new RegExp(`.${file_ext.join('|')}`, 'i');
           if (ext_expression.test(e.message)) {
-            logger.info(file, {
+            logger.error(file, {
               label: 'UNREADABLE VIDEO FILE. REMOVING FROM LIST'
             });
             trash(file);
@@ -114,7 +114,7 @@ export default async function update_queue () {
 
         // if the video stream is corrupt, delete it
         if (/display_aspect_ratio/gi.test(e.message)) {
-          logger.info(file, {
+          logger.error(file, {
             label: 'UNREADABLE VIDEO STREAM. REMOVING FROM LIST'
           });
           trash(file);
@@ -130,8 +130,6 @@ export default async function update_queue () {
       }
     }));
 
-    logger.info('', { label: 'PROBE COMPLETE. UPDATING REDIS...' });
-
     await redisClient.set(
       last_probe_cache_key,
       current_time.format('MM/DD/YYYY HH:mm:ss'),
@@ -140,8 +138,6 @@ export default async function update_queue () {
 
     // clear the lock
     await redisClient.del('update_queue_lock');
-
-    logger.info('', { label: 'REDIS UPDATED' });
   } catch (e) {
     logger.error(e, { label: 'UPDATE QUEUE ERROR' });
   }

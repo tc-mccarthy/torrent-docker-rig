@@ -23,20 +23,16 @@ const { encode_version } = config;
 export default async function probe_and_upsert (file, record_id, opts = {}) {
   file = file.replace(/\n+$/, '');
   try {
-    logger.info(`Probe and upsert on file`, { file });
     const current_time = dayjs();
 
     if (!fs.existsSync(file)) {
       throw new Error('File not found');
     }
 
-    logger.info(`Getting video record`, { file });
     const video_record = await File.findOne({ path: file });
 
-    logger.info(`Probing file`, { file });
     const ffprobe_data = await ffprobe(file);
 
-    logger.info(`Getting API data`, { file });
     const tmdb_data = await tmdb_api(file);
 
     let languages = ['en', 'und'];
@@ -57,8 +53,6 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
       .flat()
       .filter((v, i, arr) => arr.indexOf(v) === i);
 
-    logger.info(`Upserting file`, { file });
-
     await upsert_video({
       record_id,
       path: file,
@@ -74,7 +68,6 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
       ...opts
     });
 
-    logger.info(`File upserted successfully`, { file });
     return ffprobe_data;
   } catch (e) {
     if (/file\s+not\s+found/gi.test(e.message)) {

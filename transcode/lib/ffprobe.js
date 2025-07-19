@@ -100,9 +100,7 @@ export default async function ffprobe_func (file) {
       return new Error(`File does not exist: ${file}`);
     }
 
-    logger.info(`Probing ${file}`);
     const data = await ffprobe_promise(file);
-    logger.info(`Probed ${file} successfully`);
 
     logger.debug(data, { label: 'FFProbe complete' });
 

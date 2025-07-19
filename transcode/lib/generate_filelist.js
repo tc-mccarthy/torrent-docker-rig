@@ -7,7 +7,7 @@ import dayjs from './dayjs';
 const { encode_version } = config;
 
 export default async function generate_filelist ({ limit = 1, writeToFile = false }) {
-  logger.info('GENERATING PRIMARY FILE LIST');
+  logger.debug('GENERATING PRIMARY FILE LIST');
   // query for any files that have an encode version that doesn't match the current encode version
   // do not hydrate results into models
   // sort by priority, then size, then width

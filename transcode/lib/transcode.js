@@ -54,9 +54,6 @@ export default function transcode (file) {
     try {
       const video_record = file;
       file = file.path;
-
-      logger.info(`Transcoding file: ${file}`, { label: 'Transcode' });
-
       // Validate input and presence of Mongo record
       if (!video_record || !video_record?._id) {
         throw new Error(`Video record not found for file: ${file}`);
@@ -76,7 +73,7 @@ export default function transcode (file) {
       }
 
       const transcode_instructions = generateTranscodeInstructions(video_record);
-      logger.info(transcode_instructions, { label: 'Transcode Instructions' });
+      logger.debug(transcode_instructions, { label: 'Transcode Instructions' });
 
       if (!transcode_instructions.video) {
         throw new Error('No video stream found');
@@ -86,7 +83,7 @@ export default function transcode (file) {
 
       // Short-circuit if this encode version already exists
       if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
-        logger.info({ file, encode_version }, { label: 'File already encoded' });
+        logger.debug({ file, encode_version }, { label: 'File already encoded' });
         video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
         await video_record.saveDebounce();
         return resolve({ locked: true });
@@ -94,7 +91,7 @@ export default function transcode (file) {
 
       // Check file integrity if not previously validated
       if (!video_record.integrityCheck) {
-        logger.info("File hasn't been integrity checked. Checking before transcode");
+        logger.debug("File hasn't been integrity checked. Checking before transcode");
         await integrityCheck(video_record);
       }
 
@@ -206,24 +203,22 @@ export default function transcode (file) {
         })
         .on('end', async () => {
           try {
-            logger.info('Transcoding succeeded!');
             await wait(5);
             if (!fs.existsSync(scratch_file)) {
               throw new Error(`Scratch file ${scratch_file} not found after transcode complete.`);
             }
 
             await moveFile(scratch_file, dest_file);
-            logger.info('Updating timestamp on destination file', { dest_file });
+
             await fs.promises.utimes(dest_file, new Date(), new Date());
             global.processed_files_delta += 1;
-            logger.info('Getting destination filesize', { dest_file });
+
             const dest_file_size = (await stat(dest_file)).size;
 
             if (dest_file !== file) {
               await trash(file, false);
             }
 
-            logger.info('Running probe and upsert on', { dest_file });
             await probe_and_upsert(dest_file, video_record._id, {
               transcode_details: {
                 ...video_record.transcode_details,
@@ -233,12 +228,10 @@ export default function transcode (file) {
               reclaimedSpace: original_size - dest_file_size
             });
 
-            logger.info('Probe and upsert complete. Updating status');
             await update_status();
           } catch (e) {
             logger.error(e, { label: 'POST TRANSCODE ERROR' });
           } finally {
-            logger.info(`Transcode job complete for ${file}`);
             resolve({});
           }
         })

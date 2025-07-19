@@ -9,7 +9,7 @@ import generate_filelist from './generate_filelist';
 export default class TranscodeQueue {
   constructor ({ maxScore = 4, pollDelay = 2000 }) {
     // start the transcode loops
-    logger.info(`Initiating transcode queue for a max compute of ${maxScore}...`);
+    logger.debug(`Initiating transcode queue for a max compute of ${maxScore}...`);
     this.maxScore = maxScore; // Max compute units allowed simultaneously
     this.computePenalty = 0; // Current compute penalty based on system resource utilization
     this.pollDelay = pollDelay; // Delay between scheduling attempts (ms)
@@ -29,7 +29,7 @@ export default class TranscodeQueue {
   async start () {
     if (this._isRunning) return;
     this._isRunning = true;
-    logger.info('Transcode queue started.');
+    logger.debug('Transcode queue started.');
     // update_active();
     this.startMemoryPressureMonitor(); // Start monitoring system resources
     this.startFlushLoop(); // Start periodic flush
@@ -104,11 +104,10 @@ export default class TranscodeQueue {
   // Attempts to find and run a job that fits within available compute
   async scheduleJobs () {
     const availableCompute = this.getAvailableCompute();
-    logger.info(`Available transcode compute: ${availableCompute}.`);
+    logger.debug(`Available transcode compute: ${availableCompute}.`);
 
     if (availableCompute <= 0) return;
 
-    logger.info('Checking for new jobs to run...');
     const jobs = await generate_filelist({ limit: 50 });
 
     // Are there any jobs being blocked due to lack of compute?
@@ -150,7 +149,6 @@ export default class TranscodeQueue {
     try {
       this.runningJobs.push({ ...job.toObject(), file: job.path });
       await transcode(job); // Await external ffmpeg logic
-      logger.info(`Transcode job complete for ${job.path}`);
     } catch (err) {
       console.error(`Transcoding failed for ${job.path}: ${err.message}`);
     } finally {
