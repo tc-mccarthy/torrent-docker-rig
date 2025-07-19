@@ -148,7 +148,7 @@ export default class TranscodeQueue {
   // Handles job execution and cleanup
   async runJob (job) {
     try {
-      this.runningJobs.push(job.toObject());
+      this.runningJobs.push({ ...job.toObject(), file: job.path });
       await transcode(job); // Await external ffmpeg logic
     } catch (err) {
       console.error(`Transcoding failed for ${job.inputPath}: ${err.message}`);
