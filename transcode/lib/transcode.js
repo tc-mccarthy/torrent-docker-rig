@@ -234,6 +234,7 @@ export default function transcode (file) {
           } catch (e) {
             logger.error(e, { label: 'POST TRANSCODE ERROR' });
           } finally {
+            logger.info(`Transcode job complete for ${file}`);
             resolve({});
           }
         })
