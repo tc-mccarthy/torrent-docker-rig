@@ -1,5 +1,4 @@
 import fs from 'fs';
-import crypto from 'crypto';
 import dayjs from './dayjs';
 import ffprobe from './ffprobe';
 import upsert_video from './upsert_video';
@@ -11,33 +10,6 @@ import config from './config';
 import logger from './logger';
 
 const { encode_version } = config;
-
-/**
- * Computes a SHA-256 hash of the given file as a hex string.
- * @param {string} filePath - Path to the file to hash.
- * @returns {Promise<string>} - Hex-encoded hash string.
- */
-function hashFile (filePath) {
-  return new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha256');
-    const stream = fs.createReadStream(filePath);
-
-    stream.on('error', (err) => {
-      logger.error(`Stream error, bailing out`, { error: err });
-      reject(err);
-    });
-
-    stream.on('data', (chunk) => {
-      logger.info(`Hash data event`);
-      hash.update(chunk);
-    });
-
-    stream.on('end', () => {
-      logger.info(`Stream ended, finalizing hash`);
-      resolve(hash.digest('hex'));
-    });
-  });
-}
 
 /**
  * Probes the video file, collects language and metadata, and upserts it into MongoDB.
@@ -60,16 +32,6 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
 
     logger.info(`Getting video record`, { file });
     const video_record = await File.findOne({ path: file });
-
-    // Hash the current file contents
-    logger.info(`Hashing file`, { file });
-    const current_hash = await hashFile(file);
-
-    // If the file has already been processed and hash matches, skip probing
-    if (video_record?.file_hash === current_hash && video_record?.probe) {
-      logger.info(`File record already exists and hash hasn't changed. Skipping probe`);
-      return video_record.probe;
-    }
 
     logger.info(`Probing file`, { file });
     const ffprobe_data = await ffprobe(file);
@@ -100,7 +62,6 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
     await upsert_video({
       record_id,
       path: file,
-      file_hash: current_hash, // Save the hash to detect future changes
       probe: ffprobe_data,
       encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
       status: ffprobe_data.format.tags?.ENCODE_VERSION === encode_version ? 'complete' : 'pending',

@@ -98,11 +98,6 @@ const schema = new Schema(
       type: Number,
       required: false,
       default: 0
-    },
-    file_hash: {
-      type: String,
-      required: false,
-      index: true
     }
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
