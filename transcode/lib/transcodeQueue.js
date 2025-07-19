@@ -1,9 +1,10 @@
 import { setTimeout as delay } from 'timers/promises';
+import fs from 'fs/promises';
 import si from 'systeminformation'; // For system resource monitoring
 import transcode from './transcode';
 import logger from './logger';
 import generate_filelist from './generate_filelist';
-import update_active from './update_active';
+// import update_active from './update_active';
 
 export default class TranscodeQueue {
   constructor ({ maxScore = 4, pollDelay = 2000 }) {
@@ -19,6 +20,9 @@ export default class TranscodeQueue {
     this.memoryPollIntervalMs = 5000; // Interval for memory pressure checks (ms)
     this.memoryUsageSamples = [];
     this.maxMemorySamples = 10 * 60 * 1000 / this.memoryPollIntervalMs; // 10 min @ 5s/sample
+
+    this.flushIntervalMs = 10000; // 10 seconds
+    this.flushPath = '/usr/app/output/active.json';
   }
 
   // Starts the recursive scheduling loop
@@ -26,8 +30,9 @@ export default class TranscodeQueue {
     if (this._isRunning) return;
     this._isRunning = true;
     logger.info('Transcode queue started.');
-    update_active();
+    // update_active();
     this.startMemoryPressureMonitor(); // Start monitoring system resources
+    this.startFlushLoop(); // Start periodic flush
     await this.loop();
   }
 
@@ -154,6 +159,25 @@ export default class TranscodeQueue {
       );
 
       generate_filelist({ limit: 1000, writeToFile: true }); // Regenerate file list after job completion
+    }
+  }
+
+  async startFlushLoop () {
+    while (this._isRunning) {
+      await this.flushActiveJobs();
+      await delay(this.flushIntervalMs);
+    }
+  }
+
+  async flushActiveJobs () {
+    const flushObj = {
+      data: this.runningJobs,
+      refreshed: Date.now()
+    };
+    try {
+      await fs.writeFile(this.flushPath, JSON.stringify(flushObj, null, 2));
+    } catch (err) {
+      logger.error('Failed to flush active jobs:', err);
     }
   }
 }
