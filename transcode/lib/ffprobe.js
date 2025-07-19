@@ -22,53 +22,8 @@ function parseFrameRate (ratio) {
 }
 
 /**
- * Fallback slow ffprobe call using -count_frames for accurate nb_frames.
- * @param {string} filePath - Media file path.
- * @returns {Promise<Object>} - Full ffprobe JSON output.
- */
-async function ffprobe_with_count_frames (filePath) {
-  return new Promise((resolve, reject) => {
-    const args = [
-      '-v', 'error',
-      '-count_frames',
-      '-show_format',
-      '-show_streams',
-      '-show_chapters',
-      '-show_programs',
-      '-print_format', 'json',
-      filePath
-    ];
-
-    const ffprobe = spawn('ffprobe', args);
-    const lines = [];
-
-    const rl = readline.createInterface({
-      input: ffprobe.stdout,
-      crlfDelay: Infinity
-    });
-
-    rl.on('line', (line) => lines.push(line));
-    rl.on('close', () => {
-      try {
-        resolve(JSON.parse(lines.join('\n')));
-      } catch (err) {
-        reject(new Error(`Failed to parse ffprobe output: ${err.message}`));
-      }
-    });
-
-    ffprobe.stderr.on('data', () => {});
-    ffprobe.on('error', (err) => reject(new Error(`Failed to start ffprobe: ${err.message}`)));
-    ffprobe.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`ffprobe exited with code ${code}`));
-      }
-    });
-  });
-}
-
-/**
  * Runs ffprobe on the given media file and returns parsed JSON data.
- * Attempts to avoid -count_frames unless necessary.
+ * Does not fallback to -count_frames under any circumstance.
  *
  * @param {string} filePath - Path to a media file.
  * @returns {Promise<Object>} - Parsed ffprobe data.
@@ -95,12 +50,13 @@ export function ffprobe_promise (filePath) {
 
     rl.on('line', (line) => lines.push(line));
 
-    rl.on('close', async () => {
+    rl.on('close', () => {
       try {
         const json = JSON.parse(lines.join('\n'));
 
-        const needsFallback = (json.streams || []).some((stream) => {
-          if (stream.codec_type !== 'video') return false;
+        // Optionally approximate nb_frames if missing, but don't fetch -count_frames
+        (json.streams || []).forEach((stream) => {
+          if (stream.codec_type !== 'video') return;
 
           if (!stream.nb_frames || stream.nb_frames === 'N/A') {
             const fps = parseFrameRate(stream.avg_frame_rate || stream.r_frame_rate);
@@ -110,18 +66,11 @@ export function ffprobe_promise (filePath) {
               duration = parseFloat(json.format.duration);
             }
 
-            if (!fps || Number.isNaN(duration)) return true;
-
-            stream.nb_frames = Math.round(fps * duration).toString();
+            if (fps && !Number.isNaN(duration)) {
+              stream.nb_frames = Math.round(fps * duration).toString();
+            }
           }
-
-          return false;
         });
-
-        if (needsFallback) {
-          const detailed = await ffprobe_with_count_frames(filePath);
-          return resolve(detailed);
-        }
 
         resolve(json);
       } catch (err) {
@@ -139,6 +88,12 @@ export function ffprobe_promise (filePath) {
   });
 }
 
+/**
+ * Executes ffprobe on a file and processes results for common structure and validation.
+ *
+ * @param {string} file - Path to media file.
+ * @returns {Promise<Object|false>} - Parsed data or false on failure.
+ */
 export default async function ffprobe_func (file) {
   try {
     if (!fs.existsSync(file)) {
@@ -151,11 +106,13 @@ export default async function ffprobe_func (file) {
 
     logger.debug(data, { label: 'FFProbe complete' });
 
+    // Normalize some basic format fields
     data.format.duration = +data.format.duration;
     data.format.size = +data.format.size;
     data.format.bit_rate = +data.format.bit_rate;
     data.format.size = +data.format.size / 1024;
 
+    // Enrich video stream with aspect ratio
     const video = data.streams.find((s) => s.codec_type === 'video');
 
     if (video.display_aspect_ratio) {
@@ -165,6 +122,7 @@ export default async function ffprobe_func (file) {
       video.aspect = aspect_round(video.width / video.height);
     }
 
+    // Validate against unsupported Dolby Vision profiles
     if (video.side_data_list?.dv_profile && video.side_data_list?.dv_profile < 8) {
       throw new Error(`Video not supported: Dolby Vision profile version is less than 8`);
     }
