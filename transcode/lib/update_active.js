@@ -17,7 +17,7 @@ export default async function update_active () {
 
   // sort the data by the output.size.original.kb descending
   active_data.sort(
-    (a, b) => b.size.original.kb - a.size.original.kb
+    (a, b) => (b.size?.original?.kb || 0) - (a.size?.original?.kb || 0)
   );
 
   const output = {
