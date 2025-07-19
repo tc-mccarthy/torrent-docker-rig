@@ -33,7 +33,6 @@ import update_status from './update_status';
 import { generateTranscodeInstructions } from './generate_transcode_instructions';
 
 const { encode_version } = config;
-const LOG_THROTTLE_MS = 10000; // Throttle progress updates to every 10 seconds
 
 // Converts seconds into a zero-padded HH:mm:ss string
 export function formatSecondsToHHMMSS (totalSeconds) {
@@ -136,7 +135,6 @@ export default function transcode (file) {
       let start_time;
       const original_size = (await stat(file)).size;
       const startTime = Date.now();
-      let lastLogTime = startTime;
 
       cmd = cmd
         .on('start', async (commandLine) => {
@@ -153,11 +151,6 @@ export default function transcode (file) {
           await video_record.saveDebounce();
         })
         .on('progress', (progress) => {
-          const now = Date.now();
-
-          if (now - lastLogTime < LOG_THROTTLE_MS) return;
-          lastLogTime = now;
-
           const elapsed = dayjs().diff(start_time, 'seconds');
           const currentFrames = progress.frames || 0;
           const percent = totalFrames > 0 ? (currentFrames / totalFrames) * 100 : progress.percent;
@@ -206,7 +199,12 @@ export default function transcode (file) {
             action: 'transcode'
           }, null, 4);
 
-          fs.writeFileSync(`/usr/app/output/active-${video_record._id}.json`, JSON.stringify({ ffmpeg_cmd, audio_language, file, ...(JSON.parse(output)) }));
+          // find the job in the transcodeQueue and update it
+          const runningJob = global.transcodeQueue.runningJobs.find((j) => j._id.toString() === video_record._id.toString());
+
+          Object.assign(runningJob, { ffmpeg_cmd, audio_language, file, ...(JSON.parse(output)) });
+
+          // fs.writeFileSync(`/usr/app/output/active-${video_record._id}.json`, JSON.stringify({ ffmpeg_cmd, audio_language, file, ...(JSON.parse(output)) }));
         })
         .on('end', async () => {
           try {
