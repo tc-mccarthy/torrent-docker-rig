@@ -15,7 +15,7 @@ export async function getReclaimedSpace () {
     return reclaimedSpace;
   }
 
-  logger.info('Reclaimed space value not found in cache, calculating...');
+  logger.debug('Reclaimed space value not found in cache, calculating...');
 
   // if we don't have a number in cache, calculate it
   reclaimedSpace = (await File.find({ encode_version }).lean()).reduce((total, file) => total + (file.reclaimedSpace || 0), 0);
@@ -28,7 +28,7 @@ export async function getReclaimedSpace () {
 
 export default async function update_status () {
   try {
-    logger.info('Updating status metrics...');
+    logger.debug('Updating status metrics...');
     const data = {
       processed_files: await File.countDocuments({ status: 'complete' }),
       total_files: await File.countDocuments(),
@@ -42,7 +42,7 @@ export default async function update_status () {
       reclaimedSpace: await getReclaimedSpace()
     };
 
-    logger.info('Status data complete');
+    logger.debug('Status data complete');
 
     if (typeof global.processedOnStart === 'undefined') {
       global.processedOnStart = data.processed_files;

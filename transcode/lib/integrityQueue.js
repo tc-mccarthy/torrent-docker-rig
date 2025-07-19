@@ -6,7 +6,7 @@ import generate_integrity_filelist from './generate_integrity_filelist';
 export default class IntegrityQueue {
   constructor ({ maxScore = 4, pollDelay = 2000 }) {
     // start the integrity check loops
-    logger.info(`Initiating integrity check queue for a max compute of ${maxScore}...`);
+    logger.debug(`Initiating integrity check queue for a max compute of ${maxScore}...`);
     this.maxScore = maxScore; // Max compute units allowed simultaneously
     this.pollDelay = pollDelay; // Delay between scheduling attempts (ms)
     this.runningJobs = []; // In-memory list of currently active jobs
@@ -17,7 +17,7 @@ export default class IntegrityQueue {
   async start () {
     if (this._isRunning) return;
     this._isRunning = true;
-    logger.info('Integrity check queue started.');
+    logger.debug('Integrity check queue started.');
     await this.loop();
   }
 
@@ -48,11 +48,10 @@ export default class IntegrityQueue {
   // Attempts to find and run a job that fits within available compute
   async scheduleJobs () {
     const availableCompute = this.getAvailableCompute();
-    logger.info(`Available integrity check compute: ${availableCompute}.`);
+    logger.debug(`Available integrity check compute: ${availableCompute}.`);
 
     if (availableCompute <= 0) return;
 
-    logger.info('Checking for new jobs to run...');
     const jobs = await generate_integrity_filelist({ limit: 50 });
 
     // Are there any jobs being blocked due to lack of compute?
