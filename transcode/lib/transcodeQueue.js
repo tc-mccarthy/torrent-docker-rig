@@ -170,11 +170,12 @@ export default class TranscodeQueue {
   }
 
   async flushActiveJobs () {
-    const flushObj = {
-      data: this.runningJobs,
-      refreshed: Date.now()
-    };
     try {
+      const flushObj = {
+        active: this.runningJobs,
+        availableCompute: this.getAvailableCompute(),
+        refreshed: Date.now()
+      };
       await fs.writeFile(this.flushPath, JSON.stringify(flushObj, null, 2));
     } catch (err) {
       logger.error('Failed to flush active jobs:', err);
