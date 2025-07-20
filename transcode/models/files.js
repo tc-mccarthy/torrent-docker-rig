@@ -109,12 +109,7 @@ const schema = new Schema(
           const containerFactor = streamCount > 10 ? 1.1 : 1;
 
           // Final compute score focused purely on memory pressure
-          const rawScore =
-        areaScore *
-        bitDepthFactor *
-        chromaFactor *
-        audioFactor *
-        containerFactor;
+          const rawScore = areaScore * bitDepthFactor * chromaFactor * audioFactor * containerFactor;
 
           return roundComputeScore(rawScore);
         } catch (e) {
