@@ -110,8 +110,9 @@ const schema = new Schema(
           const bitDepth = parseInt(video.bits_per_raw_sample || video.bits_per_sample || '8', 10);
           const bitDepthFactor = bitDepth > 8 ? 1.2 : 1;
 
-          // Combine all the factors into a final raw compute score
-          const rawScore = areaScore * bitrateFactor * framerateFactor * codecMultiplier * bitDepthFactor;
+          // Combine all the factors into a final raw compute score. The factors additional to the area score can only increase the score, not decrease it.
+          // This ensures that the score is always at least the area score.
+          const rawScore = Math.max(areaScore * bitrateFactor * framerateFactor * codecMultiplier * bitDepthFactor, areaScore);
 
           // Round it
           return roundComputeScore(rawScore);
