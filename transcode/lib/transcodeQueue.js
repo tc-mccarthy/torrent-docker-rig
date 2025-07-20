@@ -173,6 +173,7 @@ export default class TranscodeQueue {
       const flushObj = {
         active: this.runningJobs,
         availableCompute: this.getAvailableCompute(),
+        computePenalty: this.computePenalty,
         refreshed: Date.now()
       };
       await fs.writeFile(this.flushPath, JSON.stringify(flushObj, null, 2));
