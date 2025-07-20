@@ -81,36 +81,26 @@ const schema = new Schema(
           const video = this.probe?.streams?.find((s) => s.codec_type === 'video');
           if (!video) throw new Error('No video stream found in probe data');
 
-          // 1. Area-based base score (normalized to 4K)
+          // 1. Base score from resolution (relative to full 4K)
           const areaScore = (video.width * video.height) / (3840 * 2160);
 
-          // 2. Bitrate factor: increase score if bitrate exceeds 20 Mbps baseline
-          const bitrate = parseInt(video.bit_rate || this.probe?.format?.bit_rate || 0, 10);
-          const bitrateFactor = bitrate > 20000000 ? bitrate / 20000000 : 1;
-
-          // 3. Framerate factor: increase if framerate exceeds 30 fps
-          let framerate = 30;
-          if (video.avg_frame_rate?.includes('/')) {
-            const [num, den] = video.avg_frame_rate.split('/').map(Number);
-            if (den !== 0) framerate = num / den;
-          }
-          const framerateFactor = framerate > 30 ? framerate / 30 : 1;
-
-          // 4. Codec multiplier: never less than 1
-          const codec = video.codec_name || '';
-          const codecMultiplier = (() => {
-            if (codec.includes('hevc') || codec.includes('h265')) return 1.5;
-            if (codec.includes('vp9')) return 1.8;
-            if (codec.includes('av1')) return 2.5;
-            return 1; // default (e.g., H.264)
-          })();
-
-          // 5. Bit depth: add factor only if greater than 8-bit
-          const bitDepth = parseInt(video.bits_per_raw_sample || video.bits_per_sample || '8', 10);
+          // 2. Bit depth factor: more bits per pixel = more memory per frame
+          const bitDepth = parseInt(
+            video.bits_per_raw_sample || video.bits_per_sample || '8',
+            10
+          );
           const bitDepthFactor = bitDepth > 8 ? 1.2 : 1;
 
-          // Multiply all factors — each can only maintain or increase the score
-          const rawScore = areaScore * bitrateFactor * framerateFactor * codecMultiplier * bitDepthFactor;
+          // 3. Pixel format: 4:2:2 or 4:4:4 subsampling increases memory
+          const pixFmt = video.pix_fmt || '';
+          const chromaFactor = (() => {
+            if (pixFmt.includes('422')) return 1.1;
+            if (pixFmt.includes('444')) return 1.3;
+            return 1; // assume 4:2:0 (default)
+          })();
+
+          // Final score focused purely on memory footprint
+          const rawScore = areaScore * bitDepthFactor * chromaFactor;
 
           return roundComputeScore(rawScore);
         } catch (e) {
