@@ -72,20 +72,54 @@ const schema = new Schema(
       required: false,
       get (value) {
         try {
-        // return the stored value.
+          // If the score is already set and >= minimum, return the stored value
           if (value && value >= getMinimum()) {
             return value;
           }
-          const video_stream = this.probe?.streams?.find((s) => s.codec_type === 'video');
-          if (!video_stream) {
-            throw new Error('No video stream found in probe data');
+
+          // Extract the first video stream from ffprobe data
+          const video = this.probe?.streams?.find((s) => s.codec_type === 'video');
+          if (!video) throw new Error('No video stream found in probe data');
+
+          // 1. Base compute score from resolution (normalized to 4K area)
+          const areaScore = (video.width * video.height) / (3840 * 2160);
+
+          // 2. Bitrate factor (normalize against 20 Mbps baseline for 4K)
+          const bitrate = parseInt(video.bit_rate || this.probe?.format?.bit_rate || 0, 10);
+          // Cap at 1.5x to prevent extremely high bitrates from skewing too much
+          const bitrateFactor = bitrate ? Math.min(bitrate / 20000000, 1.5) : 1;
+
+          // 3. Framerate factor (normalize to 30 fps)
+          let framerate = 30;
+          if (video.avg_frame_rate && video.avg_frame_rate.includes('/')) {
+            const [num, den] = video.avg_frame_rate.split('/').map(Number);
+            if (den !== 0) framerate = num / den;
           }
-          const calculatedScore = (video_stream.width * video_stream.height) / (3840 * 2160); // take the video area and divide it by 4K resolution area
-          return roundComputeScore(calculatedScore);
+          const framerateFactor = framerate / 30;
+
+          // 4. Codec multiplier (reflects relative decode/transcode complexity)
+          const codec = video.codec_name || '';
+          const codecMultiplier = (() => {
+            if (codec.includes('hevc') || codec.includes('h265')) return 1.5; // HEVC is heavier
+            if (codec.includes('vp9')) return 1.8;
+            if (codec.includes('av1')) return 2.5; // AV1 is significantly more expensive
+            return 1; // Default: assume H.264 or similar
+          })();
+
+          // 5. Optional: Bit depth factor (10-bit video uses more memory)
+          const bitDepth = parseInt(video.bits_per_raw_sample || video.bits_per_sample || '8', 10);
+          const bitDepthFactor = bitDepth > 8 ? 1.2 : 1;
+
+          // Combine all the factors into a final raw compute score
+          const rawScore = areaScore * bitrateFactor * framerateFactor * codecMultiplier * bitDepthFactor;
+
+          // Round it
+          return roundComputeScore(rawScore);
         } catch (e) {
+          // Gracefully handle any probe data issues and default conservatively
           logger.error(e, { label: 'COMPUTE SCORE ERROR' });
           logger.debug(this, { label: 'COMPUTE SCORE ERROR FILE' });
-          return 1; // default to 100 if there's an error
+          return 1; // Fallback compute score
         }
       }
     },
