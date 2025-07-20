@@ -99,8 +99,22 @@ const schema = new Schema(
             return 1; // assume 4:2:0 (default)
           })();
 
-          // Final score focused purely on memory footprint
-          const rawScore = areaScore * bitDepthFactor * chromaFactor;
+          // 4. Audio stream multiplier: each extra audio track adds 5%
+          const audioStreams = this.probe?.streams?.filter((s) => s.codec_type === 'audio') || [];
+          const extraAudioCount = Math.max(audioStreams.length - 1, 0);
+          const audioFactor = 1 + extraAudioCount * 0.05;
+
+          // 5. Container complexity multiplier: more than 10 streams = 10% bump
+          const streamCount = this.probe?.streams?.length || 1;
+          const containerFactor = streamCount > 10 ? 1.1 : 1;
+
+          // Final compute score focused purely on memory pressure
+          const rawScore =
+        areaScore *
+        bitDepthFactor *
+        chromaFactor *
+        audioFactor *
+        containerFactor;
 
           return roundComputeScore(rawScore);
         } catch (e) {
