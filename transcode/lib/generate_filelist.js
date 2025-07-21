@@ -14,7 +14,8 @@ export default async function generate_filelist ({ limit = 1, writeToFile = fals
   const filelist = await File.find({
     encode_version: { $ne: encode_version },
     status: 'pending',
-    _id: { $not: { $in: global.transcodeQueue?.runningJobs?.map((f) => f._id.toString()) || [] } }
+    _id: { $not: { $in: global.transcodeQueue?.runningJobs?.map((f) => f._id.toString()) || [] } },
+    integrityCheck: true // only include files that have passed integrity check
   })
     .sort({
       'sortFields.priority': 1,
