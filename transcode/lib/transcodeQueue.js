@@ -44,7 +44,7 @@ export default class TranscodeQueue {
 
   // Returns total compute in use
   getUsedCompute () {
-    return this.runningJobs.reduce((sum, job) => sum + job.computeScore, 0);
+    return this.runningJobs.reduce((sum, job) => sum + (job.computeScore || 1), 0);
   }
 
   // Returns available compute capacity
