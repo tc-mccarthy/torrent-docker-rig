@@ -123,7 +123,7 @@ export default function transcode (file) {
           ...Object.entries(transcode_instructions.video.arguments || {}).map(([k, v]) => `-${k} ${v}`)
         ])
         .outputOptions(transcode_instructions.audio
-          .flatMap((audio, idx) => [`-c:a:${idx} ${audio.codec}`, audio.bitrate && `-b:a:${idx} ${audio.bitrate}`, `-map_metadata:s:a:${idx} 0:s:a:${idx}`].filter(Boolean)))
+          .flatMap((audio, idx) => [`-c:a:${idx} ${audio.codec}`, audio.bitrate && `-b:a:${idx} ${audio.bitrate}`, audio.channels && `-ac ${audio.channels}`, `-map_metadata:s:a:${idx} 0:s:a:${idx}`].filter(Boolean)))
         .outputOptions(transcode_instructions.subtitles
           .flatMap((subtitle, idx) => [`-c:s:${idx} ${subtitle.codec}`, `-map_metadata:s:s:${idx} 0:s:s:${idx}`]))
         .outputOptions(`-metadata encode_version=${encode_version}`);

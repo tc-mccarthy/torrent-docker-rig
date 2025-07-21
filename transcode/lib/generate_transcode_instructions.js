@@ -166,10 +166,10 @@ function determineAudioCodec (stream) {
   }
 
   if (channels <= 2) {
-    return { codec: 'libfdk_aac', bitrate: `${(96000 * channels) / 1000}k` };
+    return { codec: 'libfdk_aac', bitrate: `${(96000 * channels) / 1000}k`, channels };
   }
 
-  return { codec: 'eac3', bitrate: `${(128000 * channels) / 1000}k` };
+  return { codec: 'eac3', bitrate: `${(128000 * channels) / 1000}k`, channels };
 }
 
 /**
