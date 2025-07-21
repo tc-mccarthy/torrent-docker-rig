@@ -1,5 +1,6 @@
 import logger from './logger';
 import File from '../models/files';
+import calculateComputeScore from './calculateComputeScore';
 
 /**
  * Converts a value in kilobytes (KB) to another byte unit.
@@ -89,6 +90,8 @@ export default async function upsert_video (video) {
 
     // merge the file object with the video object and override with sortFields
     file = Object.assign(file, video, { sortFields });
+
+    file.computeScore = calculateComputeScore(file);
 
     await file.saveDebounce();
   } catch (e) {
