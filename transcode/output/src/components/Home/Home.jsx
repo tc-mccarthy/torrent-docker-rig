@@ -63,7 +63,7 @@ async function getData (setData, setFileList, setDisks, setUtilization, setStatu
     clearTimeout(window.dataTimeout);
     const d = await fetchData('active.json');
 
-    setData(d.active);
+    setData(d.active.filter((a) => a.action));
     setAvailableCompute(d.availableCompute);
 
     const f = await fetchData('filelist.json');
