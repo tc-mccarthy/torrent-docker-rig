@@ -184,7 +184,7 @@ function mapChannelLayout (channels) {
 
 function determineAudioCodec (stream) {
   const codec = stream.codec_name.toLowerCase();
-  const channels = parseInt(stream.channels || 2, 10);
+  const channels = Math.min(parseInt(stream.channels || 2, 10), 6); // Limit to 6 channels max due to EAC3 limitations
 
   if (['aac', 'ac3', 'eac3'].includes(codec)) {
     return { codec: 'copy' };
