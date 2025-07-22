@@ -101,7 +101,7 @@ export default function transcode (file) {
       const { audio_language } = video_record;
 
       // Build FFmpeg input stream mappings
-      const input_maps = [`-map 0:${transcode_instructions.video.stream_index}`]
+      const input_maps = [`-map_metadata 0`, `-map 0:${transcode_instructions.video.stream_index}`]
         .concat(transcode_instructions.audio.map((audio) => `-map 0:${audio.stream_index}`))
         .concat(transcode_instructions.subtitles.map((subtitle) => `-map 0:${subtitle.stream_index}`));
 
