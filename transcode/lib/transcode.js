@@ -116,7 +116,7 @@ export default function transcode (file) {
         totalFrames = 0;
       }
 
-      let cmd = ffmpeg(file).inputOptions(['-v fatal', '-stats', `-hwaccel ${hwaccel}`].filter(Boolean))
+      let cmd = ffmpeg(file).inputOptions(['-v debug', '-stats', `-hwaccel ${hwaccel}`].filter(Boolean))
         .outputOptions(input_maps)
         .outputOptions([
           `-c:v ${transcode_instructions.video.codec}`,
