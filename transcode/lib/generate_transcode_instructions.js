@@ -142,13 +142,23 @@ function getCrfForResolution (width) {
 
 function getRateControl (width) {
   let maxrate;
-  if (width >= 3840) maxrate = '10M';
-  else if (width >= 1920) maxrate = '6M';
-  else if (width >= 1280) maxrate = '4M';
-  else maxrate = '2M';
 
-  const maxrateValue = parseInt(maxrate, 10);
-  const bufsize = `${maxrateValue * 3}M`;
+  if (width >= 3840) {
+    // 4K UHD — try to stay under 20M to allow 1–2 concurrent streams
+    maxrate = '16M';
+  } else if (width >= 1920) {
+    // 1080p — visually solid AV1 at ~8 Mbps
+    maxrate = '8M';
+  } else if (width >= 1280) {
+    // 720p — good at 4M, preserves detail
+    maxrate = '4M';
+  } else {
+    // SD — very low bitrate needed
+    maxrate = '2M';
+  }
+
+  const numericRate = parseInt(maxrate, 10);
+  const bufsize = `${numericRate * 2}M`; // more stable than 3x in constrained upstream
 
   return { maxrate, bufsize };
 }
