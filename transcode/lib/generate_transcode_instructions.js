@@ -157,6 +157,21 @@ function determinePreset (isUHD, fileSizeGB) {
   return (isUHD || fileSizeGB > 10) ? 7 : 6;
 }
 
+function mapChannelLayout (channels) {
+  const map = {
+    1: 'mono', // OK for both
+    2: 'stereo', // OK for both
+    3: 'stereo', // Fallback (2.1 isn't valid)
+    4: 'quad', // Supported by EAC3; rarely used in AAC
+    5: '5.0',
+    6: '5.1',
+    7: '5.1', // 6.1 not supported — fallback to 5.1
+    8: '7.1'
+  };
+
+  return map[channels] || 'stereo';
+}
+
 function determineAudioCodec (stream) {
   const codec = stream.codec_name.toLowerCase();
   const channels = parseInt(stream.channels || 2, 10);
@@ -166,10 +181,10 @@ function determineAudioCodec (stream) {
   }
 
   if (channels <= 2) {
-    return { codec: 'libfdk_aac', bitrate: `${(96000 * channels) / 1000}k`, channels };
+    return { codec: 'libfdk_aac', bitrate: `${(96000 * channels) / 1000}k`, channels, channel_layout: mapChannelLayout(channels) };
   }
 
-  return { codec: 'eac3', bitrate: `${(128000 * channels) / 1000}k`, channels };
+  return { codec: 'eac3', bitrate: `${(128000 * channels) / 1000}k`, channels, channel_layout: mapChannelLayout(channels) };
 }
 
 /**
