@@ -34,11 +34,6 @@ function convertKilobytes (valueInKB, targetUnit) {
 
 export function default_priority (video) {
   try {
-    // if the size is more than 20GB in kilobytes
-    if (convertKilobytes(video.probe.format.size, 'GB') >= 20) {
-      return 97;
-    }
-
     // if the size is less than 1GB in kilobytes
     if (convertKilobytes(video.probe.format.size, 'GB') <= 1) {
     // if the video is HEVC encoded, return 97 because we're just going to copy the video stream
