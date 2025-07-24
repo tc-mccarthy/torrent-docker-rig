@@ -167,9 +167,16 @@ def delete_torrent(torrent_hash):
     return r.ok
 
 def run():
-    """Run one monitoring pass."""
+    """
+    Executes a single monitoring pass:
+    - Authenticates with qBittorrent
+    - Fetches all torrents
+    - Skips torrents tagged as 'full-series' (these are considered complete collections and are not monitored)
+    - For all other torrents, determines if they should be deleted based on state, progress, and time
+    """
     log("=== Running monitor pass ===")
     if not login():
+        # If authentication fails, abort this monitoring pass
         return
 
     torrents = get_torrents()
@@ -178,7 +185,16 @@ def run():
         torrent_hash = t.get("hash")
         name = t.get("name")
         downloaded = t.get("downloaded", 0)
+        tags = t.get("tags", [])
+        # --- Expressive comment: skip monitoring for full-series torrents ---
+        # Torrents tagged with 'full-series' are typically entire TV series or large collections.
+        # These are intentionally excluded from monitoring and deletion logic to preserve them.
+        if "full-series" in tags:
+            log(f"Skipping monitoring for '{name}' ({torrent_hash}) due to 'full-series' tag.")
+            continue
+        # --- End expressive comment ---
 
+        # Evaluate if this torrent should be deleted based on its state and progress
         if should_delete(torrent_hash, status, downloaded):
             log(f"Removing torrent '{name}' ({torrent_hash})")
             delete_torrent(torrent_hash)
