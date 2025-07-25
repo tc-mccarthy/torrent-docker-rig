@@ -1,6 +1,7 @@
 import logger from './logger';
 import File from '../models/files';
 import calculateComputeScore from './calculateComputeScore';
+import getFileDiskUsage from './getFileDiskUsage';
 
 /**
  * Converts a value in kilobytes (KB) to another byte unit.
@@ -32,64 +33,107 @@ function convertKilobytes (valueInKB, targetUnit) {
   return valueInKB * units[normalizedUnit];
 }
 
-export function default_priority (video) {
+/**
+ * Determines the default processing priority for a video.
+ *
+ * Priority logic:
+ *   - If the file's volume is over 90% utilized, set priority to 97 (high urgency for freeing space)
+ *   - If the video is less than or equal to 1GB and is HEVC encoded, set priority to 96 (quick remux)
+ *   - Otherwise, default to 100 (normal priority)
+ *
+ * @param {object} video - The video object, including probe and path info
+ * @returns {number} - The computed priority
+ */
+export async function default_priority (video) {
   try {
-    // if the size is less than 1GB in kilobytes
-    if (convertKilobytes(video.probe.format.size, 'GB') <= 1) {
-    // if the video is HEVC encoded, return 97 because we're just going to copy the video stream
-      if (video.probe.streams.find((s) => s.codec_type === 'video')?.codec_name === 'hevc') {
-        return 96; // give priority to the videos we're just going to remux to get them out of the way
+    // --- Check disk utilization for the volume containing the video file ---
+    // If the file path is available, determine the mount point and check usage
+    if (video.path) {
+      try {
+        const percentUsed = await getFileDiskUsage(video.path);
+
+        if (percentUsed >= 90) {
+          // If the disk is 90% or more full, set high priority
+          return 97;
+        }
+      } catch (diskErr) {
+        // If disk usage check fails, log but do not block processing
+        logger.warn(diskErr, { label: 'DISK USAGE CHECK FAILED' });
       }
     }
 
-    // default priority for other videos
+    // --- If the size is less than or equal to 1GB in kilobytes ---
+    if (convertKilobytes(video.probe.format.size, 'GB') <= 1) {
+      // If the video is HEVC encoded, set a slightly higher priority for quick remux
+      if (video.probe.streams.find((s) => s.codec_type === 'video')?.codec_name === 'hevc') {
+        return 96; // Give priority to videos that can be remuxed quickly
+      }
+    }
+
+    // --- Default case: normal priority ---
     return 100;
   } catch (e) {
+    // Log any errors and fall back to default priority
     logger.error(e, { label: 'DEFAULT PRIORITY ERROR' });
     return 100;
   }
 }
 
+/**
+ * Upserts (inserts or updates) a video record in the database.
+ *
+ * - Attempts to find an existing file by record_id or path.
+ * - If not found, creates a new File instance.
+ * - Determines the appropriate priority for processing, preserving any preset priority < 90.
+ * - Merges sortFields and updates computeScore.
+ * - Saves the file with debounce to avoid rapid duplicate writes.
+ *
+ * @param {object} video - The video object to upsert
+ */
 export default async function upsert_video (video) {
   try {
     let { path, record_id } = video;
+    // Remove any trailing newlines from the path (defensive)
     path = path.replace(/\n+$/, '');
     let file;
 
+    // Try to find the file by record_id first
     if (record_id) {
       file = await File.findOne({ _id: record_id });
     }
 
+    // If not found, try to find by path
     if (!file) {
       file = await File.findOne({ path });
     }
 
+    // If still not found, create a new File instance
     if (!file) {
       file = new File(video);
     }
 
-    // get the highest priority from the video or file sortfields and default priority
-
-    // if the priority is already set on the video or the file, and it's less than 90, preserve it, otherwise set it to the default priority
+    // --- Priority logic ---
+    // If a priority is already set on the video or file and it's less than 90, preserve it.
+    // Otherwise, use the computed default priority.
     const preset_priority = video.sortFields?.priority || file?.sortFields?.priority;
-
-    let priority = default_priority(video);
-
+    let priority = await default_priority(video);
     if (preset_priority && preset_priority < 90) {
-      // if the preset priority is less than 90, use it
       priority = preset_priority;
     }
 
-    // merge the sortFields object with the priority
+    // Merge the sortFields object with the new priority
     const sortFields = { ...(video.sortFields || file.sortFields), priority };
 
-    // merge the file object with the video object and override with sortFields
+    // Merge the file object with the video object and override with sortFields
     file = Object.assign(file, video, { sortFields });
 
+    // Calculate the compute score for this file
     file.computeScore = calculateComputeScore(file);
 
+    // Save the file, debounced to avoid rapid duplicate writes
     await file.saveDebounce();
   } catch (e) {
+    // Log any errors that occur during upsert
     logger.error(e, { label: 'UPSERT FAILURE' });
   }
 }
