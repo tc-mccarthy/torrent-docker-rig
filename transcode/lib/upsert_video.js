@@ -46,6 +46,14 @@ function convertKilobytes (valueInKB, targetUnit) {
  */
 export async function default_priority (video) {
   try {
+    // --- If the size is less than or equal to 1GB in kilobytes ---
+    if (convertKilobytes(video.probe.format.size, 'GB') <= 1) {
+      // If the video is HEVC encoded, set a slightly higher priority for quick remux
+      if (video.probe.streams.find((s) => s.codec_type === 'video')?.codec_name === 'hevc') {
+        return 96; // Give priority to videos that can be remuxed quickly
+      }
+    }
+
     // --- Check disk utilization for the volume containing the video file ---
     // If the file path is available, determine the mount point and check usage
     if (video.path) {
@@ -59,14 +67,6 @@ export async function default_priority (video) {
       } catch (diskErr) {
         // If disk usage check fails, log but do not block processing
         logger.warn(diskErr, { label: 'DISK USAGE CHECK FAILED' });
-      }
-    }
-
-    // --- If the size is less than or equal to 1GB in kilobytes ---
-    if (convertKilobytes(video.probe.format.size, 'GB') <= 1) {
-      // If the video is HEVC encoded, set a slightly higher priority for quick remux
-      if (video.probe.streams.find((s) => s.codec_type === 'video')?.codec_name === 'hevc') {
-        return 96; // Give priority to videos that can be remuxed quickly
       }
     }
 
