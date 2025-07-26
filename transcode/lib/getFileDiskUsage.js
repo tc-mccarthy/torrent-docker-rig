@@ -16,7 +16,7 @@ const execAsync = promisify(exec);
  * @returns {Promise<number>} - A Promise that resolves to the disk utilization percentage (e.g., 74.3).
  * @throws {Error} If the `df` output is unexpected or an error occurs during execution.
  */
-export async function getDiskUtilization (filePath) {
+export default async function getDiskUtilization (filePath) {
   try {
     // Convert to an absolute path to ensure df behaves correctly
     const resolvedPath = resolvePath(filePath);
