@@ -70,14 +70,8 @@ def get_torrents():
         log("Failed to fetch torrents.")
         return []
 
-def is_queueing_enabled():
-    r = session.get(f"{QB_URL}/api/v2/app/preferences")
-    if r.ok:
-        prefs = r.json()
-        return prefs.get("queueing_enabled", False)
-    else:
-        log("Could not retrieve preferences to check queueing state.")
-        return False
+def is_top_of_hour():
+    return datetime.now().minute == 0
 
 def score_torrent(t):
     score = 0
@@ -126,37 +120,42 @@ def score_torrent(t):
     log(f"Scoring: {t['name']} ({t['hash'][:6]}...): {score} | {'; '.join(reason)}")
     return score
 
-def reprioritize_queue(torrents):
-    """Reprioritize the torrent queue in qBittorrent based on scoring criteria and age.
-
-    This function checks if queueing is enabled. If not, it logs and skips position updates.
-    Otherwise, it sorts torrents by score and age, and sets their position in the queue accordingly.
-
-    Args:
-        torrents (list): List of torrent dicts.
-    """
-    if not torrents:
+def reprioritize_queue(torrents, force=False):
+    if not torrents or (not force and not is_top_of_hour()):
         return
 
-    queueing_enabled = is_queueing_enabled()
-    if not queueing_enabled:
-        log("Torrent queueing is disabled. Skipping position updates.")
+    sorted_torrents = sorted(torrents, key=lambda t: (-score_torrent(t), t.get("added_on", 0)))
+
+    hashes_ordered = [t["hash"] for t in sorted_torrents]
+    current_order = [t["hash"] for t in torrents]
+
+    if hashes_ordered == current_order:
+        log("Torrent queue is already in desired order; skipping reprioritization.")
         return
 
-    sorted_torrents = sorted(torrents, key=lambda t: (score_torrent(t), -t.get("added_on", 0)))
-
-    for i, t in enumerate(sorted_torrents):
-        r = session.post(f"{QB_URL}/api/v2/torrents/setTorrentPosition", data={"hash": t["hash"], "newPos": i})
+    for t in sorted_torrents:
+        r = session.post(f"{QB_URL}/api/v2/torrents/topPrio", data={"hashes": t["hash"]})
         if r.ok:
-            log(f"Set position {i} for {t['name']} ({t['hash'][:6]}...)")
+            log(f"Promoted {t['name']} ({t['hash'][:6]}...) to top of queue")
         else:
-            log(f"Failed to set position for {t['name']} (hash={t['hash']}). Status code: {r.status_code}. Response: {r.text}")
+            log(f"Failed to move {t['name']} to top. Status code: {r.status_code}. Response: {r.text}")
 
 def should_delete(torrent_hash, status, downloaded_bytes):
+    """Determine if a torrent should be deleted based on state, progress, and TTL.
+
+    Args:
+        torrent_hash (str): Torrent hash.
+        status (str): Torrent state.
+        downloaded_bytes (int): Number of bytes downloaded.
+
+    Returns:
+        bool: True if the torrent should be deleted, False otherwise.
+    """
     now = int(time.time())
     tracking_info = TRACKED_STATE_LOOKUP.get(status)
 
     if not tracking_info:
+        # Torrent is no longer in a tracked state; remove any cache and skip deletion
         key = get_cache_key(torrent_hash)
         if rdb.exists(key):
             rdb.delete(key)
@@ -170,44 +169,59 @@ def should_delete(torrent_hash, status, downloaded_bytes):
     raw = rdb.get(key)
 
     if not raw:
+        # First time seeing this torrent in this state; start tracking
         payload = {"expires_at": new_expiry, "state": status, "bytes": downloaded_bytes, "dlspeed": []}
         rdb.setex(key, ttl + REDIS_EXPIRY_BUFFER, json.dumps(payload))
         log(f"Started tracking {torrent_hash} in cached_state '{cached_state}' ({status}); expires at {format_ts(new_expiry)}")
         return False
 
     try:
+        # Load cached state for this torrent
         cache = json.loads(raw)
         cached_status = cache.get("state")
         cached_expiry = int(cache.get("expires_at", 0))
         cached_bytes = int(cache.get("bytes", 0))
         cached_speeds = cache.get("dlspeed", [])
     except Exception:
+        # If cache is corrupt, reset it
         payload = {"expires_at": new_expiry, "state": status, "bytes": downloaded_bytes, "dlspeed": []}
         rdb.setex(key, ttl + REDIS_EXPIRY_BUFFER, json.dumps(payload))
         log(f"Corrupt cache for {torrent_hash}. Reset tracking. New expiry {format_ts(new_expiry)}")
         return False
 
     if downloaded_bytes != cached_bytes:
+        # Download has progressed; reset TTL and update cache
         payload = {"expires_at": new_expiry, "state": status, "bytes": downloaded_bytes, "dlspeed": []}
         rdb.setex(key, ttl + REDIS_EXPIRY_BUFFER, json.dumps(payload))
         log(f"{torrent_hash} made progress ({cached_bytes} → {downloaded_bytes} bytes); reset expiry to {format_ts(new_expiry)}")
         return False
 
     if cached_status != status:
+        # Torrent state changed; reset TTL and update cache
         payload = {"expires_at": new_expiry, "state": status, "bytes": downloaded_bytes, "dlspeed": cached_speeds}
         rdb.setex(key, ttl + REDIS_EXPIRY_BUFFER, json.dumps(payload))
         log(f"{torrent_hash} changed state from '{cached_status}' → '{status}'; reset expiry to {format_ts(new_expiry)}")
         return False
 
     if now >= cached_expiry:
+        # Torrent has been stuck in this state too long; mark for deletion
         rdb.delete(key)
         log(f"{torrent_hash} stuck in cached_state '{cached_state}' since {format_ts(cached_expiry)}. Marked for deletion.")
         return True
 
+    # Torrent is still within TTL window; keep monitoring
     log(f"{torrent_hash} in '{status}' (cached_state '{cached_state}'); expires at {format_ts(cached_expiry)}")
     return False
 
 def delete_torrent(torrent_hash):
+    """Delete a torrent and its files from qBittorrent.
+
+    Args:
+        torrent_hash (str): Torrent hash.
+
+    Returns:
+        bool: True if deletion was successful, False otherwise.
+    """
     log(f"Deleting torrent {torrent_hash} and its files")
     r = session.post(f"{QB_URL}/api/v2/torrents/delete", data={"hashes": torrent_hash, "deleteFiles": "true"})
     if r.ok:
@@ -217,6 +231,11 @@ def delete_torrent(torrent_hash):
     return r.ok
 
 def run():
+    """Run one monitoring pass: login, reprioritize, and check for deletions.
+
+    Returns:
+        None
+    """
     log("=== Running monitor pass ===")
     if not login():
         return
@@ -224,7 +243,7 @@ def run():
     if not torrents:
         return
 
-    reprioritize_queue(torrents)
+    reprioritize_queue(torrents, force=True)
 
     for t in torrents:
         status = t.get("state")
@@ -245,6 +264,11 @@ def run():
     log("=== Monitor pass complete ===")
 
 def schedule_monitor():
+    """Schedule the monitor to run immediately and then on a cron schedule.
+
+    Returns:
+        None
+    """
     log(f"Scheduling monitor with cron: '{MONITOR_CRON}'")
     scheduler = BackgroundScheduler()
     try:
