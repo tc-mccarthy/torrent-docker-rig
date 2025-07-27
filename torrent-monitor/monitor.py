@@ -46,41 +46,15 @@ session = requests.Session()
 rdb = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
 def log(message):
-    """Print a timestamped log message to stdout.
-
-    Args:
-        message (str): The message to log.
-    """
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}", flush=True)
 
 def get_cache_key(torrent_hash):
-    """Build the Redis key for a torrent using the hash and current version.
-
-    Args:
-        torrent_hash (str): The torrent's unique hash.
-
-    Returns:
-        str: The Redis key for this torrent.
-    """
     return f"{KEY_VERSION}:{torrent_hash}"
 
 def format_ts(ts):
-    """Format a UNIX timestamp as a local time string.
-
-    Args:
-        ts (int): UNIX timestamp.
-
-    Returns:
-        str: Formatted time string.
-    """
     return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
 
 def login():
-    """Authenticate with the qBittorrent Web API.
-
-    Returns:
-        bool: True if login was successful, False otherwise.
-    """
     r = session.post(f"{QB_URL}/api/v2/auth/login", data={"username": QB_USER, "password": QB_PASS})
     if r.ok:
         log("Login successful.")
@@ -88,12 +62,31 @@ def login():
         log("Login failed.")
     return r.ok
 
-def get_torrents():
-    """Fetch all torrents from qBittorrent.
+def get_preferences():
+    try:
+        r = session.get(f"{QB_URL}/api/v2/app/preferences")
+        if r.ok:
+            return r.json()
+        else:
+            log(f"Failed to fetch preferences. Status code: {r.status_code}")
+    except Exception as e:
+        log(f"Exception while fetching preferences: {e}")
+    return {}
 
-    Returns:
-        list: List of torrent dicts, or empty list on failure.
-    """
+def set_torrent_queueing(enabled):
+    try:
+        data = {"queueing_enabled": str(enabled).lower()}
+        r = session.post(f"{QB_URL}/api/v2/app/setPreferences", data={"json": json.dumps(data)})
+        if r.ok:
+            log(f"Set torrent queueing to {enabled}")
+            return True
+        else:
+            log(f"Failed to set torrent queueing. Status code: {r.status_code}. Response: {r.text}")
+    except Exception as e:
+        log(f"Exception while setting torrent queueing: {e}")
+    return False
+
+def get_torrents():
     r = session.get(f"{QB_URL}/api/v2/torrents/info")
     if r.ok:
         torrents = r.json()
@@ -104,17 +97,8 @@ def get_torrents():
         return []
 
 def score_torrent(t):
-    """Assign a score to a torrent for reprioritization.
-
-    Args:
-        t (dict): Torrent info dict.
-
-    Returns:
-        int: The computed score for this torrent.
-    """
     score = 0
     reason = []
-
     tags = t.get("tags", "")
     taglist = tags.split(",") if tags else []
 
@@ -161,11 +145,21 @@ def score_torrent(t):
 def reprioritize_queue(torrents):
     """Reprioritize the torrent queue in qBittorrent based on scoring criteria.
 
+    This function disables queueing if enabled, sorts torrents by score and age,
+    moves each to the top of the queue, and restores queueing if it was previously enabled.
+
     Args:
         torrents (list): List of torrent dicts.
     """
     if not torrents:
         return
+
+    prefs = get_preferences()
+    was_queueing_enabled = prefs.get("queueing_enabled", False)
+
+    if was_queueing_enabled:
+        set_torrent_queueing(False)
+
     sorted_torrents = sorted(torrents, key=lambda t: (score_torrent(t), -t.get("added_on", 0)))
     for t in sorted_torrents:
         r = session.post(f"{QB_URL}/api/v2/torrents/topPrio", data={"hashes": t["hash"]})
@@ -173,6 +167,9 @@ def reprioritize_queue(torrents):
             log(f"Promoted {t['name']} ({t['hash'][:6]}...) to top of queue")
         else:
             log(f"Failed to move {t['name']} to top. Status code: {r.status_code}. Response: {r.text}")
+
+    if was_queueing_enabled:
+        set_torrent_queueing(True)
 
 def should_delete(torrent_hash, status, downloaded_bytes):
     """Determine if a torrent should be deleted based on state, progress, and TTL.
