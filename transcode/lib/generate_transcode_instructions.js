@@ -77,10 +77,10 @@ export function generateTranscodeInstructions (mongoDoc) {
       const masteringDisplay = sideData.find((d) => d.side_data_type === 'Mastering display metadata');
       const contentLightLevel = sideData.find((d) => d.side_data_type === 'Content light level metadata');
 
-      if (masteringDisplay) {
+      if (masteringDisplay?.mastering_display_metadata) {
         hdrProps.master_display = masteringDisplay.mastering_display_metadata;
       }
-      if (contentLightLevel) {
+      if (contentLightLevel?.content_light_level_metadata) {
         hdrProps.cll = contentLightLevel.content_light_level_metadata;
       }
     }
