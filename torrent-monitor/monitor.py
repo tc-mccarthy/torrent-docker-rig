@@ -166,7 +166,7 @@ def reprioritize_queue(torrents):
     """
     if not torrents:
         return
-    sorted_torrents = sorted(torrents, key=score_torrent, reverse=True)
+    sorted_torrents = sorted(torrents, key=lambda t: (-score_torrent(t), t.get("added_on", 0)))  # negative score for descending, then by added_on ascending
     for t in sorted_torrents:
         r = session.post(f"{QB_URL}/api/v2/torrents/topPrio", data={"hashes": t["hash"]})
         if r.ok:
