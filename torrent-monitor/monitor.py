@@ -157,17 +157,34 @@ def score_torrent(t):
     return score
 
 def reprioritize_queue(torrents):
+    """Reprioritize the torrent queue in qBittorrent based on scoring criteria and age.
+
+    This function sorts torrents by score and age, checks if the current order matches the desired order,
+    logs any differences, and moves torrents to the top of the queue as needed.
+
+    Args:
+        torrents (list): List of torrent dicts.
+    """
     if not torrents:
         return
 
+    # Sort torrents by score (descending) and then by age (oldest first)
     sorted_torrents = sorted(torrents, key=lambda t: (score_torrent(t), -t.get("added_on", 0)))
     hashes_ordered = [t["hash"] for t in sorted_torrents]
     current_order = [t["hash"] for t in torrents]
 
+    # Check if the current queue order is already the reverse of the desired order
     if hashes_ordered[::-1] == current_order:
         log("Torrent queue is already in desired order; skipping reprioritization.")
         return
 
+    log("Torrent queue order differs; changes will be applied.")
+    # Log the differences in position for transparency
+    for i, (desired, current) in enumerate(zip(hashes_ordered[::-1], current_order)):
+        if desired != current:
+            log(f"Position {i}: Expected {desired[:6]}..., Found {current[:6]}...")
+
+    # Move each torrent to the top of the queue in the desired order
     for t in sorted_torrents:
         r = session.post(f"{QB_URL}/api/v2/torrents/topPrio", data={"hashes": t["hash"]})
         if r.ok:
