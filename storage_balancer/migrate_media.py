@@ -165,4 +165,10 @@ def main():
     proceed = input("\nProceed with migration? [y/N]: ").lower().strip()
     if proceed == 'y':
         migrate_dirs(dirs_to_move)
-        print(f"\n✅ Migration complete. Log saved to: {l
+        print(f"\n✅ Migration complete. Log saved to: {log_file}")
+    else:
+        print("🚫 Migration cancelled.")
+
+# Entry point
+if __name__ == "__main__":
+    main()
