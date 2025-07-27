@@ -172,7 +172,7 @@ def reprioritize_queue(torrents):
         if r.ok:
             log(f"Promoted {t['name']} ({t['hash'][:6]}...) to top of queue")
         else:
-            log(f"Failed to move {t['name']} to top")
+            log(f"Failed to move {t['name']} to top. Status code: {r.status_code}. Response: {r.text}")
 
 def should_delete(torrent_hash, status, downloaded_bytes):
     """Determine if a torrent should be deleted based on state, progress, and TTL.
