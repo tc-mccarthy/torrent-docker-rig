@@ -141,29 +141,7 @@ def score_torrent(t):
         score += 50
         reason.append("metaDL=+50")
 
-    # Use the average download speed (last 10 samples) as a dynamic boost.
-    key = get_cache_key(t["hash"])
-    raw = rdb.get(key)
-    avg_kbps = 0
-
-    if raw:
-        try:
-            cache = json.loads(raw)
-            dlspeed_list = cache.get("dlspeed", [])
-            if t.get("dlspeed") is not None:
-                dlspeed_list.append(t["dlspeed"])
-                if len(dlspeed_list) > 10:
-                    dlspeed_list = dlspeed_list[-10:]
-                avg_kbps = int(sum(dlspeed_list) / len(dlspeed_list) / 1000)
-                cache["dlspeed"] = dlspeed_list
-                rdb.setex(key, REDIS_EXPIRY_BUFFER, json.dumps(cache))
-        except Exception as e:
-            log(f"Error updating download speed cache for {t['hash'][:6]}...: {e}")
-
-    if avg_kbps > 0:
-        score += avg_kbps
-        reason.append(f"avg_dlspeed={avg_kbps} KB/s")
-
+    # Average download speed is no longer used for scoring or reprioritization.
     log(f"Scoring: {t['name']} ({t['hash'][:6]}...): {score} | {'; '.join(reason)}")
     return score
 
