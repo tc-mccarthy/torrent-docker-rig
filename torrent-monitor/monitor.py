@@ -26,20 +26,18 @@ REDIS_EXPIRY_BUFFER = 7200  # 2 hours
 CHECK_INTERVAL = 60
 
 # Tracked torrent states and TTLs (in seconds)
-# Each entry also specifies a `cached_state` to normalize behavior post-completion
 TRACKED_STATES = [
-    {"state": "completed",  "cached_state": "completed",  "ttl_seconds": 86400},   # Fully downloaded
-    {"state": "uploading",  "cached_state": "completed",  "ttl_seconds": 86400},   # Seeding
-    {"state": "stalledUP",  "cached_state": "completed",  "ttl_seconds": 86400},   # Upload stalled
-    {"state": "pausedUP",   "cached_state": "completed",  "ttl_seconds": 86400},   # Paused manually
-    {"state": "queuedUP",   "cached_state": "completed",  "ttl_seconds": 86400},   # Awaiting upload
-    {"state": "stalledDL",  "cached_state": "stalledDL",  "ttl_seconds": 43200},   # Download stalled (12hr)
-    {"state": "metaDL",     "cached_state": "metaDL",     "ttl_seconds": 21600},   # Metadata fetch (6hr)
+    {"state": "completed", "cached_state": "completed", "ttl_seconds": 86400},
+    {"state": "uploading", "cached_state": "completed", "ttl_seconds": 86400},
+    {"state": "stalledUP", "cached_state": "completed", "ttl_seconds": 86400},
+    {"state": "pausedUP", "cached_state": "completed", "ttl_seconds": 86400},
+    {"state": "queuedUP", "cached_state": "completed", "ttl_seconds": 86400},
+    {"state": "stalledDL", "cached_state": "stalledDL", "ttl_seconds": 43200},
+    {"state": "metaDL", "cached_state": "metaDL", "ttl_seconds": 21600},
 ]
 
 TRACKED_STATE_LOOKUP = {
-    s["state"]: {"ttl": s["ttl_seconds"], "cached_state": s["cached_state"]}
-    for s in TRACKED_STATES
+    s["state"]: {"ttl": s["ttl_seconds"], "cached_state": s["cached_state"]} for s in TRACKED_STATES
 }
 
 session = requests.Session()
@@ -62,30 +60,6 @@ def login():
         log("Login failed.")
     return r.ok
 
-def get_preferences():
-    try:
-        r = session.get(f"{QB_URL}/api/v2/app/preferences")
-        if r.ok:
-            return r.json()
-        else:
-            log(f"Failed to fetch preferences. Status code: {r.status_code}")
-    except Exception as e:
-        log(f"Exception while fetching preferences: {e}")
-    return {}
-
-def set_torrent_queueing(enabled):
-    try:
-        data = {"queueing_enabled": str(enabled).lower()}
-        r = session.post(f"{QB_URL}/api/v2/app/setPreferences", data={"json": json.dumps(data)})
-        if r.ok:
-            log(f"Set torrent queueing to {enabled}")
-            return True
-        else:
-            log(f"Failed to set torrent queueing. Status code: {r.status_code}. Response: {r.text}")
-    except Exception as e:
-        log(f"Exception while setting torrent queueing: {e}")
-    return False
-
 def get_torrents():
     r = session.get(f"{QB_URL}/api/v2/torrents/info")
     if r.ok:
@@ -96,9 +70,19 @@ def get_torrents():
         log("Failed to fetch torrents.")
         return []
 
+def is_queueing_enabled():
+    r = session.get(f"{QB_URL}/api/v2/app/preferences")
+    if r.ok:
+        prefs = r.json()
+        return prefs.get("queueing_enabled", False)
+    else:
+        log("Could not retrieve preferences to check queueing state.")
+        return False
+
 def score_torrent(t):
     score = 0
     reason = []
+
     tags = t.get("tags", "")
     taglist = tags.split(",") if tags else []
 
@@ -143,10 +127,10 @@ def score_torrent(t):
     return score
 
 def reprioritize_queue(torrents):
-    """Reprioritize the torrent queue in qBittorrent based on scoring criteria.
+    """Reprioritize the torrent queue in qBittorrent based on scoring criteria and age.
 
-    This function disables queueing if enabled, sorts torrents by score and age,
-    moves each to the top of the queue, and restores queueing if it was previously enabled.
+    This function checks if queueing is enabled. If not, it logs and skips position updates.
+    Otherwise, it sorts torrents by score and age, and sets their position in the queue accordingly.
 
     Args:
         torrents (list): List of torrent dicts.
@@ -154,34 +138,21 @@ def reprioritize_queue(torrents):
     if not torrents:
         return
 
-    prefs = get_preferences()
-    was_queueing_enabled = prefs.get("queueing_enabled", False)
-
-    if was_queueing_enabled:
-        set_torrent_queueing(False)
+    queueing_enabled = is_queueing_enabled()
+    if not queueing_enabled:
+        log("Torrent queueing is disabled. Skipping position updates.")
+        return
 
     sorted_torrents = sorted(torrents, key=lambda t: (score_torrent(t), -t.get("added_on", 0)))
-    for t in sorted_torrents:
-        r = session.post(f"{QB_URL}/api/v2/torrents/topPrio", data={"hashes": t["hash"]})
-        if r.ok:
-            log(f"Promoted {t['name']} ({t['hash'][:6]}...) to top of queue")
-        else:
-            log(f"Failed to move {t['name']} to top. Status code: {r.status_code}. Response: {r.text}")
 
-    if was_queueing_enabled:
-        set_torrent_queueing(True)
+    for i, t in enumerate(sorted_torrents):
+        r = session.post(f"{QB_URL}/api/v2/torrents/setTorrentPosition", data={"hash": t["hash"], "newPos": i})
+        if r.ok:
+            log(f"Set position {i} for {t['name']} ({t['hash'][:6]}...)")
+        else:
+            log(f"Failed to set position for {t['name']} (hash={t['hash']}). Status code: {r.status_code}. Response: {r.text}")
 
 def should_delete(torrent_hash, status, downloaded_bytes):
-    """Determine if a torrent should be deleted based on state, progress, and TTL.
-
-    Args:
-        torrent_hash (str): Torrent hash.
-        status (str): Torrent state.
-        downloaded_bytes (int): Number of bytes downloaded.
-
-    Returns:
-        bool: True if the torrent should be deleted, False otherwise.
-    """
     now = int(time.time())
     tracking_info = TRACKED_STATE_LOOKUP.get(status)
 
@@ -237,14 +208,6 @@ def should_delete(torrent_hash, status, downloaded_bytes):
     return False
 
 def delete_torrent(torrent_hash):
-    """Delete a torrent and its files from qBittorrent.
-
-    Args:
-        torrent_hash (str): Torrent hash.
-
-    Returns:
-        bool: True if deletion was successful, False otherwise.
-    """
     log(f"Deleting torrent {torrent_hash} and its files")
     r = session.post(f"{QB_URL}/api/v2/torrents/delete", data={"hashes": torrent_hash, "deleteFiles": "true"})
     if r.ok:
@@ -254,11 +217,6 @@ def delete_torrent(torrent_hash):
     return r.ok
 
 def run():
-    """Run one monitoring pass: login, reprioritize, and check for deletions.
-
-    Returns:
-        None
-    """
     log("=== Running monitor pass ===")
     if not login():
         return
@@ -287,11 +245,6 @@ def run():
     log("=== Monitor pass complete ===")
 
 def schedule_monitor():
-    """Schedule the monitor to run immediately and then on a cron schedule.
-
-    Returns:
-        None
-    """
     log(f"Scheduling monitor with cron: '{MONITOR_CRON}'")
     scheduler = BackgroundScheduler()
     try:
