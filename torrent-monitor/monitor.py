@@ -14,7 +14,7 @@ QB_USER = os.getenv("QB_USERNAME")
 QB_PASS = os.getenv("QB_PASSWORD")
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
-MONITOR_CRON = os.getenv("MONITOR_CRON", "*/5 * * * *")  # Every 5 minutes
+MONITOR_CRON = os.getenv("MONITOR_CRON", "*/15 * * * *")  # Every 15 minutes
 
 # Redis key version — updated when logic changes
 KEY_VERSION = "torrent_monitor_20250727a"
@@ -164,7 +164,7 @@ def reprioritize_queue(torrents):
     hashes_ordered = [t["hash"] for t in sorted_torrents]
     current_order = [t["hash"] for t in torrents]
 
-    if hashes_ordered.reverse() == current_order:
+    if hashes_ordered[::-1] == current_order:
         log("Torrent queue is already in desired order; skipping reprioritization.")
         return
 
