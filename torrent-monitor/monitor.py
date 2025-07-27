@@ -168,7 +168,7 @@ def reprioritize_queue(torrents):
         return
     sorted_torrents = sorted(torrents, key=score_torrent, reverse=True)
     for t in sorted_torrents:
-        r = session.post(f"{QB_URL}/api/v2/torrents/moveTop", data={"hashes": t["hash"]})
+        r = session.post(f"{QB_URL}/api/v2/torrents/topPrio", data={"hashes": t["hash"]})
         if r.ok:
             log(f"Promoted {t['name']} ({t['hash'][:6]}...) to top of queue")
         else:
