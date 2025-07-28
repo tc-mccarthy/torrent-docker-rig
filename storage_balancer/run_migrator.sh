@@ -37,6 +37,7 @@ docker build -t "$IMAGE_NAME" "$SCRIPT_DIR"
 
 echo "🚀 Launching media migrator container..."
 docker run --rm -it \
+  --network host \
   -v /media/tc:/source_media \
   -v "$SCRIPT_DIR":/usr/app \
   -w /usr/app \
@@ -48,3 +49,4 @@ docker run --rm -it \
   -e SONARR_URL \
   -e SONARR_API_KEY \
   "$IMAGE_NAME"
+
