@@ -26,6 +26,10 @@ export RADARR_URL="https://$TORRENT_SSL_HOST/radarr"
 # Sonarr configuration
 export SONARR_URL="https://$TORRENT_SSL_HOST/sonarr"
 
+# How Radarr and Sonarr see /source_media
+export MEDIA_MOUNT_PREFIX="/media/tc"
+
+
 # --------------------------------------------
 # Docker image details
 # --------------------------------------------
@@ -37,11 +41,12 @@ docker build -t "$IMAGE_NAME" "$SCRIPT_DIR"
 
 echo "🚀 Launching media migrator container..."
 docker run --rm -it \
-  -v /media/tc:/source_media \
+  -v $MEDIA_MOUNT_PREFIX:/source_media \
   -v "$SCRIPT_DIR":/usr/app \
   -w /usr/app \
   -e SOURCE_PATH \
   -e DEST_PATH \
+  -e MEDIA_MOUNT_PREFIX \
   -e TARGET_UTILIZATION \
   -e RADARR_URL \
   -e RADARR_API_KEY \
