@@ -26,268 +26,186 @@ from pathlib import Path
 from datetime import datetime
 from tqdm import tqdm
 
-# ----------------------------------------------------------
-# Configuration loaded via environment variables
-# ----------------------------------------------------------
-
-SOURCE = Path(os.getenv("SOURCE_PATH", "/source_media/Drax/Movies"))
-DEST = Path(os.getenv("DEST_PATH", "/source_media/Rogers/Movies"))
+# Load environment variables
+SOURCE = Path(os.getenv("SOURCE_PATH"))
+DEST = Path(os.getenv("DEST_PATH"))
 TARGET_UTILIZATION = float(os.getenv("TARGET_UTILIZATION", "80"))
 MEDIA_MOUNT_PREFIX = os.getenv("MEDIA_MOUNT_PREFIX", "/media/tc")
-LOG_DIR = Path("/usr/app/storage")
-
 RADARR_URL = os.getenv("RADARR_URL")
 RADARR_API_KEY = os.getenv("RADARR_API_KEY")
 SONARR_URL = os.getenv("SONARR_URL")
 SONARR_API_KEY = os.getenv("SONARR_API_KEY")
-
+LOG_DIR = Path("/usr/app/storage")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_file = LOG_DIR / f"migrated_dirs_{timestamp}.txt"
-
-# ----------------------------------------------------------
-# Connectivity Check for Radarr/Sonarr
-# ----------------------------------------------------------
+LOG_FILE = LOG_DIR / f"migrated_dirs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 
 def verify_api_connection():
-    """
-    Verifies connectivity to Radarr and Sonarr using provided API credentials.
-    Logs full URLs and partial API keys for transparency.
-    Exits early if a connection fails.
-    """
+    """Check Radarr and Sonarr connectivity before beginning."""
     if RADARR_URL and RADARR_API_KEY:
         try:
-            test_url = f"{RADARR_URL}/api/v3/movie"
-            headers = {"X-Api-Key": RADARR_API_KEY}
-            print(f"🔍 Verifying Radarr: {test_url}")
-            print(f"🔑 API Key: {RADARR_API_KEY[:6]}...")
-
-            response = requests.get(test_url, headers=headers, timeout=120)
-            response.raise_for_status()
-            print("✅ Connected to Radarr.")
+            print(f"🔍 Verifying Radarr: {RADARR_URL}")
+            res = requests.get(f"{RADARR_URL}/api/v3/movie", headers={"X-Api-Key": RADARR_API_KEY}, timeout=120)
+            res.raise_for_status()
+            print("✅ Connected to Radarr")
         except Exception as e:
-            print(f"❌ Failed to connect to Radarr:\n   URL: {test_url}\n   API Key: {RADARR_API_KEY}")
-            print(f"   Error: {e}")
+            print(f"❌ Radarr Error (URL: {RADARR_URL}, Key: {RADARR_API_KEY}): {e}")
             exit(1)
-
     if SONARR_URL and SONARR_API_KEY:
         try:
-            test_url = f"{SONARR_URL}/api/v3/series"
-            headers = {"X-Api-Key": SONARR_API_KEY}
-            print(f"🔍 Verifying Sonarr: {test_url}")
-            print(f"🔑 API Key: {SONARR_API_KEY[:6]}...")
-
-            response = requests.get(test_url, headers=headers, timeout=120)
-            response.raise_for_status()
-            print("✅ Connected to Sonarr.")
+            print(f"🔍 Verifying Sonarr: {SONARR_URL}")
+            res = requests.get(f"{SONARR_URL}/api/v3/series", headers={"X-Api-Key": SONARR_API_KEY}, timeout=120)
+            res.raise_for_status()
+            print("✅ Connected to Sonarr")
         except Exception as e:
-            print(f"❌ Failed to connect to Sonarr:\n   URL: {test_url}\n   API Key: {SONARR_API_KEY}")
-            print(f"   Error: {e}")
+            print(f"❌ Sonarr Error (URL: {SONARR_URL}, Key: {SONARR_API_KEY}): {e}")
             exit(1)
 
-    if not (RADARR_URL and RADARR_API_KEY) and not (SONARR_URL and SONARR_API_KEY):
-        print("⚠️ No Radarr or Sonarr configuration detected. Skipping indexer updates.")
+def get_df_usage(path: str):
+    """Use df to get accurate disk usage."""
+    result = subprocess.run(["df", "--output=size,used,avail,pcent", "-B1", path], capture_output=True, text=True)
+    lines = result.stdout.strip().split("\n")
+    if len(lines) < 2:
+        raise RuntimeError(f"Failed to parse df output for {path}")
+    size, used, avail, percent = lines[1].split()
+    return int(size), int(used), int(avail), int(percent.strip('%'))
 
-# ----------------------------------------------------------
-# Rsync Utility with Dry-Run Preview
-# ----------------------------------------------------------
+def get_dir_sizes(path: Path):
+    """Return dict of subdirectories and their sizes."""
+    return {p: sum(f.stat().st_size for f in p.rglob("*") if f.is_file()) for p in path.iterdir() if p.is_dir()}
+
+def format_size(bytes_size):
+    """Convert bytes to human-readable string."""
+    for unit in ['B','KB','MB','GB','TB']:
+        if bytes_size < 1024.0:
+            return f"{bytes_size:.2f} {unit}"
+        bytes_size /= 1024.0
+    return f"{bytes_size:.2f} PB"
+
+def pick_dirs_to_move(dir_sizes, bytes_needed):
+    """Select enough directories to move based on size."""
+    sorted_dirs = sorted(dir_sizes.items(), key=lambda x: x[1], reverse=True)
+    selected, total = [], 0
+    for d, size in sorted_dirs:
+        if total >= bytes_needed:
+            break
+        selected.append((d, size))
+        total += size
+    return selected
 
 def rsync_until_stable(src: Path, dest: Path) -> bool:
     """
-    Repeatedly run rsync until no changes are detected.
-    Uses a dry-run before each pass to determine if sync is stable.
+    Repeat rsync with dry-run until no changes detected.
 
     Args:
-        src (Path): Source directory
-        dest (Path): Destination directory
+        src (Path): source path
+        dest (Path): destination path
 
     Returns:
-        bool: True if sync stabilized, False if failed
+        bool: True if stable, False otherwise
     """
-    print(f"🔄 Starting rsync loop for {src.name}")
     max_attempts = 250
-
     for attempt in range(max_attempts):
-        print(f"🧪 Dry-run check for rsync pass {attempt + 1}...")
-        dry_run_cmd = [
-            "rsync", "-auvn", "--delete", str(src) + "/", str(dest) + "/"
-        ]
-        result = subprocess.run(dry_run_cmd, capture_output=True, text=True)
-        changes = result.stdout.strip().splitlines()
-
-        actual_changes = [
-            line for line in changes
-            if line and not line.startswith("sending") and not line.startswith("sent ")
-        ]
-
-        if not actual_changes:
+        print(f"🧪 Dry-run rsync check #{attempt + 1}...")
+        dry_run_cmd = ["rsync", "-auvn", "--delete", f"{src}/", f"{dest}/"]
+        dry_result = subprocess.run(dry_run_cmd, capture_output=True, text=True)
+        changes = [line for line in dry_result.stdout.strip().splitlines()
+                   if line and not line.startswith("sending") and not line.startswith("sent ")]
+        if not changes:
             print(f"✅ Sync stable for {src.name}")
             return True
+        print(f"🔁 {len(changes)} changes detected:")
+        for c in changes:
+            print(f"   🔸 {c}")
 
-        print(f"🔁 {len(actual_changes)} change(s) detected:")
-        for line in actual_changes:
-            print(f"   🔸 {line}")
-
-        print(f"▶️ Running rsync pass {attempt + 1}...")
-        rsync_cmd = [
-            "rsync", "-au", "--delete", "--info=progress2", "--progress",
-            str(src) + "/", str(dest) + "/"
-        ]
-
-        process = subprocess.Popen(
-            rsync_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            bufsize=1,
-            universal_newlines=True
-        )
-
-        with tqdm(total=100, desc=f"{src.name} Sync Progress", unit="%") as pbar:
-            for line in process.stdout:
-                print(line, end='')
-                if "%" in line:
-                    for part in line.strip().split():
-                        if "%" in part:
-                            try:
-                                pbar.n = int(part.strip('%'))
-                                pbar.refresh()
-                            except ValueError:
-                                continue
-
-        if process.wait() != 0:
+        print(f"▶️ Running real rsync for pass #{attempt + 1}...")
+        rsync_cmd = ["rsync", "-au", "--delete", "--info=progress2", "--progress", f"{src}/", f"{dest}/"]
+        with subprocess.Popen(rsync_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True) as proc:
+            with tqdm(total=100, desc=f"{src.name} Sync", unit="%") as pbar:
+                for line in proc.stdout:
+                    print(line, end='')
+                    if "%" in line:
+                        for part in line.strip().split():
+                            if "%" in part:
+                                try:
+                                    pbar.n = int(part.strip('%'))
+                                    pbar.refresh()
+                                except ValueError:
+                                    continue
+        if proc.returncode != 0:
             print(f"❌ Rsync failed for {src}")
             return False
-
     print(f"❌ Max rsync attempts reached for {src}")
     return False
 
-
-# ----------------------------------------------------------
-# Radarr / Sonarr API Integration
-# ----------------------------------------------------------
-
-def update_radarr_path(original_path: str, new_path: str):
-    """Update Radarr with the new path for a migrated movie."""
-    if not (RADARR_URL and RADARR_API_KEY): return
-    headers = {"X-Api-Key": RADARR_API_KEY}
-    movies = requests.get(f"{RADARR_URL}/api/v3/movie", headers=headers).json()
-    for movie in movies:
-        if movie['path'] == original_path:
-            movie['path'] = new_path
-            r = requests.put(f"{RADARR_URL}/api/v3/movie", headers=headers, json=movie)
-            r.raise_for_status()
-            print(f"🎬 Radarr updated: {original_path} → {new_path}")
-            return
-    print(f"⚠️ No Radarr match for: {original_path}")
-
-def update_sonarr_path(original_path: str, new_path: str):
-    """Update Sonarr with the new path for a migrated series."""
-    if not (SONARR_URL and SONARR_API_KEY): return
-    headers = {"X-Api-Key": SONARR_API_KEY}
-    shows = requests.get(f"{SONARR_URL}/api/v3/series", headers=headers).json()
-    for show in shows:
-        if show['path'] == original_path:
-            show['path'] = new_path
-            r = requests.put(f"{SONARR_URL}/api/v3/series/{show['id']}", headers=headers, json=show)
-            r.raise_for_status()
-            print(f"📺 Sonarr updated: {original_path} → {new_path}")
-            return
-    print(f"⚠️ No Sonarr match for: {original_path}")
-
 def update_indexers(original_path: str, new_path: str):
-    """
-    Route indexer updates based on path patterns, rewriting paths
-    from container-visible (/source_media) to Radarr/Sonarr-visible (/media/tc).
-    """
-    media_prefix = os.getenv("MEDIA_MOUNT_PREFIX", "/media/tc")
-
-    rewritten_original = original_path.replace("/source_media", media_prefix)
-    rewritten_new = new_path.replace("/source_media", media_prefix)
-
+    """Rewrite paths and update Radarr or Sonarr if matching type."""
+    o = original_path.replace("/source_media", MEDIA_MOUNT_PREFIX)
+    n = new_path.replace("/source_media", MEDIA_MOUNT_PREFIX)
     if "/Movies" in original_path:
-        update_radarr_path(rewritten_original, rewritten_new)
+        movies = requests.get(f"{RADARR_URL}/api/v3/movie", headers={"X-Api-Key": RADARR_API_KEY}).json()
+        for movie in movies:
+            if movie['path'] == o:
+                movie['path'] = n
+                r = requests.put(f"{RADARR_URL}/api/v3/movie", headers={"X-Api-Key": RADARR_API_KEY}, json=movie)
+                r.raise_for_status()
+                print(f"🎬 Radarr updated: {o} → {n}")
     elif "/TV Shows" in original_path:
-        update_sonarr_path(rewritten_original, rewritten_new)
+        shows = requests.get(f"{SONARR_URL}/api/v3/series", headers={"X-Api-Key": SONARR_API_KEY}).json()
+        for show in shows:
+            if show['path'] == o:
+                show['path'] = n
+                r = requests.put(f"{SONARR_URL}/api/v3/series/{show['id']}", headers={"X-Api-Key": SONARR_API_KEY}, json=show)
+                r.raise_for_status()
+                print(f"📺 Sonarr updated: {o} → {n}")
 
-
-# ----------------------------------------------------------
-# Migration Execution
-# ----------------------------------------------------------
-
-def migrate_dirs(dirs_to_move):
-    """
-    Perform migration for selected directories:
-    - Sync using rsync until stable
-    - Delete source after sync
-    - Update Radarr/Sonarr
-
-    Args:
-        dirs_to_move (list): List of (Path, size) tuples to migrate
-    """
-    with open(log_file, "w") as log:
-        for src_dir, size in dirs_to_move:
-            rel_path = src_dir.relative_to(SOURCE)
-            dest_dir = DEST / rel_path
-            dest_dir.parent.mkdir(parents=True, exist_ok=True)
-
-            print(f"\n🔁 Preparing migration: {src_dir} → {dest_dir} ({format_size(size)})")
-
-            if rsync_until_stable(src_dir, dest_dir):
-                shutil.rmtree(src_dir)
-                print(f"🗑️ Deleted: {src_dir}")
-                update_indexers(str(src_dir), str(dest_dir))
-                log.write(f"{src_dir} → {dest_dir}\n")
+def migrate_dirs(dirs):
+    """Perform migration of selected directories."""
+    with open(LOG_FILE, "w") as log:
+        for src, size in dirs:
+            rel = src.relative_to(SOURCE)
+            dest = DEST / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            print(f"\n🔁 Migrating {src} → {dest} ({format_size(size)})")
+            if rsync_until_stable(src, dest):
+                shutil.rmtree(src)
+                print(f"🗑️ Deleted: {src}")
+                update_indexers(str(src), str(dest))
+                log.write(f"{src} → {dest}\n")
             else:
-                print(f"❌ Migration failed or unstable for {src_dir}. Skipping deletion.")
-
-# ----------------------------------------------------------
-# Main Control Flow
-# ----------------------------------------------------------
+                print(f"❌ Failed: {src}. Skipped deletion.")
 
 def main():
-    """
-    Main control flow for the media migration process.
-    """
     verify_api_connection()
-
-    print(f"📁 Source: {SOURCE}")
-    print(f"📁 Destination: {DEST}")
-
     src_root = "/" + SOURCE.parts[1] + "/" + SOURCE.parts[2]
     dst_root = "/" + DEST.parts[1] + "/" + DEST.parts[2]
-    src_total, src_used, src_free, src_percent = get_df_usage(src_root)
-    dst_total, dst_used, dst_free, dst_percent = get_df_usage(dst_root)
+    src_total, src_used, _, src_pct = get_df_usage(src_root)
+    _, _, dst_free, _ = get_df_usage(dst_root)
 
-    print(f"📊 Source usage: {src_percent:.2f}% of {format_size(src_total)}")
-    print(f"📦 Destination free space: {format_size(dst_free)}")
-
-    if src_percent <= TARGET_UTILIZATION:
-        print("✅ Source already below target utilization.")
+    print(f"📊 Source usage: {src_pct}% of {format_size(src_total)}")
+    if src_pct <= TARGET_UTILIZATION:
+        print("✅ Source already below target.")
         return
 
-    bytes_to_free = src_used - (src_total * (TARGET_UTILIZATION / 100))
-    print(f"🚚 Need to free: {format_size(bytes_to_free)}")
-
+    bytes_needed = src_used - (src_total * (TARGET_UTILIZATION / 100))
+    print(f"🚚 Need to move: {format_size(bytes_needed)}")
     dir_sizes = get_dir_sizes(SOURCE)
-    dirs_to_move = pick_dirs_to_move(dir_sizes, bytes_to_free)
-    total_move_size = sum(size for _, size in dirs_to_move)
+    dirs_to_move = pick_dirs_to_move(dir_sizes, bytes_needed)
+    total_move = sum(size for _, size in dirs_to_move)
 
-    if total_move_size > dst_free:
-        print(f"❌ Not enough space. Required: {format_size(total_move_size)}, Available: {format_size(dst_free)}")
+    if total_move > dst_free:
+        print(f"❌ Not enough space: need {format_size(total_move)}, have {format_size(dst_free)}")
         return
 
-    print("\n📦 Directories to migrate:")
+    print("\n📦 Will migrate:")
     for d, size in dirs_to_move:
-        print(f" - {d.name} ({format_size(size)})")
+        print(f" - {d.name}: {format_size(size)}")
 
-    print(f"\n📝 Migration log will be saved to: {log_file}")
-
-    proceed = input("\nProceed with migration? [y/N]: ").lower().strip()
-    if proceed == 'y':
+    print(f"\n📝 Log: {LOG_FILE}")
+    if input("Proceed? [y/N]: ").lower() == 'y':
         migrate_dirs(dirs_to_move)
-        print(f"\n✅ Migration complete. Log saved to: {log_file}")
+        print("✅ Done")
     else:
-        print("🚫 Migration cancelled.")
+        print("🚫 Cancelled")
 
 if __name__ == "__main__":
     main()
