@@ -1,37 +1,46 @@
 #!/bin/bash
 set -e
 
-# -------------------------------
+# --------------------------------------------
+# Change directory to where this script lives
+# This ensures it works from anywhere
+# --------------------------------------------
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# --------------------------------------------
 # Configurable environment values
-# -------------------------------
+# --------------------------------------------
 
 # Define the source and destination paths within the mounted volume
-export SOURCE_PATH="/source_media/Drax/Movies"
-export DEST_PATH="/source_media/Rogers/Movies"
+export SOURCE_PATH="/source_media/Parker/TV Shows"
+export DEST_PATH="/source_media/Wanda/TV Shows"
 
 # Set your target utilization percentage (float)
 export TARGET_UTILIZATION="80"
 
 # Radarr configuration
-export RADARR_URL="https://$TORRENT_SSL_HOST/radarr/"
-
+export RADARR_URL="http://host.docker.internal:7878"
+export RADARR_API_KEY="your-radarr-api-key-here"
 
 # Sonarr configuration
-export SONARR_URL="https://$TORRENT_SSL_HOST/sonarr/"
+export SONARR_URL="http://host.docker.internal:8989"
+export SONARR_API_KEY="your-sonarr-api-key-here"
 
-# -------------------------------
+# --------------------------------------------
 # Docker image details
-# -------------------------------
+# --------------------------------------------
 
 IMAGE_NAME="media-migrator"
 
 echo "🛠️ Building Docker image: $IMAGE_NAME..."
-docker build -t "$IMAGE_NAME" .
+docker build -t "$IMAGE_NAME" "$SCRIPT_DIR"
 
 echo "🚀 Launching media migrator container..."
 docker run --rm -it \
   -v /media/tc:/source_media \
-  -v "$(pwd)":/usr/app \
+  -v "$SCRIPT_DIR":/usr/app \
   -w /usr/app \
   -e SOURCE_PATH \
   -e DEST_PATH \

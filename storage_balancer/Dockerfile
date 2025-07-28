@@ -1,20 +1,30 @@
+# Use an official Python base image with pip and virtualenv support
 FROM python:3.11-slim
 
-# Install dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends rsync && \
-    pip install tqdm && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Create working directory
+# Set working directory in the container
 WORKDIR /usr/app
 
-# Copy script into container
-COPY migrate_media.py .
+# Install system dependencies required for rsync and tqdm
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        rsync \
+        curl \
+        ca-certificates \
+        build-essential \
+        git \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create storage path for logs
+# Install required Python packages
+RUN pip install requests tqdm
+
+# Copy the migration script into the container
+COPY migrate_media.py ./
+
+# Create the storage directory for logs
 RUN mkdir -p /usr/app/storage
 
-# Entrypoint is the migration script
-ENTRYPOINT ["python3", "migrate_media.py"]
+# Make the script executable
+RUN chmod +x /usr/app/migrate_media.py
+
+# Default command to run the script
+CMD ["python", "migrate_media.py"]
