@@ -8,7 +8,7 @@ from datetime import datetime
 from tqdm import tqdm
 
 # --------------------------------------
-# Configuration from environment vars
+# Configuration from environment
 # --------------------------------------
 
 SOURCE = Path(os.getenv("SOURCE_PATH", "/source_media/Drax/Movies"))
@@ -24,21 +24,63 @@ log_file = LOG_DIR / f"migrated_dirs_{timestamp}.txt"
 # Utility Functions
 # --------------------------------------
 
-def get_disk_usage(path: Path):
-    """Returns total, used, free bytes for the filesystem where path is mounted."""
-    return shutil.disk_usage(str(path))
+def get_df_usage(path: str):
+    """Get disk usage statistics for a given path using the `df` command.
+
+    Args:
+        path (str): The filesystem path to check.
+
+    Returns:
+        tuple: (total_bytes, used_bytes, free_bytes, percent_used_int)
+            - total_bytes (int): Total size of the filesystem in bytes.
+            - used_bytes (int): Used space in bytes.
+            - free_bytes (int): Available space in bytes.
+            - percent_used_int (int): Percentage of space used (integer).
+
+    Raises:
+        RuntimeError: If the output of `df` cannot be parsed.
+    """
+    # Use the system 'df' command to get accurate disk usage stats for the given path.
+    result = subprocess.run(
+        ["df", "--output=size,used,avail,pcent", "-B1", path],
+        capture_output=True, text=True
+    )
+
+    lines = result.stdout.strip().split("\n")
+    if len(lines) < 2:
+        raise RuntimeError("Failed to parse df output")
+
+    size, used, avail, percent = lines[1].split()
+    return int(size), int(used), int(avail), int(percent.strip('%'))
 
 def get_dir_sizes(path: Path):
-    """Returns dictionary of directory sizes in bytes."""
+    """Calculate the total size of each subdirectory in a given path.
+
+    Args:
+        path (Path): The parent directory to scan.
+
+    Returns:
+        dict: Mapping of Path objects (subdirectories) to their total size in bytes.
+    """
+    # Walk through each subdirectory and sum the size of all files within.
     dirs = {}
     for item in path.iterdir():
         if item.is_dir():
+            # Use rglob to recursively find all files and sum their sizes.
             size = sum(f.stat().st_size for f in item.rglob('*') if f.is_file())
             dirs[item] = size
     return dirs
 
 def format_size(bytes_size):
-    """Human-readable byte formatter."""
+    """Convert a size in bytes to a human-readable string with appropriate units.
+
+    Args:
+        bytes_size (int or float): The size in bytes.
+
+    Returns:
+        str: Human-readable string (e.g., '1.23 GB').
+    """
+    # Iterate through units, dividing by 1024 each time, until the value is small enough.
     for unit in ['B','KB','MB','GB','TB']:
         if bytes_size < 1024.0:
             return f"{bytes_size:.2f} {unit}"
@@ -46,129 +88,18 @@ def format_size(bytes_size):
     return f"{bytes_size:.2f} PB"
 
 def pick_dirs_to_move(dir_sizes, bytes_needed):
-    """Greedy algorithm to pick enough directories to move."""
+    """Select a set of directories whose combined size meets or exceeds the required space.
+
+    Uses a greedy algorithm, picking the largest directories first.
+
+    Args:
+        dir_sizes (dict): Mapping of Path objects to their size in bytes.
+        bytes_needed (int): The minimum total size to select (in bytes).
+
+    Returns:
+        list: List of Path objects to move.
+    """
+    # Sort directories by size (largest first) and select until the total meets the requirement.
     sorted_dirs = sorted(dir_sizes.items(), key=lambda x: x[1], reverse=True)
     selected = []
     total = 0
-    for d, size in sorted_dirs:
-        if total >= bytes_needed:
-            break
-        selected.append((d, size))
-        total += size
-    return selected
-
-def rsync_with_progress(src, dest):
-    """Run rsync and capture file-level and job-level progress."""
-    rsync_cmd = [
-        "rsync", "-au", "--info=progress2", "--progress",
-        str(src) + "/", str(dest) + "/"
-    ]
-
-    process = subprocess.Popen(
-        rsync_cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        bufsize=1,
-        universal_newlines=True
-    )
-
-    with tqdm(total=100, desc="Total Progress", unit="%") as pbar:
-        for line in process.stdout:
-            print(line, end='')
-
-            if "%" in line:
-                parts = line.strip().split()
-                for part in parts:
-                    if "%" in part:
-                        try:
-                            percent = int(part.strip('%'))
-                            pbar.n = percent
-                            pbar.refresh()
-                        except ValueError:
-                            continue
-
-    return process.wait() == 0
-
-# --------------------------------------
-# Migration Logic
-# --------------------------------------
-
-def migrate_dirs(dirs_to_move):
-    """Rsync and auto-delete source directories after successful transfer."""
-    with open(log_file, "w") as log:
-        for src_dir, size in dirs_to_move:
-            rel_path = src_dir.relative_to(SOURCE)
-            dest_dir = DEST / rel_path
-
-            print(f"\n🔁 Migrating: {src_dir} → {dest_dir} ({format_size(size)})")
-            dest_dir.parent.mkdir(parents=True, exist_ok=True)
-
-            success = rsync_with_progress(src_dir, dest_dir)
-
-            if success:
-                print(f"✅ Migration done: {src_dir}")
-                log.write(f"{src_dir}\n")
-                shutil.rmtree(src_dir)
-                print(f"🗑️ Deleted original: {src_dir}")
-            else:
-                print(f"❌ Rsync failed for {src_dir}. Skipping delete.")
-
-# --------------------------------------
-# Main Control Flow
-# --------------------------------------
-
-def main():
-    print(f"📁 Source path: {SOURCE}")
-    print(f"📁 Destination path: {DEST}")
-
-    # Disk usage should be checked at the mount point (e.g., /source_media)
-    src_root = Path("/".join(SOURCE.parts[:3]))  # /source_media
-    dst_root = Path("/".join(DEST.parts[:3]))    # /source_media
-
-    print(f"ℹ️ Checking disk usage for source mount: {src_root}")
-    print(f"ℹ️ Checking disk usage for destination mount: {dst_root}")
-
-    src_total, src_used, _ = get_disk_usage(src_root)
-    dst_total, dst_used, dst_free = get_disk_usage(dst_root)
-
-    current_util = (src_used / src_total) * 100
-    print(f"📊 Source usage: {current_util:.2f}% of {format_size(src_total)}")
-    print(f"📦 Destination free space: {format_size(dst_free)}")
-
-    if current_util <= TARGET_UTILIZATION:
-        print("✅ Usage already below target.")
-        return
-
-    target_used = src_total * (TARGET_UTILIZATION / 100)
-    bytes_to_free = src_used - target_used
-    print(f"🚚 Need to free approximately: {format_size(bytes_to_free)}")
-
-    dir_sizes = get_dir_sizes(SOURCE)
-    dirs_to_move = pick_dirs_to_move(dir_sizes, bytes_to_free)
-    total_size_to_move = sum(size for _, size in dirs_to_move)
-
-    # Double-check space on destination
-    if total_size_to_move > dst_free:
-        print(f"❌ ERROR: Not enough space on destination volume.")
-        print(f"   Required: {format_size(total_size_to_move)}")
-        print(f"   Available: {format_size(dst_free)}")
-        return
-
-    # Migration plan summary
-    print("\n📦 Recommended directories to migrate:")
-    for d, size in dirs_to_move:
-        print(f" - {d.name} ({format_size(size)})")
-
-    print(f"\n📝 Migration log will be saved to: {log_file}")
-
-    # Final user confirmation
-    proceed = input("\nProceed with migration? [y/N]: ").lower().strip()
-    if proceed == 'y':
-        migrate_dirs(dirs_to_move)
-        print(f"\n✅ Migration complete. Log saved to: {log_file}")
-    else:
-        print("🚫 Migration cancelled.")
-
-# Entry point
-if __name__ == "__main__":
-    main()
