@@ -21,12 +21,10 @@ export DEST_PATH="/source_media/Wanda/TV Shows"
 export TARGET_UTILIZATION="80"
 
 # Radarr configuration
-export RADARR_URL="http://host.docker.internal:7878"
-export RADARR_API_KEY="your-radarr-api-key-here"
+export RADARR_URL="https://$TORRENT_SSL_HOST/radarr"
 
 # Sonarr configuration
-export SONARR_URL="http://host.docker.internal:8989"
-export SONARR_API_KEY="your-sonarr-api-key-here"
+export SONARR_URL="https://$TORRENT_SSL_HOST/sonarr"
 
 # --------------------------------------------
 # Docker image details
