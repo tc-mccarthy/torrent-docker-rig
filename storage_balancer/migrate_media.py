@@ -244,11 +244,20 @@ def update_sonarr_path(original_path: str, new_path: str):
     print(f"⚠️ No Sonarr match for: {original_path}")
 
 def update_indexers(original_path: str, new_path: str):
-    """Route indexer updates based on path patterns."""
+    """
+    Route indexer updates based on path patterns, rewriting paths
+    from container-visible (/source_media) to Radarr/Sonarr-visible (/media/tc).
+    """
+    media_prefix = os.getenv("MEDIA_MOUNT_PREFIX", "/media/tc")
+
+    rewritten_original = original_path.replace("/source_media", media_prefix)
+    rewritten_new = new_path.replace("/source_media", media_prefix)
+
     if "/Movies" in original_path:
-        update_radarr_path(original_path, new_path)
+        update_radarr_path(rewritten_original, rewritten_new)
     elif "/TV Shows" in original_path:
-        update_sonarr_path(original_path, new_path)
+        update_sonarr_path(rewritten_original, rewritten_new)
+
 
 # ----------------------------------------------------------
 # Migration Execution
