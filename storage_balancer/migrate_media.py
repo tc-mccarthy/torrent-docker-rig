@@ -113,6 +113,7 @@ def rsync_until_stable(src: Path, dest: Path) -> bool:
             if line
             and not line.startswith("sending")
             and not line.startswith("sent ")
+            and not line.startswith("total size is")
             and not line.endswith("/")  # filter out dir-only updates
         ]
 
