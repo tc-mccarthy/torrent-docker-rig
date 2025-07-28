@@ -60,7 +60,7 @@ def pick_dirs_to_move(dir_sizes, bytes_needed):
 def rsync_with_progress(src, dest):
     """Run rsync and capture file-level and job-level progress."""
     rsync_cmd = [
-        "rsync", "-a", "--info=progress2", "--progress",
+        "rsync", "-au", "--info=progress2", "--progress",
         str(src) + "/", str(dest) + "/"
     ]
 
