@@ -151,9 +151,7 @@ def pick_dirs_to_move(dir_sizes, bytes_needed):
 def rsync_until_stable(src: Path, dest: Path) -> bool:
     """
     Repeatedly run rsync until no changes are detected.
-
-    Rsync is run with `--delete` to remove files in destination
-    that no longer exist in source (handles Huntarr upgrades).
+    Uses a dry-run before each pass to determine if sync is stable.
 
     Args:
         src (Path): Source directory
@@ -166,13 +164,26 @@ def rsync_until_stable(src: Path, dest: Path) -> bool:
     max_attempts = 20
 
     for attempt in range(max_attempts):
-        print(f"➡️ Rsync pass {attempt + 1}...")
+        print(f"🧪 Dry-run check for rsync pass {attempt + 1}...")
+        dry_run_cmd = [
+            "rsync", "-auvn", "--delete", str(src) + "/", str(dest) + "/"
+        ]
+        result = subprocess.run(dry_run_cmd, capture_output=True, text=True)
+        changes = result.stdout.strip().splitlines()
+
+        # Filter out headers and the trailing summary line
+        actual_changes = [line for line in changes if line and not line.startswith("sending") and not line.startswith("sent ")]
+
+        if not actual_changes:
+            print(f"✅ Sync stable for {src.name}")
+            return True
+
+        print(f"🔁 {len(actual_changes)} change(s) detected. Running real rsync...")
+
         rsync_cmd = [
-            "rsync", "-a", "-u", "--delete", "--info=progress2", "--progress",
+            "rsync", "-au", "--delete", "--info=progress2", "--progress",
             str(src) + "/", str(dest) + "/"
         ]
-
-        changes_made = False
 
         process = subprocess.Popen(
             rsync_cmd,
@@ -185,10 +196,6 @@ def rsync_until_stable(src: Path, dest: Path) -> bool:
         with tqdm(total=100, desc=f"{src.name} Sync Progress", unit="%") as pbar:
             for line in process.stdout:
                 print(line, end='')
-
-                if any(keyword in line for keyword in ['deleting', 'sending', 'receiving']):
-                    changes_made = True
-
                 if "%" in line:
                     for part in line.strip().split():
                         if "%" in part:
@@ -201,12 +208,6 @@ def rsync_until_stable(src: Path, dest: Path) -> bool:
         if process.wait() != 0:
             print(f"❌ Rsync failed for {src}")
             return False
-
-        if not changes_made:
-            print(f"✅ Sync stable for {src.name}")
-            return True
-        else:
-            print("🔁 Changes detected, repeating rsync...")
 
     print(f"❌ Max rsync attempts reached for {src}")
     return False
