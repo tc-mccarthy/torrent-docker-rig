@@ -94,6 +94,7 @@ export function generateTranscodeInstructions (mongoDoc) {
         tune: 0,
         usage: 0, // Low latency good quality (0 = best quality)
         tier: 0, // Main tier
+        "fast-decode": 1,
         sc_threshold: 0,
         avoid_negative_ts: 'make_zero', // Fix for Plex timestamp handling
         g: calculateGOP(mainVideo), // Dynamically determined GOP size
