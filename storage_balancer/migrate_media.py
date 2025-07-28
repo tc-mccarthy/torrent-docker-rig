@@ -108,8 +108,14 @@ def rsync_until_stable(src: Path, dest: Path) -> bool:
         print(f"🧪 Dry-run rsync check #{attempt + 1}...")
         dry_run_cmd = ["rsync", "-auvn", "--delete", f"{src}/", f"{dest}/"]
         dry_result = subprocess.run(dry_run_cmd, capture_output=True, text=True)
-        changes = [line for line in dry_result.stdout.strip().splitlines()
-                   if line and not line.startswith("sending") and not line.startswith("sent ")]
+        changes = [
+            line for line in dry_result.stdout.strip().splitlines()
+            if line
+            and not line.startswith("sending")
+            and not line.startswith("sent ")
+            and not line.endswith("/")  # filter out dir-only updates
+        ]
+
         if not changes:
             print(f"✅ Sync stable for {src.name}")
             return True
