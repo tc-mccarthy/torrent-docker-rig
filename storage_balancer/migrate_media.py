@@ -105,7 +105,7 @@ def rsync_until_stable(src: Path, dest: Path) -> bool:
         bool: True if sync stabilized, False if failed
     """
     print(f"🔄 Starting rsync loop for {src.name}")
-    max_attempts = 20
+    max_attempts = 250
 
     for attempt in range(max_attempts):
         print(f"🧪 Dry-run check for rsync pass {attempt + 1}...")
