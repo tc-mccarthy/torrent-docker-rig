@@ -1,5 +1,23 @@
 #!/usr/bin/env python3
 
+"""
+Media Migration Utility
+
+This script analyzes disk utilization between two volumes and migrates media directories
+from a source to a destination until the source falls below a specified utilization target.
+
+It uses `rsync` to ensure accurate and resumable copying, deletes originals once verified,
+and updates Radarr and Sonarr with new paths if configured.
+
+Environment variables expected:
+- SOURCE_PATH: full path to the source directory (e.g., /source_media/Drax/Movies)
+- DEST_PATH: full path to the destination directory (e.g., /source_media/Rogers/Movies)
+- TARGET_UTILIZATION: target % utilization threshold to reach
+- RADARR_URL / RADARR_API_KEY: optional Radarr integration
+- SONARR_URL / SONARR_API_KEY: optional Sonarr integration
+- MEDIA_MOUNT_PREFIX: how the host paths appear to Radarr/Sonarr (e.g., /media/tc)
+"""
+
 import os
 import shutil
 import subprocess
@@ -15,6 +33,7 @@ from tqdm import tqdm
 SOURCE = Path(os.getenv("SOURCE_PATH", "/source_media/Drax/Movies"))
 DEST = Path(os.getenv("DEST_PATH", "/source_media/Rogers/Movies"))
 TARGET_UTILIZATION = float(os.getenv("TARGET_UTILIZATION", "80"))
+MEDIA_MOUNT_PREFIX = os.getenv("MEDIA_MOUNT_PREFIX", "/media/tc")
 LOG_DIR = Path("/usr/app/storage")
 
 RADARR_URL = os.getenv("RADARR_URL")
@@ -70,82 +89,7 @@ def verify_api_connection():
         print("⚠️ No Radarr or Sonarr configuration detected. Skipping indexer updates.")
 
 # ----------------------------------------------------------
-# Disk Usage and Directory Size Utilities
-# ----------------------------------------------------------
-
-def get_df_usage(path: str):
-    """
-    Use `df` to get accurate disk usage stats for a mounted path.
-
-    Args:
-        path (str): Path to check disk usage for (e.g., "/source_media/Drax")
-
-    Returns:
-        tuple: (total_bytes, used_bytes, available_bytes, used_percent)
-    """
-    result = subprocess.run(
-        ["df", "--output=size,used,avail,pcent", "-B1", path],
-        capture_output=True, text=True
-    )
-    lines = result.stdout.strip().split("\n")
-    if len(lines) < 2:
-        raise RuntimeError(f"Failed to parse df output for {path}")
-    size, used, avail, percent = lines[1].split()
-    return int(size), int(used), int(avail), int(percent.strip('%'))
-
-def get_dir_sizes(path: Path):
-    """
-    Calculate total size of each immediate subdirectory.
-
-    Args:
-        path (Path): The parent directory containing media folders.
-
-    Returns:
-        dict: {Path: size_in_bytes}
-    """
-    return {
-        item: sum(f.stat().st_size for f in item.rglob('*') if f.is_file())
-        for item in path.iterdir() if item.is_dir()
-    }
-
-def format_size(bytes_size):
-    """
-    Convert bytes to a human-readable size string.
-
-    Args:
-        bytes_size (int): Size in bytes
-
-    Returns:
-        str: Formatted size (e.g. "3.12 GB")
-    """
-    for unit in ['B','KB','MB','GB','TB']:
-        if bytes_size < 1024.0:
-            return f"{bytes_size:.2f} {unit}"
-        bytes_size /= 1024.0
-    return f"{bytes_size:.2f} PB"
-
-def pick_dirs_to_move(dir_sizes, bytes_needed):
-    """
-    Choose directories to move to free the desired amount of space.
-
-    Args:
-        dir_sizes (dict): Mapping of Path to size in bytes
-        bytes_needed (int): Space that needs to be freed
-
-    Returns:
-        list: List of (Path, size) tuples
-    """
-    sorted_dirs = sorted(dir_sizes.items(), key=lambda x: x[1], reverse=True)
-    selected, total = [], 0
-    for d, size in sorted_dirs:
-        if total >= bytes_needed:
-            break
-        selected.append((d, size))
-        total += size
-    return selected
-
-# ----------------------------------------------------------
-# Rsync Logic with Repeat-Until-Stable Check
+# Rsync Utility with Dry-Run Preview
 # ----------------------------------------------------------
 
 def rsync_until_stable(src: Path, dest: Path) -> bool:
@@ -171,15 +115,20 @@ def rsync_until_stable(src: Path, dest: Path) -> bool:
         result = subprocess.run(dry_run_cmd, capture_output=True, text=True)
         changes = result.stdout.strip().splitlines()
 
-        # Filter out headers and the trailing summary line
-        actual_changes = [line for line in changes if line and not line.startswith("sending") and not line.startswith("sent ")]
+        actual_changes = [
+            line for line in changes
+            if line and not line.startswith("sending") and not line.startswith("sent ")
+        ]
 
         if not actual_changes:
             print(f"✅ Sync stable for {src.name}")
             return True
 
-        print(f"🔁 {len(actual_changes)} change(s) detected. Running real rsync...")
+        print(f"🔁 {len(actual_changes)} change(s) detected:")
+        for line in actual_changes:
+            print(f"   🔸 {line}")
 
+        print(f"▶️ Running rsync pass {attempt + 1}...")
         rsync_cmd = [
             "rsync", "-au", "--delete", "--info=progress2", "--progress",
             str(src) + "/", str(dest) + "/"
@@ -211,6 +160,7 @@ def rsync_until_stable(src: Path, dest: Path) -> bool:
 
     print(f"❌ Max rsync attempts reached for {src}")
     return False
+
 
 # ----------------------------------------------------------
 # Radarr / Sonarr API Integration
