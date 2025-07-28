@@ -33,28 +33,37 @@ log_file = LOG_DIR / f"migrated_dirs_{timestamp}.txt"
 def verify_api_connection():
     """
     Verifies connectivity to Radarr and Sonarr using provided API credentials.
-    If a service is unreachable or returns an error, the script will exit early.
+    Logs full URLs and partial API keys for transparency.
+    Exits early if a connection fails.
     """
-    headers = {}
-
     if RADARR_URL and RADARR_API_KEY:
         try:
+            test_url = f"{RADARR_URL}/api/v3/movie"
             headers = {"X-Api-Key": RADARR_API_KEY}
-            response = requests.get(f"{RADARR_URL}/api/v3/movie", headers=headers, timeout=5)
+            print(f"🔍 Verifying Radarr: {test_url}")
+            print(f"🔑 API Key: {RADARR_API_KEY[:6]}...")
+
+            response = requests.get(test_url, headers=headers, timeout=5)
             response.raise_for_status()
             print("✅ Connected to Radarr.")
         except Exception as e:
-            print(f"❌ Failed to connect to Radarr: {e}")
+            print(f"❌ Failed to connect to Radarr:\n   URL: {test_url}\n   API Key: {RADARR_API_KEY}")
+            print(f"   Error: {e}")
             exit(1)
 
     if SONARR_URL and SONARR_API_KEY:
         try:
+            test_url = f"{SONARR_URL}/api/v3/series"
             headers = {"X-Api-Key": SONARR_API_KEY}
-            response = requests.get(f"{SONARR_URL}/api/v3/series", headers=headers, timeout=5)
+            print(f"🔍 Verifying Sonarr: {test_url}")
+            print(f"🔑 API Key: {SONARR_API_KEY[:6]}...")
+
+            response = requests.get(test_url, headers=headers, timeout=5)
             response.raise_for_status()
             print("✅ Connected to Sonarr.")
         except Exception as e:
-            print(f"❌ Failed to connect to Sonarr: {e}")
+            print(f"❌ Failed to connect to Sonarr:\n   URL: {test_url}\n   API Key: {SONARR_API_KEY}")
+            print(f"   Error: {e}")
             exit(1)
 
     if not (RADARR_URL and RADARR_API_KEY) and not (SONARR_URL and SONARR_API_KEY):
