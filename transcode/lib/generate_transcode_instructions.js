@@ -5,7 +5,7 @@
  * based on stream characteristics (e.g., codec, size, resolution, HDR metadata). This version includes:
  * - Dynamic GOP size calculation for improved Plex compatibility
  * - Usage of `-avoid_negative_ts make_zero` to fix negative timestamps
- * - SVT-AV1 `usage` and `tier` tuning for better encode control
+ * - SVT-AV1 `usage`, `tier`, and `fast-decode` passed via `-svtav1-params`
  *
  * @param {Object} mongoDoc - The Mongo document containing ffprobe and metadata info.
  * @returns {{
@@ -85,20 +85,26 @@ export function generateTranscodeInstructions (mongoDoc) {
       }
     }
 
+    const gop = calculateGOP(mainVideo);
+
+    // Build SVT-AV1 specific encoder parameters into a single string
+    const svtParams = [
+      'fast-decode=1',
+      'scd=0',
+      'usage=0',
+      'tier=0'
+    ].join(':');
+
     result.video = {
       stream_index: mainVideo.index,
       codec: 'libsvtav1',
       arguments: {
         pix_fmt: 'yuv420p10le',
         max_muxing_queue_size: 9999,
-        tune: 0,
-        usage: 0, // Low latency good quality (0 = best quality)
-        tier: 0, // Main tier
-        "fast-decode": 1,
-        sc_threshold: 0,
-        avoid_negative_ts: 'make_zero', // Fix for Plex timestamp handling
-        g: calculateGOP(mainVideo), // Dynamically determined GOP size
-        keyint_min: calculateGOP(mainVideo), // Min GOP size
+        'svtav1-params': svtParams,
+        avoid_negative_ts: 'make_zero',
+        g: gop,
+        keyint_min: gop,
         preset: determinePreset(isUHD, fileSizeGB),
         crf: getCrfForResolution(width),
         ...getRateControl(width),
