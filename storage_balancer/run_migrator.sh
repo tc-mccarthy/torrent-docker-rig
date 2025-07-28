@@ -1,27 +1,43 @@
 #!/bin/bash
-
-# Exit immediately on error
 set -e
 
-# User-configurable values
-SOURCE_PATH="/source_media/Drax/Movies"
-DEST_PATH="/source_media/Rogers/Movies"
-TARGET_UTILIZATION="80"
+# -------------------------------
+# Configurable environment values
+# -------------------------------
 
-# Image and container names
+# Define the source and destination paths within the mounted volume
+export SOURCE_PATH="/source_media/Drax/Movies"
+export DEST_PATH="/source_media/Rogers/Movies"
+
+# Set your target utilization percentage (float)
+export TARGET_UTILIZATION="80"
+
+# Radarr configuration
+export RADARR_URL="https://$TORRENT_SSL_HOST/radarr/"
+
+
+# Sonarr configuration
+export SONARR_URL="https://$TORRENT_SSL_HOST/sonarr/"
+
+# -------------------------------
+# Docker image details
+# -------------------------------
+
 IMAGE_NAME="media-migrator"
-SCRIPT_NAME="migrate_media.py"
 
-# Build Docker image
-echo "🔧 Building Docker image..."
+echo "🛠️ Building Docker image: $IMAGE_NAME..."
 docker build -t "$IMAGE_NAME" .
 
-# Run migration container with config as environment variables
-echo "🚀 Running migration..."
+echo "🚀 Launching media migrator container..."
 docker run --rm -it \
   -v /media/tc:/source_media \
   -v "$(pwd)":/usr/app \
-  -e SOURCE_PATH="$SOURCE_PATH" \
-  -e DEST_PATH="$DEST_PATH" \
-  -e TARGET_UTILIZATION="$TARGET_UTILIZATION" \
+  -w /usr/app \
+  -e SOURCE_PATH \
+  -e DEST_PATH \
+  -e TARGET_UTILIZATION \
+  -e RADARR_URL \
+  -e RADARR_API_KEY \
+  -e SONARR_URL \
+  -e SONARR_API_KEY \
   "$IMAGE_NAME"
