@@ -43,7 +43,7 @@ def verify_api_connection():
             print(f"🔍 Verifying Radarr: {test_url}")
             print(f"🔑 API Key: {RADARR_API_KEY[:6]}...")
 
-            response = requests.get(test_url, headers=headers, timeout=5)
+            response = requests.get(test_url, headers=headers, timeout=120)
             response.raise_for_status()
             print("✅ Connected to Radarr.")
         except Exception as e:
@@ -58,7 +58,7 @@ def verify_api_connection():
             print(f"🔍 Verifying Sonarr: {test_url}")
             print(f"🔑 API Key: {SONARR_API_KEY[:6]}...")
 
-            response = requests.get(test_url, headers=headers, timeout=5)
+            response = requests.get(test_url, headers=headers, timeout=120)
             response.raise_for_status()
             print("✅ Connected to Sonarr.")
         except Exception as e:
