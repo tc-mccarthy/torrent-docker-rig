@@ -36,6 +36,10 @@ const transcode_config = {
     {
       path: '/source_media/Parker/TV Shows',
       scratch: '/source_media/Romanoff/transcode_scratch'
+    },
+    {
+      path: '/source_media/Romanoff/TV Shows',
+      scratch: '/source_media/Romanoff/transcode_scratch'
     }
   ]
 };
