@@ -14,8 +14,8 @@ cd "$SCRIPT_DIR"
 # --------------------------------------------
 
 # Define the source and destination paths within the mounted volume
-export SOURCE_PATH="/source_media/Drax/Movies"
-export DEST_PATH="/source_media/Rogers/Movies"
+export SOURCE_PATH="/source_media/Danvers/TV Shows"
+export DEST_PATH="/source_media/Romanoff/TV Shows"
 
 # Set your target utilization percentage (float)
 export TARGET_UTILIZATION="80"
