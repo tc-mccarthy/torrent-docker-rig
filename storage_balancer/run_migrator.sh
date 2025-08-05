@@ -10,7 +10,6 @@ set -e
 # -------------------------------------------------------------
 
 # Change to the directory where this script is located
-# Ensures relative paths work regardless of invocation location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
@@ -19,19 +18,19 @@ cd "$SCRIPT_DIR"
 # -------------------------------------------------------------
 
 # Set the source and destination media paths inside the container
-export SOURCE_PATH="/source_media/Danvers/TV Shows"   # Source directory to migrate from
-export DEST_PATH="/source_media/Romanoff/TV Shows"    # Destination directory to migrate to
+export SOURCE_PATH="/source_media/Danvers/TV Shows"
+export DEST_PATH="/source_media/Romanoff/TV Shows"
 
 # Set the target disk utilization percentage (float, e.g. 80)
 export TARGET_UTILIZATION="80"
 
 # Radarr API configuration (URL and API key)
 export RADARR_URL="https://$TORRENT_SSL_HOST/radarr"
-# export RADARR_API_KEY="your_radarr_api_key"   # Set externally or in environment
+# export RADARR_API_KEY="your_radarr_api_key"
 
 # Sonarr API configuration (URL and API key)
 export SONARR_URL="https://$TORRENT_SSL_HOST/sonarr"
-# export SONARR_API_KEY="your_sonarr_api_key"   # Set externally or in environment
+# export SONARR_API_KEY="your_sonarr_api_key"
 
 # How Radarr/Sonarr see /source_media inside the container
 export MEDIA_MOUNT_PREFIX="/media/tc"
@@ -47,23 +46,24 @@ export STORAGE_MIGRATION_OFFSET=10
 IMAGE_NAME="media-migrator"
 
 echo "🛠️ Building Docker image: $IMAGE_NAME..."
-# Build the Docker image from the current directory
 docker build -t "$IMAGE_NAME" "$SCRIPT_DIR"
 
 echo "🚀 Launching media migrator container..."
-# Run the container with all required environment variables and mounts
 docker run --rm -it \
-  -v $MEDIA_MOUNT_PREFIX:/source_media \  # Mount media volume for migration
-  -v "$SCRIPT_DIR":/usr/app \              # Mount app directory for logs/scripts
-  -w /usr/app \                            # Set working directory inside container
-  -e SOURCE_PATH \                         # Pass source path to container
-  -e DEST_PATH \                           # Pass destination path to container
-  -e MEDIA_MOUNT_PREFIX \                  # Pass mount prefix for indexers
-  -e TARGET_UTILIZATION \                  # Pass utilization target
-  -e RADARR_URL \                          # Pass Radarr URL
-  -e RADARR_API_KEY \                      # Pass Radarr API key
-  -e SONARR_URL \                          # Pass Sonarr URL
-  -e SONARR_API_KEY \                      # Pass Sonarr API key
-  -e OFFSET=${STORAGE_MIGRATION_OFFSET} \  # Pass offset for migration (optional)
+  # Mount media volume for migration
+  -v "$MEDIA_MOUNT_PREFIX":/source_media \
+  # Mount app directory for logs/scripts
+  -v "$SCRIPT_DIR":/usr/app \
+  # Set working directory inside container
+  -w /usr/app \
+  # Pass environment variables
+  -e SOURCE_PATH \
+  -e DEST_PATH \
+  -e MEDIA_MOUNT_PREFIX \
+  -e TARGET_UTILIZATION \
+  -e RADARR_URL \
+  -e RADARR_API_KEY \
+  -e SONARR_URL \
+  -e SONARR_API_KEY \
+  -e OFFSET=${STORAGE_MIGRATION_OFFSET} \
   "$IMAGE_NAME"
-
