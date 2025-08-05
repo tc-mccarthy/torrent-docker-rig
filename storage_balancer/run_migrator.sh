@@ -65,5 +65,5 @@ docker run --rm -it \
   -e RADARR_API_KEY \
   -e SONARR_URL \
   -e SONARR_API_KEY \
-  -e OFFSET=${STORAGE_MIGRATION_OFFSET} \
+  -e STORAGE_MIGRATION_OFFSET \
   "$IMAGE_NAME"

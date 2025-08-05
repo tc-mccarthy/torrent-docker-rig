@@ -269,7 +269,7 @@ def main():
     bytes_needed = src_used - (src_total * (TARGET_UTILIZATION / 100))
     print(f"🚚 Need to move: {format_size(bytes_needed)}")
     dir_sizes = get_dir_sizes(SOURCE)
-    OFFSET = int(os.getenv("SKIP_FIRST_N_DIRS", "0"))
+    OFFSET = int(os.getenv("STORAGE_MIGRATION_OFFSET", "0"))
     dirs_to_move = pick_dirs_to_move(dir_sizes, bytes_needed, offset=OFFSET)
     total_move = sum(size for _, size in dirs_to_move)
 
