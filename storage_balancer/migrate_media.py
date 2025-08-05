@@ -40,7 +40,13 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOG_DIR / f"migrated_dirs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 
 def verify_api_connection():
-    """Check Radarr and Sonarr connectivity before beginning."""
+    """
+    Check Radarr and Sonarr connectivity before beginning.
+
+    Raises:
+        SystemExit: If either Radarr or Sonarr API connection fails.
+    """
+    # Verify Radarr connection if configured
     if RADARR_URL and RADARR_API_KEY:
         try:
             print(f"🔍 Verifying Radarr: {RADARR_URL}")
@@ -50,6 +56,7 @@ def verify_api_connection():
         except Exception as e:
             print(f"❌ Radarr Error (URL: {RADARR_URL}, Key: {RADARR_API_KEY}): {e}")
             exit(1)
+    # Verify Sonarr connection if configured
     if SONARR_URL and SONARR_API_KEY:
         try:
             print(f"🔍 Verifying Sonarr: {SONARR_URL}")
@@ -61,7 +68,18 @@ def verify_api_connection():
             exit(1)
 
 def get_df_usage(path: str):
-    """Use df to get accurate disk usage."""
+    """
+    Use the 'df' command to get accurate disk usage statistics for a given path.
+
+    Args:
+        path (str): Filesystem path to check.
+
+    Returns:
+        tuple: (size, used, avail, percent) in bytes and percent used.
+
+    Raises:
+        RuntimeError: If df output cannot be parsed.
+    """
     result = subprocess.run(["df", "--output=size,used,avail,pcent", "-B1", path], capture_output=True, text=True)
     lines = result.stdout.strip().split("\n")
     if len(lines) < 2:
@@ -70,21 +88,51 @@ def get_df_usage(path: str):
     return int(size), int(used), int(avail), int(percent.strip('%'))
 
 def get_dir_sizes(path: Path):
-    """Return dict of subdirectories and their sizes."""
+    """
+    Calculate the size of each subdirectory within a given path.
+
+    Args:
+        path (Path): Directory to scan.
+
+    Returns:
+        dict: Mapping of Path objects to their total size in bytes.
+    """
     return {p: sum(f.stat().st_size for f in p.rglob("*") if f.is_file()) for p in path.iterdir() if p.is_dir()}
 
 def format_size(bytes_size):
-    """Convert bytes to human-readable string."""
+    """
+    Convert a byte value to a human-readable string (e.g., GB, TB).
+
+    Args:
+        bytes_size (int): Size in bytes.
+
+    Returns:
+        str: Human-readable size string.
+    """
     for unit in ['B','KB','MB','GB','TB']:
         if bytes_size < 1024.0:
             return f"{bytes_size:.2f} {unit}"
         bytes_size /= 1024.0
     return f"{bytes_size:.2f} PB"
 
-def pick_dirs_to_move(dir_sizes, bytes_needed):
-    """Select enough directories to move based on size."""
+def pick_dirs_to_move(dir_sizes, bytes_needed, offset=0):
+    """
+    Select enough directories to move based on their size, skipping the first N largest.
+
+    Args:
+        dir_sizes (dict): Mapping of Path to size in bytes.
+        bytes_needed (int): Total bytes to move.
+        offset (int): Number of largest directories to skip.
+
+    Returns:
+        list: List of (Path, size) tuples to move.
+    """
     sorted_dirs = sorted(dir_sizes.items(), key=lambda x: x[1], reverse=True)
     selected, total = [], 0
+
+    # Apply offset
+    sorted_dirs = sorted_dirs[offset:]
+
     for d, size in sorted_dirs:
         if total >= bytes_needed:
             break
@@ -94,15 +142,16 @@ def pick_dirs_to_move(dir_sizes, bytes_needed):
 
 def rsync_until_stable(src: Path, dest: Path) -> bool:
     """
-    Repeat rsync with dry-run until no changes detected.
+    Repeat rsync with dry-run until no changes detected, then perform actual rsync.
 
     Args:
-        src (Path): source path
-        dest (Path): destination path
+        src (Path): Source directory path.
+        dest (Path): Destination directory path.
 
     Returns:
-        bool: True if stable, False otherwise
+        bool: True if sync is stable and successful, False otherwise.
     """
+    # Try up to max_attempts to reach a stable rsync state
     max_attempts = 250
     for attempt in range(max_attempts):
         print(f"🧪 Dry-run rsync check #{attempt + 1}...")
@@ -145,10 +194,18 @@ def rsync_until_stable(src: Path, dest: Path) -> bool:
     return False
 
 def update_indexers(original_path: str, new_path: str):
-    """Rewrite paths and update Radarr or Sonarr if matching type."""
+    """
+    Rewrite paths and update Radarr or Sonarr if the migrated directory matches their type.
+
+    Args:
+        original_path (str): Original directory path.
+        new_path (str): New directory path after migration.
+    """
+    # Replace mount prefix for indexer compatibility
     o = original_path.replace("/source_media", MEDIA_MOUNT_PREFIX)
     n = new_path.replace("/source_media", MEDIA_MOUNT_PREFIX)
     if "/Movies" in original_path:
+        # Update Radarr movie path if matched
         movies = requests.get(f"{RADARR_URL}/api/v3/movie", headers={"X-Api-Key": RADARR_API_KEY}).json()
         for movie in movies:
             if movie['path'] == o:
@@ -157,6 +214,7 @@ def update_indexers(original_path: str, new_path: str):
                 r.raise_for_status()
                 print(f"🎬 Radarr updated: {o} → {n}")
     elif "/TV Shows" in original_path:
+        # Update Sonarr series path if matched
         shows = requests.get(f"{SONARR_URL}/api/v3/series", headers={"X-Api-Key": SONARR_API_KEY}).json()
         for show in shows:
             if show['path'] == o:
@@ -166,13 +224,20 @@ def update_indexers(original_path: str, new_path: str):
                 print(f"📺 Sonarr updated: {o} → {n}")
 
 def migrate_dirs(dirs):
-    """Perform migration of selected directories."""
+    """
+    Perform migration of selected directories from source to destination.
+
+    Args:
+        dirs (list): List of (Path, size) tuples to migrate.
+    """
     with open(LOG_FILE, "w") as log:
         for src, size in dirs:
+            # Compute relative path and destination
             rel = src.relative_to(SOURCE)
             dest = DEST / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             print(f"\n🔁 Migrating {src} → {dest} ({format_size(size)})")
+            # Use rsync to copy and verify stability
             if rsync_until_stable(src, dest):
                 shutil.rmtree(src)
                 print(f"🗑️ Deleted: {src}")
@@ -182,7 +247,14 @@ def migrate_dirs(dirs):
                 print(f"❌ Failed: {src}. Skipped deletion.")
 
 def main():
+    """
+    Main entry point for the media migration utility.
+    Orchestrates disk usage analysis, directory selection, and migration process.
+    """
+    # Step 1: Verify API connections
     verify_api_connection()
+
+    # Step 2: Get root paths for df usage
     src_root = "/" + SOURCE.parts[1] + "/" + SOURCE.parts[2]
     dst_root = "/" + DEST.parts[1] + "/" + DEST.parts[2]
     src_total, src_used, _, src_pct = get_df_usage(src_root)
@@ -193,21 +265,26 @@ def main():
         print("✅ Source already below target.")
         return
 
+    # Step 3: Calculate bytes needed to move
     bytes_needed = src_used - (src_total * (TARGET_UTILIZATION / 100))
     print(f"🚚 Need to move: {format_size(bytes_needed)}")
     dir_sizes = get_dir_sizes(SOURCE)
-    dirs_to_move = pick_dirs_to_move(dir_sizes, bytes_needed)
+    OFFSET = int(os.getenv("SKIP_FIRST_N_DIRS", "0"))
+    dirs_to_move = pick_dirs_to_move(dir_sizes, bytes_needed, offset=OFFSET)
     total_move = sum(size for _, size in dirs_to_move)
 
+    # Step 4: Check destination free space
     if total_move > dst_free:
         print(f"❌ Not enough space: need {format_size(total_move)}, have {format_size(dst_free)}")
         return
 
+    # Step 5: Print migration plan
     print("\n📦 Will migrate:")
     for d, size in dirs_to_move:
         print(f" - {d.name}: {format_size(size)}")
 
     print(f"\n📝 Log: {LOG_FILE}")
+    # Step 6: Confirm and execute migration
     if input("Proceed? [y/N]: ").lower() == 'y':
         migrate_dirs(dirs_to_move)
         print("✅ Done")
@@ -215,4 +292,5 @@ def main():
         print("🚫 Cancelled")
 
 if __name__ == "__main__":
+    # Run the migration utility if executed as a script
     main()
