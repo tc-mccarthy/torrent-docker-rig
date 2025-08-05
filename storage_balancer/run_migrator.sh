@@ -50,13 +50,9 @@ docker build -t "$IMAGE_NAME" "$SCRIPT_DIR"
 
 echo "🚀 Launching media migrator container..."
 docker run --rm -it \
-  # Mount media volume for migration
   -v "$MEDIA_MOUNT_PREFIX":/source_media \
-  # Mount app directory for logs/scripts
   -v "$SCRIPT_DIR":/usr/app \
-  # Set working directory inside container
   -w /usr/app \
-  # Pass environment variables
   -e SOURCE_PATH \
   -e DEST_PATH \
   -e MEDIA_MOUNT_PREFIX \
