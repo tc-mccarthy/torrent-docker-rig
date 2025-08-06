@@ -3,6 +3,7 @@ import fs from 'fs';
 import { exec } from 'child_process';
 import si from 'systeminformation';
 import config from './config';
+import { getCpuLoadPercentage } from './getCpuLoadPercentage';
 
 // Extract path configuration utility from config
 const { get_paths } = config;
@@ -85,17 +86,11 @@ export async function get_utilization () {
 
   try {
     // Gather memory and CPU usage concurrently
-    const [mem, cpu] = await Promise.all([si.mem(), si.currentLoad()]);
-
-    // Total logical CPU cores
-    const coreCount = cpu.cpus.length;
+    const [mem] = await Promise.all([si.mem()]);
+    const { loadPercent: cpuLoadPercent } = await getCpuLoadPercentage();
 
     // Calculate memory usage percentage
     const memoryUsedPercent = 100 - Math.round(mem.available / mem.total * 100);
-
-    // Calculate CPU load ratio (can exceed 100%)
-    const loadRatio = cpu.avgLoad / coreCount;
-    const cpuLoadPercent = Math.round(loadRatio * 100); // e.g. 135%
 
     // Compose utilization data
     const data = {
