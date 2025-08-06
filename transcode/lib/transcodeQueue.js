@@ -135,27 +135,29 @@ export default class TranscodeQueue {
 
   /**
    * Monitors CPU load and applies penalty based on a rolling 10-minute average.
-   * Penalizes by half of maxCpuComputeScore when CPU load > 80% and again > 110%.
+   * Uses load-to-core ratio to adapt thresholds across systems with different core counts.
    */
   async startCpuPressureMonitor () {
     while (true) {
       try {
         const load = await si.currentLoad();
-        const avgLoad = load.avgLoad * 100 / load.cpus.length;
-        this.cpuUsageSamples.push(avgLoad);
+        const avgLoad = load.avgLoad;
+        const coreCount = load.cpus.length;
+        const loadRatio = avgLoad / coreCount;
 
+        this.cpuUsageSamples.push(loadRatio);
         if (this.cpuUsageSamples.length > this.maxResourceSamples) {
           this.cpuUsageSamples.shift();
         }
 
-        const avgCpuLoad = this.cpuUsageSamples.reduce((a, b) => a + b, 0) / this.cpuUsageSamples.length;
+        const avgCpuRatio = this.cpuUsageSamples.reduce((a, b) => a + b, 0) / this.cpuUsageSamples.length;
 
         let penalty = 0;
-        if (avgCpuLoad > 80) penalty += this.maxCpuComputeScore / 2;
-        if (avgCpuLoad > 110) penalty += this.maxCpuComputeScore / 2;
+        if (avgCpuRatio > 4.0) penalty += this.maxCpuComputeScore / 2;
+        if (avgCpuRatio > 6.0) penalty += this.maxCpuComputeScore / 2;
 
         this.cpuPenalty = penalty;
-        console.log(`[ResourceMonitor] CPU Penalty: ${penalty} | Avg CPU Load (10 min): ${avgCpuLoad.toFixed(1)}%`);
+        console.log(`[ResourceMonitor] CPU Penalty: ${penalty} | Avg Load Ratio (10 min): ${avgCpuRatio.toFixed(2)}x per core`);
       } catch (err) {
         console.error('[ResourceMonitor] CPU Error:', err);
       }

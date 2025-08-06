@@ -75,25 +75,42 @@ export function get_disk_space () {
  *
  * This function uses systeminformation to gather memory and CPU usage,
  * writes the results to disk, and schedules itself to run every 10 seconds.
+ *
+ * CPU utilization is calculated using load-to-core ratio, allowing values to
+ * exceed 100% to reflect true processing pressure.
  */
 export async function get_utilization () {
   // Clear any existing utilization polling timeout to avoid duplicate intervals
   clearTimeout(global.utilization_timeout);
 
-  // Gather memory and CPU usage concurrently using systeminformation
-  const [mem, cpu] = await Promise.all([si.mem(), si.currentLoad()]);
+  try {
+    // Gather memory and CPU usage concurrently
+    const [mem, cpu] = await Promise.all([si.mem(), si.currentLoad()]);
 
-  // Calculate memory utilization as percent used
-  const data = {
-    memory: 100 - Math.round(mem.available / mem.total * 100),
-    cpu: Math.round(cpu.avgLoad * 100 / cpu.cpus.length),
-    last_updated: new Date() // Timestamp for last update
-  };
+    // Total logical CPU cores
+    const coreCount = cpu.cpus.length;
 
-  // Persist utilization data to disk for external monitoring
-  fs.writeFileSync('/usr/app/output/utilization.json', JSON.stringify(data));
+    // Calculate memory usage percentage
+    const memoryUsedPercent = 100 - Math.round(mem.available / mem.total * 100);
 
-  // Schedule next utilization poll in 10 seconds
+    // Calculate CPU load ratio (can exceed 100%)
+    const loadRatio = cpu.avgLoad / coreCount;
+    const cpuLoadPercent = Math.round(loadRatio * 100); // e.g. 135%
+
+    // Compose utilization data
+    const data = {
+      memory: memoryUsedPercent,
+      cpu: cpuLoadPercent,
+      last_updated: new Date()
+    };
+
+    // Write data to disk for external monitoring tools
+    fs.writeFileSync('/usr/app/output/utilization.json', JSON.stringify(data));
+  } catch (err) {
+    console.error('[get_utilization] Failed to fetch system info:', err);
+  }
+
+  // Schedule next poll after 10 seconds
   global.utilization_timeout = setTimeout(() => {
     get_utilization();
   }, 10 * 1000);
