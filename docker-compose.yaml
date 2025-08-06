@@ -247,7 +247,8 @@ services:
       - LOG_LEVEL=info # make debug when debugging
       - CHOKIDAR_USEPOLLING=1
       - NODE_OPTIONS=--max-old-space-size=57344 --enable-source-maps
-      - CONCURRENT_TRANSCODES
+      - MAX_MEMORY_SCORE # number of concurrent 4K videos your system memory can handle at once
+      - MAX_CPU_SCORE # number of concurrent 4K videos your system CPU can handle at
       - CONCURRENT_FILE_CHECKS
       - CONCURRENT_INTEGRITY_CHECKS
       - ENV=${ENV:-prod}
