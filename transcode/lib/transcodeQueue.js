@@ -235,6 +235,7 @@ export default class TranscodeQueue {
         active: this.runningJobs,
         availableMemoryCompute: this.getAvailableMemoryCompute(),
         availableCpuCompute: this.getAvailableCpuCompute(),
+        availableCompute: Math.min(this.getAvailableMemoryCompute(), this.getAvailableCpuCompute()),
         memoryPenalty: this.memoryPenalty,
         cpuPenalty: this.cpuPenalty,
         refreshed: Date.now()
