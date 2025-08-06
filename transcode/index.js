@@ -14,7 +14,7 @@ import TranscodeQueue from './lib/transcodeQueue';
 import update_status from './lib/update_status';
 
 const {
-  concurrent_transcodes,
+  max_memory_score, max_cpu_score,
   concurrent_integrity_checks,
   application_version
 } = config;
@@ -53,7 +53,7 @@ async function run () {
     update_queue();
     generate_filelist({ limit: 1000, writeToFile: true });
 
-    const transcodeQueue = new TranscodeQueue({ maxScore: concurrent_transcodes, pollDelay: 30000 });
+    const transcodeQueue = new TranscodeQueue({ maxMemoryComputeScore: max_memory_score, maxCpuComputeScore: max_cpu_score, pollDelay: 30000 });
     transcodeQueue.start();
 
     global.transcodeQueue = transcodeQueue; // Make the queue globally accessible

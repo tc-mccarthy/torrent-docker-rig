@@ -22,7 +22,7 @@ export default async function generate_filelist ({ limit = 1, writeToFile = fals
       'sortFields.size': -1,
       'sortFields.width': -1
     })
-    .limit(limit + config.concurrent_transcodes);
+    .limit(limit);
 
   if (writeToFile) {
     const data = filelist.slice(1, 1001).map((f) => ({

@@ -8,7 +8,8 @@ export function aspect_round (val) {
 const config = {
   encode_version: '20250108a',
   concurrent_file_checks: process.env.CONCURRENT_FILE_CHECKS || 50,
-  concurrent_transcodes: process.env.CONCURRENT_TRANSCODES || 1,
+  max_memory_score: process.env.MAX_MEMORY_SCORE || 1,
+  max_cpu_score: process.env.MAX_CPU_SCORE || 1,
   concurrent_integrity_checks: process.env.CONCURRENT_INTEGRITY_CHECKS || 1,
   profiles: [
     {
