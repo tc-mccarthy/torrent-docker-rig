@@ -145,6 +145,8 @@ export default class TranscodeQueue {
         const coreCount = load.cpus.length;
         const loadRatio = avgLoad / coreCount;
 
+        logger.info({ avgLoad, coreCount, loadRatio }, { label: `[ResourceMonitor] CPU Load Ratio` });
+
         this.cpuUsageSamples.push(loadRatio);
         if (this.cpuUsageSamples.length > this.maxResourceSamples) {
           this.cpuUsageSamples.shift();
