@@ -11,6 +11,7 @@ import si from 'systeminformation';
 import transcode from './transcode';
 import logger from './logger';
 import generate_filelist from './generate_filelist';
+import { getCpuLoadPercentage } from './getCpuLoadPercentage';
 
 export default class TranscodeQueue {
   /**
@@ -140,12 +141,9 @@ export default class TranscodeQueue {
   async startCpuPressureMonitor () {
     while (true) {
       try {
-        const load = await si.currentLoad();
-        const avgLoad = load.avgLoad;
-        const coreCount = load.cpus.length;
-        const loadRatio = avgLoad / coreCount;
+        const { loadPercent, loadRatio } = await getCpuLoadPercentage();
 
-        logger.info({ avgLoad, coreCount, loadRatio }, { label: `[ResourceMonitor] CPU Load Ratio` });
+        logger.info({ loadPercent, loadRatio }, { label: `[ResourceMonitor] CPU Load Ratio` });
 
         this.cpuUsageSamples.push(loadRatio);
         if (this.cpuUsageSamples.length > this.maxResourceSamples) {
