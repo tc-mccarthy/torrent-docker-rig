@@ -86,7 +86,7 @@ export async function get_utilization () {
   // Calculate memory utilization as percent used
   const data = {
     memory: 100 - Math.round(mem.available / mem.total * 100),
-    cpu: Math.round(cpu.currentLoad),
+    cpu: Math.round(cpu.avgLoad * 100 / cpu.cpus.length),
     last_updated: new Date() // Timestamp for last update
   };
 
