@@ -82,7 +82,15 @@ export default class TranscodeQueue {
     return this.maxCpuComputeScore - this.cpuPenalty - this.getUsedCpuCompute();
   }
 
-  /** Main scheduling loop */
+  /**
+   * @returns {number} Minimum available compute across memory and CPU.
+   * Used to determine whether a new job can be scheduled.
+   */
+  getAvailableCompute () {
+    return Math.min(this.getAvailableMemoryCompute(), this.getAvailableCpuCompute());
+  }
+
+  /** Main loop: repeatedly attempts to schedule jobs */
   async loop () {
     while (this._isRunning) {
       await this.scheduleJobs();
@@ -104,7 +112,10 @@ export default class TranscodeQueue {
     while (true) {
       try {
         const mem = await si.mem();
-        this.memoryUsageSamples = [...this.memoryUsageSamples.slice(-this.maxResourceSamples + 1), mem.available];
+        this.memoryUsageSamples.push(mem.available);
+        if (this.memoryUsageSamples.length > this.maxResourceSamples) {
+          this.memoryUsageSamples.shift();
+        }
 
         const avgAvailable = this.memoryUsageSamples.reduce((a, b) => a + b, 0) / this.memoryUsageSamples.length;
         const memUsedPercent = 100 - (avgAvailable / mem.total * 100);
@@ -131,7 +142,11 @@ export default class TranscodeQueue {
       try {
         const load = await si.currentLoad();
         const avgLoad = load.avgLoad * 100 / load.cpus.length;
-        this.cpuUsageSamples = [...this.cpuUsageSamples.slice(-this.maxResourceSamples + 1), avgLoad];
+        this.cpuUsageSamples.push(avgLoad);
+
+        if (this.cpuUsageSamples.length > this.maxResourceSamples) {
+          this.cpuUsageSamples.shift();
+        }
 
         const avgCpuLoad = this.cpuUsageSamples.reduce((a, b) => a + b, 0) / this.cpuUsageSamples.length;
 
@@ -150,53 +165,45 @@ export default class TranscodeQueue {
 
   /**
    * Attempts to find and start a job that fits within both memory and CPU compute limits.
-   * Applies starvation logic and honors job priority.
+   * Honors priority order and introduces starvation detection for blocked jobs.
    */
   async scheduleJobs () {
     const availableMemory = this.getAvailableMemoryCompute();
     const availableCpu = this.getAvailableCpuCompute();
-    const availableCompute = Math.min(availableMemory, availableCpu);
+    const availableCompute = this.getAvailableCompute();
 
-    logger.debug(`Available compute (Memory: ${availableMemory}, CPU: ${availableCpu})`);
+    logger.debug(`Available compute (Memory: ${availableMemory}, CPU: ${availableCpu}, Unified: ${availableCompute})`);
     if (availableCompute <= 0) return;
 
     const jobs = await generate_filelist({ limit: 50 });
-    let blockedJob = null;
 
-    // Identify the first job that cannot run due to insufficient compute.
-    jobs.some((job) => {
+    // Find the first job in the queue that cannot run due to lack of compute
+    const blockedEntry = jobs.find((job) => {
       const alreadyRunning = this.runningJobs.some((j) => j._id.toString() === job._id.toString());
-      if (alreadyRunning) return false;
-      if (job.computeScore > availableCompute) {
-        blockedJob = job;
-        this.starvationCounter = this.lastBlockedJobId?.toString() === job._id.toString() ? this.starvationCounter += 1 : 1;
-        this.lastBlockedJobId = job._id;
-        logger.debug(`[QUEUE] Blocked job ${job.path} | Compute ${job.computeScore} | Starvation ${this.starvationCounter}`);
-        return true;
-      }
-      return false;
+      return !alreadyRunning && job.computeScore > availableCompute;
     });
 
-    if (!blockedJob) {
+    if (blockedEntry) {
+      this.starvationCounter = this.lastBlockedJobId?.toString() === blockedEntry._id.toString()
+        ? this.starvationCounter += 1
+        : 1;
+      this.lastBlockedJobId = blockedEntry._id;
+      logger.debug(`[QUEUE] Blocked job ${blockedEntry.path} | Compute ${blockedEntry.computeScore} | Starvation ${this.starvationCounter}`);
+    } else {
       this.starvationCounter = 0;
       this.lastBlockedJobId = null;
     }
 
-    /**
-     * Finds a job eligible to run based on compute score and priority logic.
-     * - Must not already be running.
-     * - Must fit within available compute.
-     * - Must not bypass higher-priority or starved jobs.
-     */
+    // Select the next job that fits within the compute and respects priority/starvation rules
     const nextJob = jobs.find((job) => {
       const alreadyRunning = this.runningJobs.some((j) => j._id.toString() === job._id.toString());
       if (alreadyRunning) return false;
 
       if (job.computeScore > availableCompute) return false;
 
-      if (blockedJob && job.sortFields.priority > blockedJob.sortFields.priority) return false;
+      if (blockedEntry && job.sortFields.priority > blockedEntry.sortFields.priority) return false;
 
-      if (blockedJob && job.sortFields.priority === blockedJob.sortFields.priority && this.starvationCounter >= 5) return false;
+      if (blockedEntry && job.sortFields.priority === blockedEntry.sortFields.priority && this.starvationCounter >= 5) return false;
 
       return true;
     });
@@ -205,7 +212,7 @@ export default class TranscodeQueue {
   }
 
   /**
-   * Starts transcoding job and removes it from memory on completion.
+   * Starts the transcode process for a given job and removes it from memory when done.
    * @param {Object} job - Job document with ._id, .computeScore, and .path
    */
   async runJob (job) {
@@ -220,7 +227,7 @@ export default class TranscodeQueue {
     }
   }
 
-  /** Periodically flushes current queue state to disk */
+  /** Starts a loop that periodically writes the job queue state to disk */
   async startFlushLoop () {
     while (this._isRunning) {
       await this.flushActiveJobs();
@@ -228,14 +235,14 @@ export default class TranscodeQueue {
     }
   }
 
-  /** Writes current job state and available compute to disk */
+  /** Flushes the current job state and available compute scores to disk */
   async flushActiveJobs () {
     try {
       const flushObj = {
         active: this.runningJobs,
         availableMemoryCompute: this.getAvailableMemoryCompute(),
         availableCpuCompute: this.getAvailableCpuCompute(),
-        availableCompute: Math.min(this.getAvailableMemoryCompute(), this.getAvailableCpuCompute()),
+        availableCompute: this.getAvailableCompute(),
         memoryPenalty: this.memoryPenalty,
         cpuPenalty: this.cpuPenalty,
         refreshed: Date.now()
