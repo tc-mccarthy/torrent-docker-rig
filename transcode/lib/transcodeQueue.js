@@ -177,7 +177,7 @@ export default class TranscodeQueue {
     logger.debug(`Available compute (Memory: ${availableMemory}, CPU: ${availableCpu}, Unified: ${availableCompute})`);
     if (availableCompute <= 0) return;
 
-    const jobs = await generate_filelist({ limit: 50 });
+    const jobs = await generate_filelist({ limit: 250 });
 
     // Find the first job in the queue that cannot run due to lack of compute
     const blockedEntry = jobs.find((job) => {
