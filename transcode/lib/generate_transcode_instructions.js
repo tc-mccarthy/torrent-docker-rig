@@ -27,32 +27,38 @@
  * }} - Transcoding instruction object.
  */
 export function generateTranscodeInstructions (mongoDoc) {
+  // Extract ffprobe and language info from the document
   const {
     probe: ffprobe,
     audio_language = []
   } = mongoDoc;
 
+  // Defensive: ensure streams and format are always objects
   const streams = ffprobe.streams || [];
   const format = ffprobe.format || {};
   const fileSizeKB = parseInt(format.size || 0, 10);
   const fileSizeGB = fileSizeKB / (1024 ** 2);
 
-  // Split streams by type
+  // Split streams by type for easier processing
   const videoStreams = streams.filter((s) => s.codec_type === 'video');
   const audioStreams = streams.filter((s) => s.codec_type === 'audio');
   const subtitleStreams = streams.filter((s) => s.codec_type === 'subtitle');
 
+  // Lowercase all spoken language codes for matching
   const spokenLangs = audio_language.map((lang) => lang.toLowerCase());
 
+  // Prepare the result object
   const result = {
     video: null,
     audio: [],
     subtitles: []
   };
 
+  // Main video stream is always the first video stream
   const mainVideo = videoStreams[0];
   if (!mainVideo) throw new Error('No video stream found');
 
+  // Gather video stream properties
   const videoCodec = mainVideo.codec_name;
   const isHEVC = videoCodec === 'hevc' || videoCodec === 'h265';
   const width = mainVideo.width || 0;
@@ -60,6 +66,7 @@ export function generateTranscodeInstructions (mongoDoc) {
 
   console.log(`Processing video stream: ${videoCodec}, width: ${width}, size: ${fileSizeGB.toFixed(2)} GB`);
 
+  // If the file is small and already HEVC, just copy the video stream
   if (fileSizeGB <= 1 && isHEVC) {
     result.video = {
       stream_index: mainVideo.index,
@@ -67,12 +74,15 @@ export function generateTranscodeInstructions (mongoDoc) {
       arguments: {}
     };
   } else {
+    // Otherwise, build a full transcode instruction
     const hdrProps = {};
+    // If HDR (PQ/2084), preserve HDR metadata
     if (mainVideo.color_transfer?.includes('2084')) {
       hdrProps.color_primaries = mainVideo.color_primaries;
       hdrProps.color_trc = mainVideo.color_transfer;
       hdrProps.colorspace = mainVideo.color_space;
 
+      // Extract HDR mastering and content light level metadata if present
       const sideData = mainVideo.side_data_list || [];
       const masteringDisplay = sideData.find((d) => d.side_data_type === 'Mastering display metadata');
       const contentLightLevel = sideData.find((d) => d.side_data_type === 'Content light level metadata');
@@ -85,6 +95,7 @@ export function generateTranscodeInstructions (mongoDoc) {
       }
     }
 
+    // Calculate GOP size for Plex compatibility
     const gop = calculateGOP(mainVideo);
 
     // Build SVT-AV1 specific encoder parameters into a single string
@@ -99,26 +110,28 @@ export function generateTranscodeInstructions (mongoDoc) {
       stream_index: mainVideo.index,
       codec: 'libsvtav1',
       arguments: {
-        pix_fmt: 'yuv420p10le',
-        max_muxing_queue_size: 9999,
-        'svtav1-params': svtParams,
-        avoid_negative_ts: 'make_zero',
-        g: gop,
-        keyint_min: gop,
-        preset: determinePreset(isUHD, fileSizeGB),
-        crf: getCrfForResolution(width),
-        ...getRateControl(width),
-        ...hdrProps
+        pix_fmt: 'yuv420p10le', // 10-bit for best quality
+        max_muxing_queue_size: 9999, // Avoid muxing errors
+        'svtav1-params': svtParams, // Pass SVT-AV1 params
+        avoid_negative_ts: 'make_zero', // Fix negative timestamps
+        g: gop, // GOP size
+        keyint_min: gop, // Minimum keyframe interval
+        preset: determinePreset(isUHD, fileSizeGB), // Encoder preset
+        crf: getCrfForResolution(width), // Quality target
+        ...getRateControl(width), // Bitrate and bufsize
+        ...hdrProps // HDR metadata if present
       }
     };
   }
 
+  // Filter audio streams to only those matching spoken languages
   const filteredAudio = audioStreams
     .filter((s) => {
       const lang = (s.tags?.language || 'und').toLowerCase();
       return spokenLangs.includes(lang);
     });
 
+  // Map filtered audio streams to encoding instructions
   result.audio = filteredAudio.map((stream) => {
     const lang = (stream.tags?.language || 'und').toLowerCase();
     return {
@@ -128,9 +141,11 @@ export function generateTranscodeInstructions (mongoDoc) {
     };
   });
 
+  // Only include English/und subtitle streams in supported formats
   result.subtitles = subtitleStreams.filter((stream) => {
     const lang = (stream.tags?.language || 'und').toLowerCase();
     const codec = stream.codec_name.toLowerCase();
+    // Only keep English/und and supported subtitle codecs
     return (['en', 'eng', 'und'].includes(lang) && /subrip|hdmv_pgs_subtitle|substation/i.test(codec));
   }).map((stream) => ({
     stream_index: stream.index,
@@ -170,10 +185,29 @@ function getRateControl (width) {
   return { maxrate, bufsize };
 }
 
+/**
+ * Selects the encoder preset for SVT-AV1 based on resolution and file size.
+ *
+ * - UHD (4K) always uses preset 8 (slowest, highest quality)
+ * - Non-UHD files larger than 10GB use preset 7 (slower, higher quality)
+ * - All others use preset 6 (default balance)
+ *
+ * @param {boolean} isUHD - True if the video is UHD/4K.
+ * @param {number} fileSizeGB - File size in gigabytes.
+ * @returns {number} - SVT-AV1 preset value (6, 7, or 8)
+ */
 function determinePreset (isUHD, fileSizeGB) {
-  return (isUHD || fileSizeGB > 10) ? 7 : 6;
+  if (isUHD) return 8;
+  if (fileSizeGB > 10) return 7;
+  return 6;
 }
 
+/**
+ * Maps a channel count to a valid channel layout string for audio encoding.
+ *
+ * @param {number} channels - Number of audio channels.
+ * @returns {string} - Channel layout name.
+ */
 function mapChannelLayout (channels) {
   const map = {
     1: 'mono', // OK for both
@@ -187,28 +221,43 @@ function mapChannelLayout (channels) {
   return map[channels] || 'stereo';
 }
 
+/**
+ * Determines the audio codec and encoding parameters for a given stream.
+ *
+ * - If the input is already AAC, AC3, or EAC3, copy the stream.
+ * - For stereo or mono, use libfdk_aac at 96k per channel.
+ * - For multichannel, use EAC3 at 128k per channel (max 640k).
+ *
+ * @param {Object} stream - ffprobe audio stream object.
+ * @returns {Object} - Audio encoding parameters for ffmpeg.
+ */
 function determineAudioCodec (stream) {
   const codec = stream.codec_name.toLowerCase();
-  const channels = Math.min(parseInt(stream.channels || 2, 10), 6); // Limit to 6 channels max due to EAC3 limitations
+  // Limit to 6 channels max due to EAC3 limitations
+  const channels = Math.min(parseInt(stream.channels || 2, 10), 6);
 
   if (['aac', 'ac3', 'eac3'].includes(codec)) {
     return { codec: 'copy' };
   }
 
   if (channels <= 2) {
+    // Use libfdk_aac for mono/stereo
     return { codec: 'libfdk_aac', bitrate: `${(96000 * channels) / 1000}k`, channels, channel_layout: mapChannelLayout(channels) };
   }
 
+  // Use EAC3 for multichannel
   return { codec: 'eac3', bitrate: `${(Math.min(128000 * channels, 640000) / 1000)}k`, channels, channel_layout: mapChannelLayout(channels) };
 }
 
 /**
  * Dynamically calculates GOP size (group of pictures interval).
  * Target is 2 seconds worth of frames.
+ *
  * @param {Object} stream - The video stream.
  * @returns {number} - GOP size in frames.
  */
 function calculateGOP (stream) {
+  // Use avg_frame_rate if available, else r_frame_rate
   const fpsStr = stream.avg_frame_rate || stream.r_frame_rate;
   const [num, den] = fpsStr.split('/').map((n) => parseInt(n, 10));
   if (!den || Number.isNaN(num)) return 48; // fallback default
