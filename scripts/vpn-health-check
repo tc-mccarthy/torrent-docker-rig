@@ -1,31 +1,167 @@
-#!/bin/bash
-TIMESTAMP=$(date)
-echo "$TIMESTAMP" > /scripts/vpn-health-check.log
+#!/usr/bin/env bash
+# ============================================================================
+# vpn-health-check
+#
+# Purpose:
+#   Health check for the NordLynx (NordVPN / WireGuard) gateway container.
+#   This script verifies BOTH:
+#     1) General internet connectivity (DNS + HTTP reachability)
+#     2) That the default route is actually going through the NordLynx
+#        interface (wg0), and (optionally) that the WireGuard handshake
+#        is recent.
+#
+# Why this matters:
+#   Some apps keep long-lived connections and do not crash when the VPN
+#   link flaps. A strong health check lets autoheal/Docker restart the
+#   container only when the tunnel is actually unhealthy.
+#
+# Exit codes:
+#   0 = healthy
+#   1 = unhealthy (autoheal / Docker will restart based on this)
+#
+# Notes:
+#   - Keep timeouts short to avoid blocking the healthcheck loop.
+#   - Avoid overly chatty external services—prefer simple reachability checks.
+# ============================================================================
 
-$LOCK=$(find /scripts -iname "vpn-health-check.lock" -mmin +10 | wc -l)
+set -Eeuo pipefail
 
-if [[ "$LOCK" != "0" ]]; then
-    echo ">> LOCK DETECTED. SKIPPING HEALTHCHECK >>" >> /scripts/vpn-health-check.log
-    exit 0;
+# -------------------------------
+# Tunables
+# -------------------------------
+VPN_IF="${VPN_IF:-wg0}"                     # expected NordLynx/WireGuard interface name
+CURL_BIN="${CURL_BIN:-curl}"                # curl binary (override if needed)
+PING_BIN="${PING_BIN:-ping}"                # ping binary (fallback reachability)
+GETENT_BIN="${GETENT_BIN:-getent}"          # DNS resolution without extra deps
+ROUTE_BIN="${ROUTE_BIN:-ip}"                # iproute2
+WG_BIN="${WG_BIN:-wg}"                      # wireguard tool (optional)
+LOCK_FILE="${LOCK_FILE:-/scripts/vpn-health-check.lock}"  # optional lock indicator
+LOG_FILE="${LOG_FILE:-/scripts/vpn-health-check.log}"     # rolling log for debugging
+
+DNS_TEST_HOST="${DNS_TEST_HOST:-one.one.one.one}" # Cloudflare DNS hostname
+HTTP_TEST_URL="${HTTP_TEST_URL:-https://www.cloudflare.com/cdn-cgi/trace}" # lightweight endpoint
+HTTP_TIMEOUT="${HTTP_TIMEOUT:-5}"                  # seconds
+HANDSHAKE_MAX_AGE="${HANDSHAKE_MAX_AGE:-180}"      # seconds; max age for latest WG handshake
+
+# -------------------------------
+# Logging helpers
+# -------------------------------
+timestamp() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
+log() { echo "[$(timestamp)] $*" | tee -a "${LOG_FILE}" >/dev/null; }
+
+fail() {
+  log "HEALTHCHECK: UNHEALTHY – $*"
+  echo "$(timestamp): $*" > "${LOCK_FILE}" || true
+  exit 1
+}
+
+ok() {
+  log "HEALTHCHECK: healthy"
+  echo "$(timestamp): OK" > "${LOCK_FILE}" || true
+  exit 0
+}
+
+# -------------------------------
+# Preconditions
+# -------------------------------
+command -v "${ROUTE_BIN}" >/dev/null 2>&1 || fail "Missing '${ROUTE_BIN}' command"
+if ! command -v "${CURL_BIN}" >/dev/null 2>&1; then
+  log "curl not found; will fall back to ping for connectivity checks"
 fi
 
-## URL TO THE VPN STATUS CHECK TO CONFIRM THIS CONTAINER IS GOING OUT TO THE INTERNET PROTECTED
-VPN_STATUS_URL="https://nordvpn.com/wp-admin/admin-ajax.php?action=get_user_info_data"
+# -------------------------------
+# Check 1: VPN interface exists and is UP
+# -------------------------------
+if ! ${ROUTE_BIN} link show "${VPN_IF}" >/dev/null 2>&1; then
+  fail "Interface ${VPN_IF} not found (NordLynx not up?)"
+fi
 
-## CAPTURE STATUSES
-VPN_STATUS=$(curl "$VPN_STATUS_URL");
+if ! ${ROUTE_BIN} link show "${VPN_IF}" | grep -q "state UP"; then
+  fail "Interface ${VPN_IF} is down"
+fi
+log "VPN interface ${VPN_IF} exists and is UP"
 
-echo "VPN STATUS" >> /scripts/vpn-health-check.log
-echo "$VPN_STATUS" | jq . >> /scripts/vpn-health-check.log
+# -------------------------------
+# Check 2: Default route goes through VPN interface
+# -------------------------------
+DEFAULT_V4="$(${ROUTE_BIN} -4 route show default || true)"
+if ! echo "${DEFAULT_V4}" | grep -q " dev ${VPN_IF}"; then
+  fail "Default IPv4 route is NOT via ${VPN_IF}: ${DEFAULT_V4}"
+fi
+log "Default IPv4 route is via ${VPN_IF}: ${DEFAULT_V4}"
 
-VPN_STATUS=$(echo "$VPN_STATUS" | jq .status)
-
-## IF WE'RE NOT VPN PROTECTED, FAIL
-if [[ "$VPN_STATUS" == "false" ]]; then
-    echo "Not connected to NordLynx. Marking unhealthy" >> /scripts/vpn-health-check.log
-    exit 1;
+# -------------------------------
+# Check 3 (optional but strong): recent WireGuard handshake
+# -------------------------------
+if command -v "${WG_BIN}" >/dev/null 2>&1; then
+  if ${WG_BIN} show "${VPN_IF}" latest-handshakes >/dev/null 2>&1; then
+    recent_ok="false"
+    now_epoch="$(date +%s)"
+    while IFS= read -r line; do
+      last_epoch="$(echo "${line}" | awk '{print $2}')" || true
+      if [[ -n "${last_epoch}" && "${last_epoch}" != "0" ]]; then
+        age="$(( now_epoch - last_epoch ))"
+        if (( age <= HANDSHAKE_MAX_AGE )); then
+          recent_ok="true"
+          break
+        fi
+      fi
+    done < <(${WG_BIN} show "${VPN_IF}" latest-handshakes)
+    [[ "${recent_ok}" == "true" ]] || fail "WireGuard handshake is stale (> ${HANDSHAKE_MAX_AGE}s)"
+    log "WireGuard handshake is recent (<= ${HANDSHAKE_MAX_AGE}s)"
+  else
+    if ${WG_BIN} show "${VPN_IF}" >/dev/null 2>&1; then
+      if ! ${WG_BIN} show "${VPN_IF}" | grep -q "latest handshake"; then
+        fail "wg output lacks 'latest handshake' – is the tunnel connected?"
+      fi
+      if ${WG_BIN} show "${VPN_IF}" | grep -q "latest handshake: (none)"; then
+        fail "No recent WireGuard handshake"
+      fi
+      log "WireGuard reports a recent handshake"
+    else
+      log "wg present but unable to show ${VPN_IF}; skipping handshake freshness check"
+    fi
+  fi
 else
-    echo "VPN connected" >> /scripts/vpn-health-check.log
-    touch "/scripts/vpn-health-check.lock"
-    exit 0;
+  log "wg not installed; skipping handshake freshness check"
 fi
+
+# -------------------------------
+# Check 4: DNS resolution works
+# -------------------------------
+if command -v "${GETENT_BIN}" >/dev/null 2>&1; then
+  if ! ${GETENT_BIN} hosts "${DNS_TEST_HOST}" >/dev/null 2>&1; then
+    fail "DNS resolution failed for ${DNS_TEST_HOST}"
+  fi
+  log "DNS resolution succeeded for ${DNS_TEST_HOST}"
+else
+  log "getent not available; skipping DNS test"
+fi
+
+# -------------------------------
+# Check 5: HTTP reachability (confirms outbound connectivity)
+# -------------------------------
+if command -v "${CURL_BIN}" >/dev/null 2>&1; then
+  if ! ${CURL_BIN} -fsS --max-time "${HTTP_TIMEOUT}" "${HTTP_TEST_URL}" >/dev/null 2>&1; then
+    if command -v "${PING_BIN}" >/dev/null 2>&1; then
+      if ! ${PING_BIN} -c1 -W1 1.1.1.1 >/dev/null 2>&1; then
+        fail "No HTTP reachability (${HTTP_TEST_URL}) and ICMP ping to 1.1.1.1 failed"
+      fi
+      log "HTTP unreachable but ICMP ping succeeded – treating as healthy"
+    else
+      fail "HTTP reachability failed and ping is unavailable"
+    fi
+  else
+    log "HTTP reachability OK (${HTTP_TEST_URL})"
+  fi
+else
+  if command -v "${PING_BIN}" >/dev/null 2>&1; then
+    ${PING_BIN} -c1 -W1 1.1.1.1 >/dev/null 2>&1 || fail "ICMP ping to 1.1.1.1 failed"
+    log "ICMP ping succeeded – treating as healthy"
+  else
+    fail "Neither curl nor ping available for connectivity test"
+  fi
+fi
+
+# All checks passed
+ok
