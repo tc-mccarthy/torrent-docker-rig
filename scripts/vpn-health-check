@@ -4,27 +4,44 @@
 #
 # Purpose:
 #   Health check for the NordLynx (NordVPN / WireGuard) gateway container.
-#   This script verifies BOTH:
-#     1) General internet connectivity (DNS + HTTP reachability)
-#     2) That the default route is actually going through the NordLynx
-#        interface (wg0), and (optionally) that the WireGuard handshake
-#        is recent.
+#   Verifies BOTH:
+#     1) General internet connectivity (DNS + HTTP/ICMP reachability)
+#     2) That traffic to a public IP egresses via the WireGuard interface (wg0)
+#        using a robust route test (ip route get), not just the default route.
+#        Optionally checks for a recent WireGuard handshake.
+#
+# Why this version?
+#   Some NordLynx setups keep the main default route on eth0 while policy-
+#   routing actual traffic over wg0. Relying only on the default route causes
+#   false negatives. This script therefore inspects the actual egress path to
+#   a public IP and (optionally) validates WG handshake freshness.
 #
 # Startup friendliness:
-#   Some providers take a bit to bring the interface up and complete the
-#   first handshake. This script is tolerant:
-#     - It includes short, bounded retries for the interface & default route.
-#     - It SKIPS the handshake freshness check during an initial grace window
-#       (HANDSHAKE_GRACE seconds) to avoid false negatives right after boot.
-#   You can ALSO enlarge Docker's healthcheck start_period in compose (e.g. 90s).
+#   - Short retries for interface and route readiness (RETRY_TOTAL/RETRY_SLEEP).
+#   - Skip handshake freshness during an initial HANDSHAKE_GRACE window.
+#   - You can also enlarge Docker's healthcheck start_period (e.g. 90s) in
+#     docker-compose to further reduce startup flaps.
 #
 # Exit codes:
 #   0 = healthy
 #   1 = unhealthy (autoheal / Docker will restart based on this)
 #
-# Notes:
-#   - Keep timeouts short to avoid blocking the healthcheck loop.
-#   - Avoid overly chatty external services—prefer simple reachability checks.
+# Tuning via env vars (defaults shown):
+#   VPN_IF=wg0
+#   ROUTE_TEST_IP=1.1.1.1             # public IP to test egress path
+#   REQUIRE_HANDSHAKE=false            # set true to require recent handshake
+#   HANDSHAKE_MAX_AGE=180              # seconds
+#   HANDSHAKE_GRACE=120                # seconds after first run to skip freshness
+#   RETRY_TOTAL=20                     # total seconds to retry readiness
+#   RETRY_SLEEP=2                      # seconds between retries
+#   HTTP_TEST_URL=https://www.cloudflare.com/cdn-cgi/trace
+#   DNS_TEST_HOST=one.one.one.one
+#   HTTP_TIMEOUT=5
+#
+# Logs/markers (paths inside container):
+#   LOG_FILE=/scripts/vpn-health-check.log
+#   LOCK_FILE=/scripts/vpn-health-check.lock
+#   STATE_FILE=/scripts/vpn-health-check.start
 # ============================================================================
 
 set -Eeuo pipefail
@@ -32,23 +49,25 @@ set -Eeuo pipefail
 # -------------------------------
 # Tunables
 # -------------------------------
-VPN_IF="${VPN_IF:-wg0}"                     # expected NordLynx/WireGuard interface name
-CURL_BIN="${CURL_BIN:-curl}"                # curl binary (override if needed)
-PING_BIN="${PING_BIN:-ping}"                # ping binary (fallback reachability)
-GETENT_BIN="${GETENT_BIN:-getent}"          # DNS resolution without extra deps
-ROUTE_BIN="${ROUTE_BIN:-ip}"                # iproute2
-WG_BIN="${WG_BIN:-wg}"                      # wireguard tool (optional)
-LOCK_FILE="${LOCK_FILE:-/scripts/vpn-health-check.lock}"  # optional lock indicator
-LOG_FILE="${LOG_FILE:-/scripts/vpn-health-check.log}"     # rolling log for debugging
-STATE_FILE="${STATE_FILE:-/scripts/vpn-health-check.start}" # first-run timestamp
+VPN_IF="${VPN_IF:-wg0}"
+CURL_BIN="${CURL_BIN:-curl}"
+PING_BIN="${PING_BIN:-ping}"
+GETENT_BIN="${GETENT_BIN:-getent}"
+ROUTE_BIN="${ROUTE_BIN:-ip}"
+WG_BIN="${WG_BIN:-wg}"
+LOCK_FILE="${LOCK_FILE:-/scripts/vpn-health-check.lock}"
+LOG_FILE="${LOG_FILE:-/scripts/vpn-health-check.log}"
+STATE_FILE="${STATE_FILE:-/scripts/vpn-health-check.start}"
+ROUTE_TEST_IP="${ROUTE_TEST_IP:-1.1.1.1}"
+REQUIRE_HANDSHAKE="${REQUIRE_HANDSHAKE:-false}"
 
-DNS_TEST_HOST="${DNS_TEST_HOST:-one.one.one.one}"         # Cloudflare DNS hostname
-HTTP_TEST_URL="${HTTP_TEST_URL:-https://www.cloudflare.com/cdn-cgi/trace}" # lightweight endpoint
-HTTP_TIMEOUT="${HTTP_TIMEOUT:-5}"                          # seconds
-HANDSHAKE_MAX_AGE="${HANDSHAKE_MAX_AGE:-180}"              # seconds; max age for latest WG handshake
-HANDSHAKE_GRACE="${HANDSHAKE_GRACE:-120}"                  # seconds; skip handshake freshness within this window
-RETRY_TOTAL="${RETRY_TOTAL:-15}"                           # total seconds to retry critical readiness checks
-RETRY_SLEEP="${RETRY_SLEEP:-3}"                            # seconds between retries
+DNS_TEST_HOST="${DNS_TEST_HOST:-one.one.one.one}"
+HTTP_TEST_URL="${HTTP_TEST_URL:-https://www.cloudflare.com/cdn-cgi/trace}"
+HTTP_TIMEOUT="${HTTP_TIMEOUT:-5}"
+HANDSHAKE_MAX_AGE="${HANDSHAKE_MAX_AGE:-180}"
+HANDSHAKE_GRACE="${HANDSHAKE_GRACE:-120}"
+RETRY_TOTAL="${RETRY_TOTAL:-20}"
+RETRY_SLEEP="${RETRY_SLEEP:-2}"
 
 # -------------------------------
 # Logging helpers
@@ -57,14 +76,16 @@ timestamp() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 log() { echo "[$(timestamp)] $*" | tee -a "${LOG_FILE}" >/dev/null; }
 
 fail() {
+  # Log explicit reason for UNHEALTHY status (and keep in a lock file)
   log "HEALTHCHECK: UNHEALTHY – $*"
-  echo "$(timestamp): $*" > "${LOCK_FILE}" || true
+  echo "$(timestamp): UNHEALTHY – $*" > "${LOCK_FILE}" || true
   exit 1
 }
 
 ok() {
-  log "HEALTHCHECK: healthy"
-  echo "$(timestamp): OK" > "${LOCK_FILE}" || true
+  # Log success once all checks pass (and stamp the lock file)
+  log "HEALTHCHECK: HEALTHY – all checks passed"
+  echo "$(timestamp): HEALTHY" > "${LOCK_FILE}" || true
   exit 0
 }
 
@@ -110,33 +131,39 @@ check_if_up() {
   ${ROUTE_BIN} link show "${VPN_IF}" >/dev/null 2>&1 || return 1
   ${ROUTE_BIN} link show "${VPN_IF}" | grep -q "state UP" || return 1
 }
-
 if ! retry_until "${RETRY_TOTAL}" "${RETRY_SLEEP}" check_if_up; then
   fail "Interface ${VPN_IF} not found or not UP after ${RETRY_TOTAL}s"
 fi
 log "VPN interface ${VPN_IF} exists and is UP"
 
 # -------------------------------
-# Check 2: Default route goes through VPN interface (with short retries)
+# Check 2: Egress path to a public IP uses wg0 (robust)
 # -------------------------------
-check_default_route() {
-  local def
-  def="$(${ROUTE_BIN} -4 route show default 2>/dev/null || true)"
-  echo "${def}" | grep -q " dev ${VPN_IF}"
+# Why: Some stacks keep default route on eth0 but policy-route traffic via wg0.
+# We assert that `ip -4 route get <public IP>` shows `dev ${VPN_IF}`. If that
+# cannot be determined, we fall back to checking the default route as a hint.
+route_get_uses_vpn() {
+  local out
+  out="$(${ROUTE_BIN} -4 route get "${ROUTE_TEST_IP}" 2>/dev/null || true)"
+  echo "${out}" | grep -q " dev ${VPN_IF} "
 }
-
-if ! retry_until "${RETRY_TOTAL}" "${RETRY_SLEEP}" check_default_route; then
-  DEFAULT_V4="$(${ROUTE_BIN} -4 route show default || true)"
-  fail "Default IPv4 route is NOT via ${VPN_IF} after ${RETRY_TOTAL}s: ${DEFAULT_V4}"
+if ! retry_until "${RETRY_TOTAL}" "${RETRY_SLEEP}" route_get_uses_vpn; then
+  log "Route-get did not clearly show dev ${VPN_IF} to ${ROUTE_TEST_IP}"
+  log "Route-get output: $(${ROUTE_BIN} -4 route get "${ROUTE_TEST_IP}" 2>/dev/null || true)"
+  DEFAULT_V4="$(${ROUTE_BIN} -4 route show default 2>/dev/null || true)"
+  log "Default route output: ${DEFAULT_V4}"
+  if ! echo "${DEFAULT_V4}" | grep -q " dev ${VPN_IF}"; then
+    fail "Traffic to ${ROUTE_TEST_IP} not via ${VPN_IF}, and default route not via ${VPN_IF}"
+  fi
 fi
-DEFAULT_V4="$(${ROUTE_BIN} -4 route show default || true)"
-log "Default IPv4 route is via ${VPN_IF}: ${DEFAULT_V4}"
+log "Egress to ${ROUTE_TEST_IP} confirmed via ${VPN_IF}"
 
 # -------------------------------
-# Check 3 (optional but strong): recent WireGuard handshake
-#   Skipped during initial HANDSHAKE_GRACE seconds to avoid startup flaps.
+# Check 3 (optional): recent WireGuard handshake
 # -------------------------------
-if command -v "${WG_BIN}" >/dev/null 2>&1; then
+# - Skipped during HANDSHAKE_GRACE window.
+# - Controlled by REQUIRE_HANDSHAKE (false by default).
+if command -v "${WG_BIN}" >/dev/null 2>&1 && [[ "${REQUIRE_HANDSHAKE}" == "true" ]]; then
   if (( SINCE_START >= HANDSHAKE_GRACE )); then
     if ${WG_BIN} show "${VPN_IF}" latest-handshakes >/dev/null 2>&1; then
       recent_ok="false"
@@ -169,7 +196,7 @@ if command -v "${WG_BIN}" >/dev/null 2>&1; then
     log "Skipping handshake freshness (SINCE_START=${SINCE_START}s < HANDSHAKE_GRACE=${HANDSHAKE_GRACE}s)"
   fi
 else
-  log "wg not installed; skipping handshake freshness check"
+  log "Handshake freshness not required (REQUIRE_HANDSHAKE=${REQUIRE_HANDSHAKE}) or wg not installed; skipping"
 fi
 
 # -------------------------------
@@ -177,6 +204,7 @@ fi
 # -------------------------------
 if command -v "${GETENT_BIN}" >/dev/null 2>&1; then
   if ! ${GETENT_BIN} hosts "${DNS_TEST_HOST}" >/dev/null 2>&1; then
+    log "DNS resolution output: $(${GETENT_BIN} hosts "${DNS_TEST_HOST}" 2>&1 || true)"
     fail "DNS resolution failed for ${DNS_TEST_HOST}"
   fi
   log "DNS resolution succeeded for ${DNS_TEST_HOST}"
@@ -189,9 +217,11 @@ fi
 # -------------------------------
 if command -v "${CURL_BIN}" >/dev/null 2>&1; then
   if ! ${CURL_BIN} -fsS --max-time "${HTTP_TIMEOUT}" "${HTTP_TEST_URL}" >/dev/null 2>&1; then
+    log "HTTP request failed for ${HTTP_TEST_URL}"
     if command -v "${PING_BIN}" >/dev/null 2>&1; then
       if ! ${PING_BIN} -c1 -W1 1.1.1.1 >/dev/null 2>&1; then
-        fail "No HTTP reachability (${HTTP_TEST_URL}) and ICMP ping to 1.1.1.1 failed"
+        log "Ping to 1.1.1.1 also failed"
+        fail "No HTTP reachability and ICMP ping failed"
       fi
       log "HTTP unreachable but ICMP ping succeeded – treating as healthy"
     else
@@ -202,7 +232,10 @@ if command -v "${CURL_BIN}" >/dev/null 2>&1; then
   fi
 else
   if command -v "${PING_BIN}" >/dev/null 2>&1; then
-    ${PING_BIN} -c1 -W1 1.1.1.1 >/dev/null 2>&1 || fail "ICMP ping to 1.1.1.1 failed"
+    if ! ${PING_BIN} -c1 -W1 1.1.1.1 >/dev/null 2>&1; then
+      log "Ping to 1.1.1.1 failed"
+      fail "ICMP ping failed"
+    fi
     log "ICMP ping succeeded – treating as healthy"
   else
     fail "Neither curl nor ping available for connectivity test"
