@@ -1,43 +1,78 @@
+# ------------------------------------------------------------------------------
+# docker-compose.yml
+#
+# Purpose:
+#   Media/torrent stack with all VPN-routed services bound to a NordLynx
+#   container ("nordlynx"). When the VPN restarts, any service labeled
+#   `restart-with=nordlynx` is also restarted immediately to refresh sockets,
+#   trackers, and long-lived connections. Autoheal + healthchecks provide
+#   self-healing for transient tunnel blips.
+#
+# Key patterns:
+#   - VPN gateway container: services route via `network_mode: service:vpn`.
+#   - Autoheal: label `autoheal=true` + a meaningful healthcheck.
+#   - Immediate restart on VPN restart: label `restart-with=nordlynx`.
+#   - Event watcher: `vpn-restarter` listens to docker events for `nordlynx`
+#     and restarts all containers with `restart-with=nordlynx`.
+#
+# Extend:
+#   If you move any other service behind the VPN, add:
+#     network_mode: service:vpn
+#     labels:
+#       - "autoheal=true"
+#       - "restart-with=nordlynx"
+#   and (ideally) a healthcheck that fails when the VPN is down.
+# ------------------------------------------------------------------------------
+
 version: "3.7"
+
 services:
+  # --------------------------------------------------------------------------
+  # VPN GATEWAY
+  # Exposes ports for the inner apps (via service:vpn network mode).
+  # Healthcheck ensures tunnel + qbittorrent reachability before dependents start.
+  # --------------------------------------------------------------------------
   vpn:
     image: ghcr.io/bubuntux/nordlynx
     container_name: nordlynx
     cap_add:
-      - NET_ADMIN # Required
+      - NET_ADMIN # Required for wireguard/nordlynx to manage routes/tunnel
     environment:
-      - ALLOWED_IPS=0.0.0.0/0 # So this docker network can access it
-      - NET_LOCAL=172.16.0.0/16 # So it can be accessed within the local network
-      - PRIVATE_KEY=${NORDVPN_PRIVATE_KEY} # Your NordLynx private key. You can obtain this by running the get_nordvpn_private_key script
-      # - QUERY="filters\[servers_groups\]\[identifier\]=legacy_p2p&filters\[country_id\]=228" # narrow the list of servers to US-based P2P servers
-      - TZ # Timezone used for logging
-      - CONNECT=p2p
+      - ALLOWED_IPS=0.0.0.0/0     # Allow full egress to the VPN from this docker network
+      - NET_LOCAL=172.16.0.0/16   # Permit LAN access within this CIDR from inside VPN netns
+      - PRIVATE_KEY=${NORDVPN_PRIVATE_KEY} # NordLynx key from Nord account
+      # - QUERY="filters\[servers_groups\]\[identifier\]=legacy_p2p&filters\[country_id\]=228"
+      - TZ                        # Logging timezone
+      - CONNECT=p2p               # Ask for P2P-friendly servers
       - CATEGORY=p2p
       - TECHNOLOGY=nordlynx
     ports:
-      - 8088:8088 ## qbittorrent web ui
-      - 6881:6881 ## qbittorrent
-      - 6881:6881/udp ## qbittorrent udp
-      - 7878:7878 ## radarr
-      - 8989:8989 ## sonarr
-      - 9696:9696 ## prowlarr
-      - 4000:4000 ## tmm VNC
-      - 9443:9443 ## portainer
-      - 6767:6767 ## bazarr
-      - 8090:8080 ## usenet
-      - 5055:5055 ## overseerr
-      - 8181:8181 ## tautulli
-      - 9705:9705 ## huntarr
+      # Ports exposed *on the VPN container* for services running inside it.
+      # These map the inner apps' ports to the host.
+      - 8088:8088   # qbittorrent web ui
+      - 6881:6881   # qbittorrent tcp
+      - 6881:6881/udp
+      - 7878:7878   # radarr
+      - 8989:8989   # sonarr
+      - 9696:9696   # prowlarr
+      - 4000:4000   # tinyMediaManager VNC (if enabled)
+      - 9443:9443   # portainer behind VPN
+      - 6767:6767   # bazarr
+      - 8090:8080   # sabnzbd (usenet)
+      - 5055:5055   # overseerr
+      - 8181:8181   # tautulli
+      - 9705:9705   # huntarr
     sysctls:
-      - net.ipv6.conf.all.disable_ipv6=1 # Recommended if using ipv4 only
-      - net.ipv4.conf.all.rp_filter=2
+      - net.ipv6.conf.all.disable_ipv6=1 # Prefer IPv4-only to avoid leak/route confusion
+      - net.ipv4.conf.all.rp_filter=2    # Loose reverse path filtering for policy routing
     volumes:
-      - ./scripts:/scripts # health check script and more
+      - ./scripts:/scripts # healthcheck and utility scripts
     restart: unless-stopped
     labels:
-      - "autoheal=true" # include in autoheal check
+      - "autoheal=true" # autoheal will check health and restart when failing
     healthcheck:
-      test: bash ./scripts/vpn-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      # Script should verify both the VPN tunnel and a key dependent (e.g., qbit)
+      test: bash ./scripts/vpn-health-check
       interval: 10s
       retries: 3
       timeout: 5s
@@ -50,29 +85,71 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # VPN EVENT WATCHER
+  # Watches docker events for 'nordlynx' start/die and restarts dependents
+  # labeled with "restart-with=nordlynx". This gives instant recovery after a
+  # manual VPN restart (no waiting for healthchecks).
+  # --------------------------------------------------------------------------
+  vpn-restarter:
+    image: docker:26-cli
+    container_name: vpn-restarter
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro # read-only for safety
+    command: >
+      sh -c '
+        echo "[vpn-restarter] watching nordlynx events...";
+        docker events --filter container=nordlynx --filter event=start --filter event=die |
+        while read line; do
+          echo "[vpn-restarter] vpn event: $line";
+          case "$line" in
+            *"start"*) sleep 3 ;; # small grace for tunnel readiness
+          esac
+          ids=$(docker ps -q --filter "label=restart-with=nordlynx");
+          if [ -n "$ids" ]; then
+            echo "[vpn-restarter] restarting: $ids";
+            docker restart $ids || true
+          else
+            echo "[vpn-restarter] no matching containers to restart";
+          fi
+        done
+      '
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+
+  # --------------------------------------------------------------------------
+  # TORRENT CLIENT (qBittorrent)
+  # Runs inside the VPN namespace. Healthcheck should fail on tunnel loss.
+  # Labeled for autoheal and restart-with-vpn for instant reconnection.
+  # --------------------------------------------------------------------------
   torrent:
     image: linuxserver/qbittorrent
     container_name: qbittorrent
-    network_mode: service:vpn # all traffic goes through vpn
+    network_mode: service:vpn # Route all traffic through the VPN container
     environment:
       - WEBUI_PORT=${QBIT_WEB_UI_PORT}
       - PUID=1000
       - GUID=1000
       - Umask=022
-      - TZ # Timezone used for logging
+      - TZ
     volumes:
-      - ${TORRENT_STORAGE}:${TORRENT_STORAGE} # path to my volumes for download storage
-      - ./config:/config # qbittorrent config -- this mount allows you to script your own config and preserve the changes you make between container instances
-      - ./scripts:/scripts # health check script and more
+      - ${TORRENT_STORAGE}:${TORRENT_STORAGE} # downloads storage
+      - ./config:/config                     # qBittorrent config
+      - ./scripts:/scripts                   # healthcheck scripts
       - ./vuetorrent:/vuetorrent
     depends_on:
-      vpn: # wait for vpn to start before starting
-        condition: service_healthy
+      vpn:
+        condition: service_healthy # wait for tunnel
     labels:
-      - "autoheal=true" # include in autoheal check
+      - "autoheal=true"
+      - "restart-with=nordlynx"
     restart: unless-stopped
     healthcheck:
-      test: bash ./scripts/torrent-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash ./scripts/torrent-health-check
       interval: 10s
       retries: 0
       timeout: 5s
@@ -83,6 +160,10 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # TORRENT MONITOR (custom)
+  # Monitors qBittorrent; not VPN-routed, but depends on torrent+redis.
+  # --------------------------------------------------------------------------
   torrent-monitor:
     build: ./torrent-monitor
     container_name: torrent-monitor
@@ -91,8 +172,8 @@ services:
       - redis
     environment:
       - QB_API_URL=https://${TORRENT_SSL_HOST}/qbt
-      - QB_USERNAME        # Replace with actual qBittorrent Web UI user
-      - QB_PASSWORD   # Replace with actual password
+      - QB_USERNAME                 # supply at runtime
+      - QB_PASSWORD                 # supply at runtime
       - REDIS_HOST=torrent-redis-local
       - REDIS_PORT=6379
       - TZ
@@ -105,7 +186,10 @@ services:
         max-size: "200k"
         max-file: "10"
 
-
+  # --------------------------------------------------------------------------
+  # AUTOHEAL
+  # Periodically checks containers with "autoheal=true" and restarts if unhealthy.
+  # --------------------------------------------------------------------------
   autoheal:
     image: willfarrell/autoheal:latest
     tty: true
@@ -119,6 +203,11 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # NGINX REVERSE PROXY (public)
+  # Terminates TLS for selected services; depends on torrent for qbit upstream.
+  # Not VPN-routed (by design).
+  # --------------------------------------------------------------------------
   proxy:
     image: nginx:1.23.3-alpine
     container_name: proxy
@@ -147,10 +236,13 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # CERTBOT (DNS-01 via Cloudflare)
+  # Generates wildcard/host certs for the reverse proxy.
+  # --------------------------------------------------------------------------
   certbot:
     container_name: certbot
-    image: certbot/dns-cloudflare # Generates a cert for qbittorrent reverse proxy.
-    # This expects cloudflare to be your DNS provider but certbot supports multiple providers. Google is your friend here.
+    image: certbot/dns-cloudflare
     volumes:
       - ./certbot/etc:/etc/letsencrypt
       - ./certbot/cloudflare.ini:/root/cloudflare.ini
@@ -170,6 +262,10 @@ services:
       -d ${OVERSEERR_SSL_HOST}
       -d ${BACKUP_SSL_HOST}
 
+  # --------------------------------------------------------------------------
+  # CLOUDFLARE DDNS CLIENTS
+  # Keep public DNS records in sync with your IP / endpoints.
+  # --------------------------------------------------------------------------
   ddns_torrent:
     container_name: ddns_torrent
     restart: unless-stopped
@@ -212,6 +308,9 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # DUPLICATI (Backups)
+  # --------------------------------------------------------------------------
   duplicati:
     image: lscr.io/linuxserver/duplicati:latest
     container_name: duplicati
@@ -234,28 +333,32 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # TRANSCODE ENGINE (custom Node + FFmpeg)
+  # Not VPN-routed: interacts with local media and infra.
+  # --------------------------------------------------------------------------
   transcode:
     container_name: transcode
     build:
       context: ./transcode
     devices:
-      - "/dev/dri:/dev/dri" # GPU passthrough for hardware transcoding (intel quicksync)
+      - "/dev/dri:/dev/dri" # Intel Quick Sync
     environment:
       - TZ
       - TRANSCODE_PATHS
       - LOG_PRETTY=on
-      - LOG_LEVEL=info # make debug when debugging
+      - LOG_LEVEL=info
       - CHOKIDAR_USEPOLLING=1
       - NODE_OPTIONS=--max-old-space-size=57344 --enable-source-maps
-      - MAX_MEMORY_SCORE # number of concurrent 4K videos your system memory can handle at once
-      - MAX_CPU_SCORE # number of concurrent 4K videos your system CPU can handle at
+      - MAX_MEMORY_SCORE
+      - MAX_CPU_SCORE
       - CONCURRENT_FILE_CHECKS
       - CONCURRENT_INTEGRITY_CHECKS
       - ENV=${ENV:-prod}
       - TMDB_READ_ACCESS_TOKEN
-      - COMPUTE_SCORE_FACTOR # Factor to compute the score for a file. The score is rounded to the nearest 1/COMPUTE_SCORE_FACTOR.
+      - COMPUTE_SCORE_FACTOR
     volumes:
-      - ${TRANSCODE_STORAGE}:/source_media # path to my volumes for download storage
+      - ${TRANSCODE_STORAGE}:/source_media
       - ./transcode:/usr/app
       - /usr/app/node_modules
       - /usr/app/bin
@@ -272,27 +375,33 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # PLEX (host network for DLNA/UPnP discovery)
+  # --------------------------------------------------------------------------
   plex:
     container_name: plex
     image: lscr.io/linuxserver/plex:latest
     network_mode: host
     devices:
-      - "/dev/dri:/dev/dri" # GPU passthrough for hardware transcoding (intel quicksync)
+      - "/dev/dri:/dev/dri" # Intel Quick Sync
     environment:
       - TZ
       - PUID=1000
       - PGID=1000
       - VERSION=docker
     volumes:
-      - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE} # path to my volumes for download storage
+      - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE}
       - ./plex:/config
     restart: unless-stopped
     logging: 
-        driver: "json-file"
-        options: 
-          max-size: "200k"
-          max-file: "10"
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # MONGO (local)
+  # --------------------------------------------------------------------------
   mongo:
     container_name: torrent-mongo-local
     image: mongo:8.0.4-noble
@@ -308,10 +417,14 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # SONARR (VPN-routed)
+  # Waits for VPN, Prowlarr, Torrent; labeled for autoheal + instant restart.
+  # --------------------------------------------------------------------------
   sonarr:
     container_name: sonarr
     image: lscr.io/linuxserver/sonarr:latest
-    network_mode: service:vpn # all traffic goes through vpn
+    network_mode: service:vpn
     environment:
       - TZ
       - PUID=1000
@@ -320,24 +433,25 @@ services:
       - SERVICE_PORT=${SONARR_SERVICE_PORT}
       - API_KEY=${SONARR_API_KEY}
     volumes:
-      - ${SONARR_STORAGE}:${SONARR_STORAGE} # path to my volumes for download storage
+      - ${SONARR_STORAGE}:${SONARR_STORAGE}
       - ./sonarr:/config
-      - ./scripts:/scripts # health check script and more
+      - ./scripts:/scripts
     healthcheck:
-      test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash /scripts/arr-health-check
       interval: 10s
       retries: 3
       timeout: 5s
       start_period: 30s
     restart: unless-stopped
     labels:
-      - "autoheal=true" # include in autoheal check
+      - "autoheal=true"
+      - "restart-with=nordlynx"
     depends_on:
-      vpn: # wait for vpn to start before starting
+      vpn:
         condition: service_healthy
-      prowlarr: # wait for index service to start before starting
+      prowlarr:
         condition: service_healthy
-      torrent: # wait for download client to start before starting
+      torrent:
         condition: service_healthy
     logging: 
       driver: "json-file"
@@ -345,10 +459,13 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # RADARR (VPN-routed)
+  # --------------------------------------------------------------------------
   radarr:
     container_name: radarr
     image: lscr.io/linuxserver/radarr:latest
-    network_mode: service:vpn # all traffic goes through vpn
+    network_mode: service:vpn
     environment:
       - TZ
       - PUID=1000
@@ -357,24 +474,25 @@ services:
       - SERVICE_PORT=${RADARR_SERVICE_PORT}
       - API_KEY=${RADARR_API_KEY}
     volumes:
-      - ${RADARR_STORAGE}:${RADARR_STORAGE} # path to my volumes for download storage
+      - ${RADARR_STORAGE}:${RADARR_STORAGE}
       - ./radarr:/config
-      - ./scripts:/scripts # health check script and more
+      - ./scripts:/scripts
     healthcheck:
-      test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash /scripts/arr-health-check
       interval: 10s
       retries: 3
       timeout: 5s
       start_period: 10s
     restart: unless-stopped
     labels:
-      - "autoheal=true" # include in autoheal check
+      - "autoheal=true"
+      - "restart-with=nordlynx"
     depends_on:
-      vpn: # wait for vpn to start before starting
+      vpn:
         condition: service_healthy
-      prowlarr: # wait for index service to start before starting
+      prowlarr:
         condition: service_healthy
-      torrent: # wait for download client to start before starting
+      torrent:
         condition: service_healthy
     logging: 
       driver: "json-file"
@@ -382,10 +500,13 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # BAZARR (VPN-routed)
+  # --------------------------------------------------------------------------
   bazarr:
     container_name: bazarr
     image: lscr.io/linuxserver/bazarr:latest
-    network_mode: service:vpn # all traffic goes through vpn
+    network_mode: service:vpn
     environment:
       - TZ
       - PUID=1000
@@ -394,24 +515,25 @@ services:
       - SERVICE_PORT=${BAZARR_SERVICE_PORT}
       - API_KEY=${BAZARR_API_KEY}
     volumes:
-      - ${BAZARR_STORAGE}:${BAZARR_STORAGE} # path to my volumes for download storage
+      - ${BAZARR_STORAGE}:${BAZARR_STORAGE}
       - ./bazarr:/config
-      - ./scripts:/scripts # health check script and more
+      - ./scripts:/scripts
     healthcheck:
-      test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash /scripts/arr-health-check
       interval: 10s
       retries: 3
       timeout: 5s
       start_period: 10s
     restart: unless-stopped
     labels:
-      - "autoheal=true" # include in autoheal check
+      - "autoheal=true"
+      - "restart-with=nordlynx"
     depends_on:
-      vpn: # wait for vpn to start before starting
+      vpn:
         condition: service_healthy
-      radarr: # wait for index service to start before starting
+      radarr:
         condition: service_healthy
-      sonarr: # wait for download client to start before starting
+      sonarr:
         condition: service_healthy
     logging: 
       driver: "json-file"
@@ -419,10 +541,13 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # OVERSEERR (VPN-routed)
+  # --------------------------------------------------------------------------
   overseerr:
     container_name: overseerr
     image: lscr.io/linuxserver/overseerr:latest
-    network_mode: service:vpn # all traffic goes through vpn
+    network_mode: service:vpn
     environment:
       - TZ
       - PUID=1000
@@ -430,24 +555,25 @@ services:
       - SERVICE_NAME=${OVERSEERR_SERVICE_NAME}
       - SERVICE_PORT=${OVERSEERR_SERVICE_PORT}
     volumes:
-      - ${OVERSEERR_STORAGE}:${OVERSEERR_STORAGE} # path to my volumes for download storage
+      - ${OVERSEERR_STORAGE}:${OVERSEERR_STORAGE}
       - ./overseerr:/config
-      - ./scripts:/scripts # health check script and more
+      - ./scripts:/scripts
     healthcheck:
-      test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash /scripts/arr-health-check
       interval: 10s
       retries: 3
       timeout: 5s
       start_period: 10s
     restart: unless-stopped
     labels:
-      - "autoheal=true" # include in autoheal check
+      - "autoheal=true"
+      - "restart-with=nordlynx"
     depends_on:
-      vpn: # wait for vpn to start before starting
+      vpn:
         condition: service_healthy
-      radarr: # wait for index service to start before starting
+      radarr:
         condition: service_healthy
-      sonarr: # wait for download client to start before starting
+      sonarr:
         condition: service_healthy
     logging: 
       driver: "json-file"
@@ -455,10 +581,13 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # PROWLARR (VPN-routed)
+  # --------------------------------------------------------------------------
   prowlarr:
     container_name: prowlarr
     image: lscr.io/linuxserver/prowlarr:latest
-    network_mode: service:vpn # all traffic goes through vpn
+    network_mode: service:vpn
     environment:
       - TZ
       - PUID=1000
@@ -467,22 +596,23 @@ services:
       - SERVICE_PORT=${PROWLARR_SERVICE_PORT}
       - API_KEY=${PROWLARR_API_KEY}
     volumes:
-      - ${PROWLARR_STORAGE}:${PROWLARR_STORAGE} # path to my volumes for download storage
+      - ${PROWLARR_STORAGE}:${PROWLARR_STORAGE}
       - ./prowlarr:/config
-      - ./scripts:/scripts # health check script and more
+      - ./scripts:/scripts
     healthcheck:
-      test: bash /scripts/arr-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash /scripts/arr-health-check
       interval: 10s
       retries: 3
       timeout: 5s
       start_period: 10s
     labels:
-      - "autoheal=true" # include in autoheal check
+      - "autoheal=true"
+      - "restart-with=nordlynx"
     restart: unless-stopped
     depends_on:
-      vpn: # wait for vpn to start before starting
+      vpn:
         condition: service_healthy
-      torrent: # wait for vpn to start before starting
+      torrent:
         condition: service_healthy
     logging: 
       driver: "json-file"
@@ -490,6 +620,9 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # TAUTULLI (local analytics, not VPN-routed)
+  # --------------------------------------------------------------------------
   tautulli:
     container_name: tautulli
     image: lscr.io/linuxserver/tautulli:latest
@@ -506,10 +639,15 @@ services:
         max-size: "200k"
         max-file: "10"
   
+  # --------------------------------------------------------------------------
+  # HUNTARR (VPN-routed)
+  # Typically exits on network loss -> Docker restarts quickly.
+  # Still labeled to follow VPN restarts immediately.
+  # --------------------------------------------------------------------------
   huntarr:
     container_name: huntarr
     image: huntarr/huntarr:latest
-    network_mode: service:vpn # all traffic goes through vpn
+    network_mode: service:vpn
     environment:
       - TZ
       - PUID=1000
@@ -517,37 +655,44 @@ services:
     volumes:
       - ./huntarr/config:/config
     restart: unless-stopped
+    labels:
+      - "autoheal=true"
+      - "restart-with=nordlynx"
     logging: 
       driver: "json-file"
       options: 
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # TINYMEDIA MANAGER (VPN-routed)
+  # --------------------------------------------------------------------------
   tmm:
     container_name: tinymediamanager
     image: tinymediamanager/tinymediamanager:latest
-    network_mode: service:vpn # all traffic goes through vpn
+    network_mode: service:vpn
     environment:
       - TZ
       - USER_ID=1000
       - GROUP_ID=1000
       - PASSWORD=${TMM_PASSWORD}
     volumes:
-      - ${TMM_STORAGE}:${TMM_STORAGE} # path to my volumes for download storage
+      - ${TMM_STORAGE}:${TMM_STORAGE}
       - ./tmm:/data
       - ./scripts:/scripts
       - ./tmm/launcher-extra.yml:/app/launcher-extra.yml
     restart: unless-stopped
     healthcheck:
-      test: bash /scripts/tmm-health-check # health check script confirms protected vpn connection and a connected qbittorrent
+      test: bash /scripts/tmm-health-check
       interval: 10s
       retries: 3
       timeout: 5s
       start_period: 30s
     labels:
-      - "autoheal=true" # include in autoheal check
+      - "autoheal=true"
+      - "restart-with=nordlynx"
     depends_on:
-      vpn: # wait for vpn to start before starting
+      vpn:
         condition: service_healthy
     logging: 
       driver: "json-file"
@@ -555,23 +700,33 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # PORTAINER (VPN-routed UI)
+  # Labeled to follow VPN restarts so its session reconnects promptly.
+  # --------------------------------------------------------------------------
   portainer:
     container_name: portainer
     image: portainer/portainer-ce:latest
-    network_mode: service:vpn # all traffic goes through vpn
+    network_mode: service:vpn
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_db:/data
     depends_on:
-      vpn: # wait for vpn to start before starting
+      vpn:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      - "restart-with=nordlynx"
+      - "autoheal=true"
     logging: 
       driver: "json-file"
       options: 
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # REDIS (local cache/queue)
+  # --------------------------------------------------------------------------
   redis:
     container_name: torrent-redis-local
     image: redis:latest
@@ -588,6 +743,9 @@ services:
         max-size: "200k"
         max-file: "10"
     
+  # --------------------------------------------------------------------------
+  # SAMBA (host network for LAN file shares)
+  # --------------------------------------------------------------------------
   samba:
     container_name: samba
     image: crazymax/samba:latest
@@ -598,7 +756,7 @@ services:
       - SAMBA_PASSWORD
       - SAMBA_GROUP
     volumes:
-      - ${SAMBA_STORAGE}:/samba/public # path to my volumes for download storage
+      - ${SAMBA_STORAGE}:/samba/public
       - ./samba:/data
     restart: always
     logging: 
@@ -607,24 +765,28 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # SABNZBD / USENET (VPN-routed)
+  # --------------------------------------------------------------------------
   usenet:
     image: linuxserver/sabnzbd
     container_name: usenet
-    network_mode: service:vpn # all traffic goes through vpn
+    network_mode: service:vpn
     environment:
       - PUID=1000
       - GUID=1000
       - Umask=022
-      - TZ # Timezone used for logging
+      - TZ
     volumes:
-      - ${USENET_STORAGE}:${USENET_STORAGE} # path to my volumes for download storage
-      - ./sabnzbd:/config # qbittorrent config -- this mount allows you to script your own config and preserve the changes you make between container instances
-      - ./scripts:/scripts # health check script and more
+      - ${USENET_STORAGE}:${USENET_STORAGE}
+      - ./sabnzbd:/config
+      - ./scripts:/scripts
     depends_on:
-      vpn: # wait for vpn to start before starting
+      vpn:
         condition: service_healthy
     labels:
-      - "autoheal=true" # include in autoheal check
+      - "autoheal=true"
+      - "restart-with=nordlynx"
     restart: unless-stopped
     logging: 
       driver: "json-file"
@@ -632,6 +794,9 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # --------------------------------------------------------------------------
+  # GLANCES (web UI monitoring)
+  # --------------------------------------------------------------------------
   monitoring:
     image: nicolargo/glances:latest-full
     container_name: monitoring
@@ -651,13 +816,16 @@ services:
         max-size: "200k"
         max-file: "10"
   
+  # --------------------------------------------------------------------------
+  # RABBITMQ (management + AMQP)
+  # --------------------------------------------------------------------------
   rabbitmq:
     hostname: rabbitmq
     container_name: rabbitmq
     image: rabbitmq:4.0.9-management-alpine
     ports:
-      - "15672:15672"
-      - "5672:5672"
+      - "15672:15672" # mgmt UI
+      - "5672:5672"   # amqp
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq/mnesia/
     restart: always
@@ -667,6 +835,9 @@ services:
         max-size: "200k"
         max-file: "10"
   
+  # --------------------------------------------------------------------------
+  # MEMCACHED
+  # --------------------------------------------------------------------------
   memcached:
     container_name: memcached
     image: memcached:latest
@@ -679,12 +850,20 @@ services:
         max-size: "200k"
         max-file: "10"
 
+# ------------------------------------------------------------------------------
+# VOLUMES
+# ------------------------------------------------------------------------------
 volumes:
   mongo_db_8:
   portainer_db:
   redis_data:
   rabbitmq_data:
 
+# ------------------------------------------------------------------------------
+# NETWORKS
+# Using an external pre-created network "torrent-rig" to keep container names
+# stable and allow sidecar/proxy composition across multiple stacks if needed.
+# ------------------------------------------------------------------------------
 networks:
   default:
     name: torrent-rig
