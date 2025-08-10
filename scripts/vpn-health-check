@@ -10,10 +10,13 @@
 #        interface (wg0), and (optionally) that the WireGuard handshake
 #        is recent.
 #
-# Why this matters:
-#   Some apps keep long-lived connections and do not crash when the VPN
-#   link flaps. A strong health check lets autoheal/Docker restart the
-#   container only when the tunnel is actually unhealthy.
+# Startup friendliness:
+#   Some providers take a bit to bring the interface up and complete the
+#   first handshake. This script is tolerant:
+#     - It includes short, bounded retries for the interface & default route.
+#     - It SKIPS the handshake freshness check during an initial grace window
+#       (HANDSHAKE_GRACE seconds) to avoid false negatives right after boot.
+#   You can ALSO enlarge Docker's healthcheck start_period in compose (e.g. 90s).
 #
 # Exit codes:
 #   0 = healthy
@@ -37,11 +40,15 @@ ROUTE_BIN="${ROUTE_BIN:-ip}"                # iproute2
 WG_BIN="${WG_BIN:-wg}"                      # wireguard tool (optional)
 LOCK_FILE="${LOCK_FILE:-/scripts/vpn-health-check.lock}"  # optional lock indicator
 LOG_FILE="${LOG_FILE:-/scripts/vpn-health-check.log}"     # rolling log for debugging
+STATE_FILE="${STATE_FILE:-/scripts/vpn-health-check.start}" # first-run timestamp
 
-DNS_TEST_HOST="${DNS_TEST_HOST:-one.one.one.one}" # Cloudflare DNS hostname
+DNS_TEST_HOST="${DNS_TEST_HOST:-one.one.one.one}"         # Cloudflare DNS hostname
 HTTP_TEST_URL="${HTTP_TEST_URL:-https://www.cloudflare.com/cdn-cgi/trace}" # lightweight endpoint
-HTTP_TIMEOUT="${HTTP_TIMEOUT:-5}"                  # seconds
-HANDSHAKE_MAX_AGE="${HANDSHAKE_MAX_AGE:-180}"      # seconds; max age for latest WG handshake
+HTTP_TIMEOUT="${HTTP_TIMEOUT:-5}"                          # seconds
+HANDSHAKE_MAX_AGE="${HANDSHAKE_MAX_AGE:-180}"              # seconds; max age for latest WG handshake
+HANDSHAKE_GRACE="${HANDSHAKE_GRACE:-120}"                  # seconds; skip handshake freshness within this window
+RETRY_TOTAL="${RETRY_TOTAL:-15}"                           # total seconds to retry critical readiness checks
+RETRY_SLEEP="${RETRY_SLEEP:-3}"                            # seconds between retries
 
 # -------------------------------
 # Logging helpers
@@ -62,6 +69,16 @@ ok() {
 }
 
 # -------------------------------
+# Startup timestamp (for handshake grace)
+# -------------------------------
+if [ ! -f "${STATE_FILE}" ]; then
+  date +%s > "${STATE_FILE}" || true
+fi
+START_EPOCH=$(cat "${STATE_FILE}" 2>/dev/null || echo 0)
+NOW_EPOCH=$(date +%s)
+SINCE_START=$(( NOW_EPOCH - START_EPOCH ))
+
+# -------------------------------
 # Preconditions
 # -------------------------------
 command -v "${ROUTE_BIN}" >/dev/null 2>&1 || fail "Missing '${ROUTE_BIN}' command"
@@ -70,57 +87,86 @@ if ! command -v "${CURL_BIN}" >/dev/null 2>&1; then
 fi
 
 # -------------------------------
-# Check 1: VPN interface exists and is UP
+# Small retry helper
 # -------------------------------
-if ! ${ROUTE_BIN} link show "${VPN_IF}" >/dev/null 2>&1; then
-  fail "Interface ${VPN_IF} not found (NordLynx not up?)"
-fi
+retry_until() {
+  # Usage: retry_until <seconds_total> <sleep_seconds> <cmd...>
+  local total="$1"; shift
+  local sleep_s="$1"; shift
+  local start ts
+  start=$(date +%s)
+  while true; do
+    if "$@"; then return 0; fi
+    ts=$(date +%s)
+    if (( ts - start >= total )); then return 1; fi
+    sleep "${sleep_s}"
+  done
+}
 
-if ! ${ROUTE_BIN} link show "${VPN_IF}" | grep -q "state UP"; then
-  fail "Interface ${VPN_IF} is down"
+# -------------------------------
+# Check 1: VPN interface exists and is UP (with short retries)
+# -------------------------------
+check_if_up() {
+  ${ROUTE_BIN} link show "${VPN_IF}" >/dev/null 2>&1 || return 1
+  ${ROUTE_BIN} link show "${VPN_IF}" | grep -q "state UP" || return 1
+}
+
+if ! retry_until "${RETRY_TOTAL}" "${RETRY_SLEEP}" check_if_up; then
+  fail "Interface ${VPN_IF} not found or not UP after ${RETRY_TOTAL}s"
 fi
 log "VPN interface ${VPN_IF} exists and is UP"
 
 # -------------------------------
-# Check 2: Default route goes through VPN interface
+# Check 2: Default route goes through VPN interface (with short retries)
 # -------------------------------
-DEFAULT_V4="$(${ROUTE_BIN} -4 route show default || true)"
-if ! echo "${DEFAULT_V4}" | grep -q " dev ${VPN_IF}"; then
-  fail "Default IPv4 route is NOT via ${VPN_IF}: ${DEFAULT_V4}"
+check_default_route() {
+  local def
+  def="$(${ROUTE_BIN} -4 route show default 2>/dev/null || true)"
+  echo "${def}" | grep -q " dev ${VPN_IF}"
+}
+
+if ! retry_until "${RETRY_TOTAL}" "${RETRY_SLEEP}" check_default_route; then
+  DEFAULT_V4="$(${ROUTE_BIN} -4 route show default || true)"
+  fail "Default IPv4 route is NOT via ${VPN_IF} after ${RETRY_TOTAL}s: ${DEFAULT_V4}"
 fi
+DEFAULT_V4="$(${ROUTE_BIN} -4 route show default || true)"
 log "Default IPv4 route is via ${VPN_IF}: ${DEFAULT_V4}"
 
 # -------------------------------
 # Check 3 (optional but strong): recent WireGuard handshake
+#   Skipped during initial HANDSHAKE_GRACE seconds to avoid startup flaps.
 # -------------------------------
 if command -v "${WG_BIN}" >/dev/null 2>&1; then
-  if ${WG_BIN} show "${VPN_IF}" latest-handshakes >/dev/null 2>&1; then
-    recent_ok="false"
-    now_epoch="$(date +%s)"
-    while IFS= read -r line; do
-      last_epoch="$(echo "${line}" | awk '{print $2}')" || true
-      if [[ -n "${last_epoch}" && "${last_epoch}" != "0" ]]; then
-        age="$(( now_epoch - last_epoch ))"
-        if (( age <= HANDSHAKE_MAX_AGE )); then
-          recent_ok="true"
-          break
+  if (( SINCE_START >= HANDSHAKE_GRACE )); then
+    if ${WG_BIN} show "${VPN_IF}" latest-handshakes >/dev/null 2>&1; then
+      recent_ok="false"
+      now_epoch="$(date +%s)"
+      while IFS= read -r line; do
+        last_epoch="$(echo "${line}" | awk '{print $2}')" || true
+        if [[ -n "${last_epoch}" && "${last_epoch}" != "0" ]]; then
+          age="$(( now_epoch - last_epoch ))"
+          if (( age <= HANDSHAKE_MAX_AGE )); then
+            recent_ok="true"; break
+          fi
         fi
-      fi
-    done < <(${WG_BIN} show "${VPN_IF}" latest-handshakes)
-    [[ "${recent_ok}" == "true" ]] || fail "WireGuard handshake is stale (> ${HANDSHAKE_MAX_AGE}s)"
-    log "WireGuard handshake is recent (<= ${HANDSHAKE_MAX_AGE}s)"
-  else
-    if ${WG_BIN} show "${VPN_IF}" >/dev/null 2>&1; then
-      if ! ${WG_BIN} show "${VPN_IF}" | grep -q "latest handshake"; then
-        fail "wg output lacks 'latest handshake' – is the tunnel connected?"
-      fi
-      if ${WG_BIN} show "${VPN_IF}" | grep -q "latest handshake: (none)"; then
-        fail "No recent WireGuard handshake"
-      fi
-      log "WireGuard reports a recent handshake"
+      done < <(${WG_BIN} show "${VPN_IF}" latest-handshakes)
+      [[ "${recent_ok}" == "true" ]] || fail "WireGuard handshake stale (> ${HANDSHAKE_MAX_AGE}s)"
+      log "WireGuard handshake is recent (<= ${HANDSHAKE_MAX_AGE}s)"
     else
-      log "wg present but unable to show ${VPN_IF}; skipping handshake freshness check"
+      if ${WG_BIN} show "${VPN_IF}" >/dev/null 2>&1; then
+        if ! ${WG_BIN} show "${VPN_IF}" | grep -q "latest handshake"; then
+          fail "wg output lacks 'latest handshake' – is the tunnel connected?"
+        fi
+        if ${WG_BIN} show "${VPN_IF}" | grep -q "latest handshake: (none)"; then
+          fail "No recent WireGuard handshake"
+        fi
+        log "WireGuard reports a recent handshake"
+      else
+        log "wg present but unable to show ${VPN_IF}; skipping handshake freshness check"
+      fi
     fi
+  else
+    log "Skipping handshake freshness (SINCE_START=${SINCE_START}s < HANDSHAKE_GRACE=${HANDSHAKE_GRACE}s)"
   fi
 else
   log "wg not installed; skipping handshake freshness check"
