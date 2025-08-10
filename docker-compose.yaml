@@ -86,42 +86,6 @@ services:
         max-file: "10"
 
   # --------------------------------------------------------------------------
-  # VPN EVENT WATCHER
-  # Watches docker events for 'nordlynx' start/die and restarts dependents
-  # labeled with "restart-with=nordlynx". This gives instant recovery after a
-  # manual VPN restart (no waiting for healthchecks).
-  # --------------------------------------------------------------------------
-  vpn-restarter:
-    image: docker:26-cli
-    container_name: vpn-restarter
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro # read-only for safety
-    command: >
-      sh -c '
-        echo "[vpn-restarter] watching nordlynx events...";
-        docker events --filter container=nordlynx --filter event=start --filter event=die |
-        while read line; do
-          echo "[vpn-restarter] vpn event: $line";
-          case "$line" in
-            *"start"*) sleep 3 ;; # small grace for tunnel readiness
-          esac
-          ids=$(docker ps -q --filter "label=restart-with=nordlynx");
-          if [ -n "$ids" ]; then
-            echo "[vpn-restarter] restarting: $ids";
-            docker restart $ids || true
-          else
-            echo "[vpn-restarter] no matching containers to restart";
-          fi
-        done
-      '
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "200k"
-        max-file: "10"
-
-  # --------------------------------------------------------------------------
   # TORRENT CLIENT (qBittorrent)
   # Runs inside the VPN namespace. Healthcheck should fail on tunnel loss.
   # Labeled for autoheal and restart-with-vpn for instant reconnection.
@@ -445,7 +409,6 @@ services:
     restart: unless-stopped
     labels:
       - "autoheal=true"
-      - "restart-with=nordlynx"
     depends_on:
       vpn:
         condition: service_healthy
@@ -486,7 +449,6 @@ services:
     restart: unless-stopped
     labels:
       - "autoheal=true"
-      - "restart-with=nordlynx"
     depends_on:
       vpn:
         condition: service_healthy
@@ -527,7 +489,6 @@ services:
     restart: unless-stopped
     labels:
       - "autoheal=true"
-      - "restart-with=nordlynx"
     depends_on:
       vpn:
         condition: service_healthy
@@ -567,7 +528,6 @@ services:
     restart: unless-stopped
     labels:
       - "autoheal=true"
-      - "restart-with=nordlynx"
     depends_on:
       vpn:
         condition: service_healthy
@@ -606,8 +566,7 @@ services:
       timeout: 5s
       start_period: 10s
     labels:
-      - "autoheal=true"
-      - "restart-with=nordlynx"
+      - "autoheal=true" 
     restart: unless-stopped
     depends_on:
       vpn:
@@ -657,7 +616,6 @@ services:
     restart: unless-stopped
     labels:
       - "autoheal=true"
-      - "restart-with=nordlynx"
     logging: 
       driver: "json-file"
       options: 
@@ -690,7 +648,6 @@ services:
       start_period: 30s
     labels:
       - "autoheal=true"
-      - "restart-with=nordlynx"
     depends_on:
       vpn:
         condition: service_healthy
@@ -716,7 +673,6 @@ services:
         condition: service_healthy
     restart: unless-stopped
     labels:
-      - "restart-with=nordlynx"
       - "autoheal=true"
     logging: 
       driver: "json-file"
@@ -786,7 +742,6 @@ services:
         condition: service_healthy
     labels:
       - "autoheal=true"
-      - "restart-with=nordlynx"
     restart: unless-stopped
     logging: 
       driver: "json-file"
