@@ -38,9 +38,9 @@ echo "$VPN_STATUS" | jq . >> /scripts/vpn-health-check.log
 # Extract the 'status' field (should be true if protected)
 VPN_STATUS=$(echo "$VPN_STATUS" | jq .protected)
 
-# If not VPN protected, mark container as unhealthy
-if [[ "$VPN_STATUS" == "false" ]]; then
-    echo "Not connected to NordLynx. Marking unhealthy" >> /scripts/vpn-health-check.log
+# If not VPN protected (anything except true), mark container as unhealthy
+if [[ $VPN_STATUS != true ]]; then
+    echo "Not connected to NordLynx or unable to verify VPN status. Marking unhealthy" >> /scripts/vpn-health-check.log
     exit 1;
 else
     echo "VPN connected" >> /scripts/vpn-health-check.log
