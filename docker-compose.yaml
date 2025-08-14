@@ -296,6 +296,18 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
+  # --------------------------------------------------------------------------
+  # RECYCLARR (Trash-Guides sync)
+  # --------------------------------------------------------------------------
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr
+    container_name: recyclarr
+    user: 1000:1000
+    volumes:
+      - ./recyclarr:/config
+    environment:
+      - TZ
+      - RECYCLARR_CREATE_CONFIG=true
 
   # --------------------------------------------------------------------------
   # TRANSCODE ENGINE (custom Node + FFmpeg)
