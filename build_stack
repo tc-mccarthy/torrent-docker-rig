@@ -25,7 +25,7 @@ fi
 
 # Prebuild all containers with no cache to ensure fresh images
 echo "Prebuilding all containers with --no-cache..."
-docker compose build --no-cache
+docker compose build
 
 # Gracefully shut down running stack, prune orphans
 echo "Shutting down running stack and pruning orphans..."
@@ -34,6 +34,10 @@ docker compose down --remove-orphans
 # Bring up new stack in detached mode (blue-green replacement)
 echo "Starting new stack..."
 docker compose up -d --remove-orphans
+
+# Prune all unused containers, images, networks, and volumes
+echo "Pruning unused containers, images, networks, and volumes..."
+docker system prune -af --volumes
 
 # Follow logs for all containers
 docker compose logs --follow
