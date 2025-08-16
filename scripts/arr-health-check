@@ -1,5 +1,6 @@
 #!/bin/bash
 #
+
 # arr-health-check: Health check script for Sonarr/Radarr/Bazarr/Overseerr containers
 # -------------------------------------------------------------------------------
 # This script verifies that the container is connected to the internet via VPN (NordLynx),
@@ -8,7 +9,7 @@
 # by sourcing vpn_utils.sh and calling check_vpn_protection().
 #
 # - Logs all output to /scripts/$SERVICE_NAME-health-check.log
-# - Uses a lock file to avoid redundant checks
+# - Uses a lock file to avoid redundant checks; lock file must be no more than 10 minutes old
 # - Checks VPN status using a shared utility function
 # - Exits 0 if VPN is up, 1 if not
 # -------------------------------------------------------------------------------
@@ -28,19 +29,19 @@ LOG_FILE="$DIR/$SERVICE_NAME-health-check.log"
 # Log the current timestamp for traceability
 log_msg "INFO" "Health check started for $SERVICE_NAME"
 
-# Check for a stale lock file (older than 10 minutes)
-LOCK=$(find "$DIR" -iname "$SERVICE_NAME-health-check.lock" -mmin +10 | wc -l)
+## Lock file logic: Only skip health check if a lock file exists and is 10 minutes old or younger.
+# If a lock file exists and is 10 minutes old or younger, skip the health check to avoid spamming.
+LOCK=$(find "$DIR" -iname "$SERVICE_NAME-health-check.lock" -mmin -10 | wc -l)
 
-# If a lock is detected, skip the health check to avoid spamming
 if [[ "$LOCK" != "0" ]]; then
-    log_msg "WARN" "Lock detected. Skipping health check for $SERVICE_NAME"
+    log_msg "WARN" "Qualifying lock file found. Skipping health check for $SERVICE_NAME."
     exit 0;
 fi
 
 # Use the shared function to check VPN protection status
 VPN_STATUS=$(check_vpn_protection)
 
-# Log the VPN status (raw output and parsed)
+# Log the VPN status (raw output)
 log_msg "DEBUG" "VPN STATUS: $VPN_STATUS"
 
 # If not VPN protected, mark container as unhealthy
@@ -48,9 +49,9 @@ if [[ $VPN_STATUS != true ]]; then
     log_msg "ERROR" "Not connected to NordLynx. Marking unhealthy"
     exit 1;
 else
-    # If an API key is provided, refresh download clients
+    # If an API key is provided, refresh download clients and indexers
     if [[ "$API_KEY" != "" ]]; then
-        log_msg "INFO" "API KEY DETECTED. REFRESHING ${SERVICE_NAME} DOWNLOAD CLIENTS"
+        log_msg "INFO" "API KEY DETECTED. Refreshing ${SERVICE_NAME} download clients."
         curl "http://localhost:${SERVICE_PORT}/${SERVICE_NAME}/api/v3/downloadclient/testall" \
             -X 'POST' \
             -H 'Accept: application/json, text/javascript, */*; q=0.01' \
@@ -59,8 +60,18 @@ else
             -H 'Content-Type: application/json' \
             -H "X-Api-Key: ${API_KEY}" \
             --compressed
+
+        log_msg "INFO" "API KEY DETECTED. Refreshing ${SERVICE_NAME} indexers."
+        curl "http://localhost:${SERVICE_PORT}/${SERVICE_NAME}/api/v3/indexer/testall" \
+            -X 'POST' \
+            -H 'Accept: application/json, text/javascript, */*; q=0.01' \
+            -H 'Accept-Language: en-US,en;q=0.9' \
+            -H 'Content-Length: 0' \
+            -H 'Content-Type: application/json' \
+            -H "X-Api-Key: ${API_KEY}" \
+            --compressed
     fi
-    echo "All systems go" >> "$DIR/$SERVICE_NAME-health-check.log"
+    log_msg "INFO" "All systems go for $SERVICE_NAME."
     touch "$DIR/$SERVICE_NAME-health-check.lock"
     exit 0;
 fi
