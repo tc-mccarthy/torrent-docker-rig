@@ -76,7 +76,7 @@ services:
       interval: 10s
       retries: 3
       timeout: 5s
-      start_period: 60s
+      start_period: 30s
     networks:
       - default
     logging: 
@@ -114,9 +114,9 @@ services:
     healthcheck:
       test: bash ./scripts/torrent-health-check
       interval: 10s
-      retries: 0
+      retries: 5
       timeout: 5s
-      start_period: 60s
+      start_period: 45s
     logging: 
       driver: "json-file"
       options: 
