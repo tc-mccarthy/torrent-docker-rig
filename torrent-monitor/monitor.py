@@ -7,7 +7,15 @@ from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+
 # === Configuration ===
+#
+# This section loads all environment variables and sets up intervals for monitoring and reprioritization.
+#
+# - MONITOR_CRON: Interval for torrent tracking and deletion (default: every 15 min)
+# - REPRIORITIZE_CRON: Interval for reprioritization (default: every 1 hour)
+#
+# All other config values are documented inline.
 
 QB_URL = os.getenv("QB_API_URL")
 QB_USER = os.getenv("QB_USERNAME")
@@ -15,6 +23,7 @@ QB_PASS = os.getenv("QB_PASSWORD")
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 MONITOR_CRON = os.getenv("MONITOR_CRON", "*/15 * * * *")  # Every 15 minutes
+REPRIORITIZE_CRON = os.getenv("REPRIORITIZE_CRON", "0 * * * *")  # Every hour
 
 # Redis key version — updated when logic changes
 KEY_VERSION = "torrent_monitor_20250727a"
@@ -271,11 +280,12 @@ def delete_torrent(torrent_hash):
         log(f"Failed to delete {torrent_hash}")
     return r.ok
 
-def run():
-    """Run one monitoring pass: login, optionally reprioritize, and check for deletions.
+def monitor_pass():
+    """
+    Run one monitoring pass: login, track torrents, and check for deletions.
 
-    Reprioritization only occurs on startup (first run) and once per hour.
-    All other runs only perform monitoring and deletion logic.
+    This function is scheduled using MONITOR_CRON (default: every 15 min).
+    It always runs on startup.
 
     Returns:
         None
@@ -286,20 +296,6 @@ def run():
     torrents = get_torrents()
     if not torrents:
         return
-
-    # Only reprioritize on startup (first run) or once per hour.
-    now = datetime.now()
-    last_reprio = getattr(run, "last_reprioritize", None)
-    should_reprioritize = not hasattr(run, "has_run")
-    if not should_reprioritize and last_reprio:
-        # Reprioritize if an hour or more has passed since last reprioritization.
-        should_reprioritize = (now - last_reprio).total_seconds() >= 3600
-    if should_reprioritize:
-        reprioritize_queue(torrents)
-        run.has_run = True
-        run.last_reprioritize = now
-    else:
-        log("Skipping reprioritization (not startup or 1 hour since last)")
 
     for t in torrents:
         status = t.get("state")
@@ -348,23 +344,52 @@ def run():
 
     log("=== Monitor pass complete ===")
 
-def schedule_monitor():
-    """Schedule the monitor to run periodically using APScheduler and a cron expression.
-
-    This function sets up the background scheduler, adds the monitor job, and starts the scheduler loop.
+def reprioritize_pass():
     """
-    log(f"Scheduling monitor with cron: '{MONITOR_CRON}'")
+    Run a reprioritization pass: login and reprioritize the torrent queue.
+
+    This function is scheduled using REPRIORITIZE_CRON (default: every 1 hour).
+    It always runs on startup.
+
+    Returns:
+        None
+    """
+    log("=== Running reprioritization pass ===")
+    if not login():
+        return
+    torrents = get_torrents()
+    if not torrents:
+        return
+    reprioritize_queue(torrents)
+    log("=== Reprioritization pass complete ===")
+
+
+def schedule_monitor():
+    """
+    Schedule monitoring and reprioritization jobs using APScheduler and cron expressions.
+
+    - Torrent tracking and deletion uses MONITOR_CRON (default: every 15 min)
+    - Reprioritization uses REPRIORITIZE_CRON (default: every 1 hour)
+    - Both run once immediately on startup
+
+    Returns:
+        None
+    """
+    log(f"Scheduling monitor with cron: '{MONITOR_CRON}' and reprioritization with cron: '{REPRIORITIZE_CRON}'")
     scheduler = BackgroundScheduler()
     try:
-        trigger = CronTrigger.from_crontab(MONITOR_CRON)
-        scheduler.add_job(run, trigger)
+        monitor_trigger = CronTrigger.from_crontab(MONITOR_CRON)
+        reprio_trigger = CronTrigger.from_crontab(REPRIORITIZE_CRON)
+        scheduler.add_job(monitor_pass, monitor_trigger)
+        scheduler.add_job(reprioritize_pass, reprio_trigger)
         scheduler.start()
     except Exception as e:
-        log(f"Failed to schedule monitor: {e}")
+        log(f"Failed to schedule monitor or reprioritization: {e}")
         exit(1)
 
-    # Run once immediately on startup.
-    run()
+    # Run both jobs immediately on startup
+    monitor_pass()
+    reprioritize_pass()
 
     try:
         while True:
