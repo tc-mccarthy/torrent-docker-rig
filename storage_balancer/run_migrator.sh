@@ -18,8 +18,8 @@ cd "$SCRIPT_DIR"
 # -------------------------------------------------------------
 
 # Set the source and destination media paths inside the container
-export SOURCE_PATH="/source_media/Danvers/TV Shows"
-export DEST_PATH="/source_media/Romanoff/TV Shows"
+export SOURCE_PATH="${SOURCE_PATH:-/source_media/Danvers/TV Shows}"
+export DEST_PATH="${DEST_PATH:-/source_media/Romanoff/TV Shows}"
 
 # Set the target disk utilization percentage (float, e.g. 80)
 export TARGET_UTILIZATION="80"

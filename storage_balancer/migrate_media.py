@@ -239,10 +239,19 @@ def migrate_dirs(dirs):
             print(f"\n🔁 Migrating {src} → {dest} ({format_size(size)})")
             # Use rsync to copy and verify stability
             if rsync_until_stable(src, dest):
-                shutil.rmtree(src)
-                print(f"🗑️ Deleted: {src}")
-                update_indexers(str(src), str(dest))
-                log.write(f"{src} → {dest}\n")
+                # Only delete after successful Radarr/Sonarr update
+                api_update_success = True
+                try:
+                    update_indexers(str(src), str(dest))
+                except Exception as e:
+                    print(f"❌ API update failed for {src}: {e}")
+                    api_update_success = False
+                if api_update_success:
+                    shutil.rmtree(src)
+                    print(f"🗑️ Deleted: {src}")
+                    log.write(f"{src} → {dest}\n")
+                else:
+                    print(f"❌ Skipped deletion due to failed API update: {src}")
             else:
                 print(f"❌ Failed: {src}. Skipped deletion.")
 
