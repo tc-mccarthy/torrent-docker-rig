@@ -16,12 +16,11 @@
 TIMESTAMP=$(date)
 echo "$TIMESTAMP" > /scripts/vpn-health-check.log
 
-# Check for a stale lock file (older than 10 minutes)
-LOCK=$(find /scripts -iname "vpn-health-check.lock" -mmin +10 | wc -l)
+# Lock file logic: Only skip health check if a lock file exists and is 10 minutes old or younger.
+LOCK=$(find /scripts -iname "vpn-health-check.lock" -mmin -10 | wc -l)
 
-# If a lock is detected, skip the health check to avoid spamming
 if [[ "$LOCK" != "0" ]]; then
-    echo ">> LOCK DETECTED. SKIPPING HEALTHCHECK >>" >> /scripts/vpn-health-check.log
+    echo ">> LOCK file is less than or equal to 10 minutes old. SKIPPING HEALTHCHECK >>" >> /scripts/vpn-health-check.log
     exit 0;
 fi
 
