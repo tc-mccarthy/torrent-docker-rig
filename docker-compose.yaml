@@ -110,7 +110,6 @@ services:
         condition: service_healthy # wait for tunnel
     labels:
       - "autoheal=true"
-      - "restart-with=nordlynx"
     restart: unless-stopped
     healthcheck:
       test: bash ./scripts/torrent-health-check
@@ -616,6 +615,17 @@ services:
     restart: unless-stopped
     labels:
       - "autoheal=true"
+    depends_on:
+      vpn:
+        condition: service_healthy
+      sonarr:
+        condition: service_healthy
+      radarr:
+        condition: service_healthy
+      prowlarr:
+        condition: service_healthy
+      torrent:
+        condition: service_healthy
     logging: 
       driver: "json-file"
       options: 
