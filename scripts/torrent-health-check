@@ -53,7 +53,7 @@ log_msg "DEBUG" "TORRENT STATUS: $TORRENT_STATUS"
 if [[ $VPN_STATUS != true ]]; then
     log_msg "ERROR" "Not connected to NordLynx. Marking unhealthy"
     exit 1;
-elif [[ $(echo "$TORRENT_STATUS" | jq -r .connection_status) != "connected" ]]; then
+elif [[ $(echo "$TORRENT_STATUS" | jq -r .connection_status) != "connected" && $(echo "$TORRENT_STATUS" | jq -r .connection_status) != "firewalled" ]]; then
     log_msg "ERROR" "qBittorrent not open to internet. Current Status: $(echo "$TORRENT_STATUS" | jq -r .connection_status). Marking unhealthy"
     exit 1;
 else
