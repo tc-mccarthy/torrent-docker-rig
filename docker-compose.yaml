@@ -76,7 +76,7 @@ services:
       interval: 10s
       retries: 3
       timeout: 5s
-      start_period: 30s
+      start_period: 60s
     networks:
       - default
     logging: 
@@ -116,7 +116,7 @@ services:
       interval: 10s
       retries: 0
       timeout: 5s
-      start_period: 30s
+      start_period: 60s
     logging: 
       driver: "json-file"
       options: 
@@ -404,7 +404,7 @@ services:
       interval: 10s
       retries: 3
       timeout: 5s
-      start_period: 30s
+      start_period: 60s
     restart: unless-stopped
     labels:
       - "autoheal=true"
@@ -444,7 +444,7 @@ services:
       interval: 10s
       retries: 3
       timeout: 5s
-      start_period: 10s
+      start_period: 60s
     restart: unless-stopped
     labels:
       - "autoheal=true"
@@ -484,7 +484,7 @@ services:
       interval: 10s
       retries: 3
       timeout: 5s
-      start_period: 10s
+      start_period: 60s
     restart: unless-stopped
     labels:
       - "autoheal=true"
@@ -523,7 +523,7 @@ services:
       interval: 10s
       retries: 3
       timeout: 5s
-      start_period: 10s
+      start_period: 60s
     restart: unless-stopped
     labels:
       - "autoheal=true"
@@ -655,7 +655,7 @@ services:
       interval: 10s
       retries: 3
       timeout: 5s
-      start_period: 30s
+      start_period: 60s
     labels:
       - "autoheal=true"
     depends_on:
