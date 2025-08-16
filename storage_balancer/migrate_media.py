@@ -27,10 +27,16 @@ from datetime import datetime
 from tqdm import tqdm
 
 # Load environment variables
-SOURCE = Path(os.getenv("SOURCE_PATH"))
-DEST = Path(os.getenv("DEST_PATH"))
-TARGET_UTILIZATION = float(os.getenv("TARGET_UTILIZATION", "80"))
 MEDIA_MOUNT_PREFIX = os.getenv("MEDIA_MOUNT_PREFIX", "/media/tc")
+raw_source = os.getenv("SOURCE_PATH")
+raw_dest = os.getenv("DEST_PATH")
+if MEDIA_MOUNT_PREFIX in raw_source:
+    raw_source = raw_source.replace(MEDIA_MOUNT_PREFIX, "/source_media")
+if MEDIA_MOUNT_PREFIX in raw_dest:
+    raw_dest = raw_dest.replace(MEDIA_MOUNT_PREFIX, "/source_media")
+SOURCE = Path(raw_source)
+DEST = Path(raw_dest)
+TARGET_UTILIZATION = float(os.getenv("TARGET_UTILIZATION", "80"))
 RADARR_URL = os.getenv("RADARR_URL")
 RADARR_API_KEY = os.getenv("RADARR_API_KEY")
 SONARR_URL = os.getenv("SONARR_URL")
@@ -201,7 +207,7 @@ def update_indexers(original_path: str, new_path: str):
         original_path (str): Original directory path.
         new_path (str): New directory path after migration.
     """
-    # Replace mount prefix for indexer compatibility
+    # Swap /source_media back to MEDIA_MOUNT_PREFIX for API updates
     o = original_path.replace("/source_media", MEDIA_MOUNT_PREFIX)
     n = new_path.replace("/source_media", MEDIA_MOUNT_PREFIX)
     if "/Movies" in original_path:
