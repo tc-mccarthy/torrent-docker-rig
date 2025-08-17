@@ -77,14 +77,12 @@ async function run () {
 
     // Start the main transcode queue (handles video jobs)
     const transcodeQueue = new TranscodeQueue({ maxMemoryComputeScore: max_memory_score, maxCpuComputeScore: max_cpu_score, pollDelay: 10000 });
-    // transcodeQueue.start();
+    transcodeQueue.start();
     global.transcodeQueue = transcodeQueue; // Make the queue globally accessible
 
     // Start the integrity queue (handles file integrity checks)
     const integrityQueue = new IntegrityQueue({ maxScore: concurrent_integrity_checks });
     integrityQueue.start();
-
-    importIndexerData();
 
     // Schedule filelist regeneration every 5 minutes
     cron.schedule('*/5 * * * *', () => {
@@ -99,6 +97,10 @@ async function run () {
     // Schedule queue update every day at midnight
     cron.schedule('0 0 * * *', () => {
       update_queue();
+    });
+
+    cron.schedule('0 4 * * *', () => {
+      importIndexerData();
     });
   } catch (e) {
     logger.error(e, { label: 'RUN ERROR', message: e.message });
