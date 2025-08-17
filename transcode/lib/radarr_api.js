@@ -1,4 +1,3 @@
-
 import { setTimeout as delay } from 'timers/promises';
 import async, { asyncify } from 'async';
 import memcached from './memcached';
@@ -272,4 +271,15 @@ export async function getMovieFilesByTag (tagName) {
     })
   );
   return allFiles;
+}
+
+/**
+ * Fetch all tags from Radarr.
+ *
+ * @returns {Promise<Array>} Array of tag objects
+ * @throws {Error} If the API call fails
+ */
+export async function getTags () {
+  // Radarr API: /api/v3/tag
+  return radarrRequest('/api/v3/tag');
 }

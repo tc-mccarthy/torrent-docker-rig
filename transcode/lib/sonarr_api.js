@@ -240,3 +240,14 @@ export async function getEpisodesByTag (tagName) {
 
   return allEpisodes;
 }
+
+/**
+ * Fetch all tags from Sonarr.
+ *
+ * @returns {Promise<Array>} Array of tag objects
+ * @throws {Error} If the API call fails
+ */
+export async function getTags () {
+  // Sonarr API: /api/v3/tag
+  return sonarrRequest('/api/v3/tag');
+}

@@ -324,6 +324,7 @@ services:
       - RADARR_API_KEY
       - SONARR_URL=https://${TORRENT_SSL_HOST}/sonarr
       - RADARR_URL=https://${TORRENT_SSL_HOST}/radarr
+      - TRANSCODE_STORAGE
     volumes:
       - ${TRANSCODE_STORAGE}:/source_media
       - ./transcode:/usr/app
