@@ -48,6 +48,17 @@ function convertKilobytes (valueInKB, targetUnit) {
  */
 export async function default_priority (video) {
   try {
+    // --- If the size is less than or equal to 1GB in kilobytes ---
+    if (convertKilobytes(video.probe.format.size, 'GB') <= 1) {
+      // If the video is HEVC encoded, set a slightly higher priority for quick remux
+      if (
+        video.probe.streams.find((s) => s.codec_type === 'video')
+          ?.codec_name === 'hevc'
+      ) {
+        return 90; // Give priority to videos that can be remuxed quickly
+      }
+    }
+
     const { path } = video;
     const type = path.includes('/Movies/') ? 'radarr' : 'sonarr';
     const match_path = path.replace('/source_media', '/media/tc');
@@ -58,7 +69,7 @@ export async function default_priority (video) {
         'priority-transcode'
       );
       if (movieFiles.some((file) => file.path === match_path)) {
-        return 90; // Set priority for movies that need transcoding
+        return 91; // Set priority for movies that need transcoding
       }
     }
 
@@ -68,18 +79,7 @@ export async function default_priority (video) {
         'priority-transcode'
       );
       if (seriesFiles.some((file) => file.path === match_path)) {
-        return 90; // Set priority for series that need transcoding
-      }
-    }
-
-    // --- If the size is less than or equal to 1GB in kilobytes ---
-    if (convertKilobytes(video.probe.format.size, 'GB') <= 1) {
-      // If the video is HEVC encoded, set a slightly higher priority for quick remux
-      if (
-        video.probe.streams.find((s) => s.codec_type === 'video')
-          ?.codec_name === 'hevc'
-      ) {
-        return 96; // Give priority to videos that can be remuxed quickly
+        return 91; // Set priority for series that need transcoding
       }
     }
 
