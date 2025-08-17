@@ -1,0 +1,123 @@
+import async, { asyncify } from 'async';
+import { getMovies, getTags as getRadarrTags } from './radarr_api';
+import { getSeries, getTags as getSonarrTags } from './sonarr_api';
+import File from '../models/files';
+import logger from './logger';
+
+/**
+ * @fileoverview Imports indexer data from Radarr and Sonarr, mapping tag IDs to names and updating File records in MongoDB.
+ * This module enriches File records with indexer metadata for movies and series, including tag names, monitored status, and IDs.
+ */
+
+/**
+ * Imports indexer data from Radarr and Sonarr, mapping tag IDs to names and updating File records in MongoDB.
+ *
+ * For each movie/series, builds a map of properties to store in indexer_data, including tag names.
+ * Updates File records where the path matches the movie/series directory.
+ *
+ * @async
+ * @function importIndexerData
+ * @returns {Promise<void>} Resolves when import is complete.
+ */
+export async function importIndexerData () {
+  try {
+    // --- RADARR ---
+    logger.info('Importing Radarr indexer data...');
+
+    // Fetch all Radarr tags using radarr_api.js
+    const radarrTagObjs = await getRadarrTags();
+
+    // Build an array of tag names indexed by tag ID for Radarr
+    /** @type {Array<string>} */
+    const radarrTagMap = [];
+    radarrTagObjs.forEach((tag) => {
+      radarrTagMap[tag.id] = tag.label;
+    });
+
+    // Fetch all movies from Radarr
+    const movies = await getMovies();
+
+    // Iterate over movies and update File records with indexer data (5 at a time)
+    await async.eachLimit(movies, 5, asyncify(async (movie) => {
+      /**
+       * @type {Object}
+       * @property {string} title - Movie title
+       * @property {number} year - Release year
+       * @property {number} tmdbId - TMDB ID
+       * @property {string} imdbId - IMDB ID
+       * @property {string} path - File path
+       * @property {Array<string|number>} tags - Tag names (or IDs if missing)
+       * @property {boolean} monitored - Monitored status
+       * @property {string} status - Movie status
+       */
+      const indexerData = {
+        title: movie.title,
+        overview: movie.overview,
+        tmdbId: movie.tmdbId,
+        imdbId: movie.imdbId,
+        folderName: movie.folderName.replace(process.env.TRANSCODE_STORAGE, '/source_media'),
+        tags: (movie.tags || []).map((id) => radarrTagMap[id] || id),
+        poster: movie.images?.find((img) => img.coverType === 'poster')?.remoteUrl || ''
+      };
+
+      // Update File records in MongoDB where record path includes movie folderName (case-insensitive)
+      await File.updateMany(
+        { path: { $regex: movie.folderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+        { $set: { indexer_data: indexerData } }
+      );
+
+      return true;
+    }));
+
+    // --- SONARR ---
+    logger.info('Importing Sonarr indexer data...');
+
+    // Fetch all Sonarr tags using sonarr_api.js
+    const sonarrTagObjs = await getSonarrTags();
+
+    // Build an array of tag names indexed by tag ID for Sonarr
+    /** @type {Array<string>} */
+    const sonarrTagMap = [];
+    sonarrTagObjs.forEach((tag) => {
+      sonarrTagMap[tag.id] = tag.label;
+    });
+
+    // Fetch all series from Sonarr
+    const seriesList = await getSeries();
+
+    // Iterate over series and update File records with indexer data (5 at a time)
+    await async.eachLimit(seriesList, 5, asyncify(async (series) => {
+      /**
+       * @type {Object}
+       * @property {string} title - Series title
+       * @property {number} tvdbId - TVDB ID
+       * @property {string} imdbId - IMDB ID
+       * @property {string} path - File path
+       * @property {Array<string|number>} tags - Tag names (or IDs if missing)
+       * @property {boolean} monitored - Monitored status
+       * @property {string} status - Series status
+       */
+      const indexerData = {
+        title: series.title,
+        tvdbId: series.tvdbId,
+        imdbId: series.imdbId,
+        folderName: series.path.replace(process.env.TRANSCODE_STORAGE, '/source_media'),
+        tags: (series.tags || []).map((id) => sonarrTagMap[id] || id),
+        poster: series.images?.find((img) => img.coverType === 'poster')?.remoteUrl || ''
+      };
+
+      // Update File records in MongoDB where record path includes series folderName (case-insensitive)
+      await File.updateMany(
+        { path: { $regex: series.folderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+        { $set: { indexer_data: indexerData } }
+      );
+
+      return true;
+    }));
+
+    logger.info('Indexer data import complete.');
+  } catch (err) {
+    // Log error and stack trace for debugging
+    logger.error('Indexer data import failed:', err);
+  }
+}

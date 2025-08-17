@@ -25,6 +25,7 @@ import generate_filelist from './lib/generate_filelist';
 import IntegrityQueue from './lib/integrityQueue';
 import TranscodeQueue from './lib/transcodeQueue';
 import update_status from './lib/update_status';
+import { importIndexerData } from './lib/indexer_data_import';
 
 const {
   max_memory_score, max_cpu_score,
@@ -82,6 +83,8 @@ async function run () {
     // Start the integrity queue (handles file integrity checks)
     const integrityQueue = new IntegrityQueue({ maxScore: concurrent_integrity_checks });
     integrityQueue.start();
+
+    importIndexerData();
 
     // Schedule filelist regeneration every 5 minutes
     cron.schedule('*/5 * * * *', () => {

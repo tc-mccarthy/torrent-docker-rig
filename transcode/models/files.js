@@ -96,6 +96,10 @@ const schema = new Schema(
       type: Number,
       required: false,
       default: 0
+    },
+    indexerData: {
+      type: Object,
+      required: false
     }
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
