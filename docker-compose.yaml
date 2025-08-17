@@ -488,10 +488,10 @@ services:
     depends_on:
       vpn:
         condition: service_healthy
-      radarr:
-        condition: service_healthy
-      sonarr:
-        condition: service_healthy
+      # radarr:
+      #   condition: service_healthy
+      # sonarr:
+      #   condition: service_healthy
     logging: 
       driver: "json-file"
       options: 
@@ -527,10 +527,10 @@ services:
     depends_on:
       vpn:
         condition: service_healthy
-      radarr:
-        condition: service_healthy
-      sonarr:
-        condition: service_healthy
+      # radarr:
+      #   condition: service_healthy
+      # sonarr:
+      #   condition: service_healthy
     logging: 
       driver: "json-file"
       options: 
@@ -615,10 +615,10 @@ services:
     depends_on:
       vpn:
         condition: service_healthy
-      sonarr:
-        condition: service_healthy
-      radarr:
-        condition: service_healthy
+      # sonarr:
+      #   condition: service_healthy
+      # radarr:
+      #   condition: service_healthy
       prowlarr:
         condition: service_healthy
       torrent:
