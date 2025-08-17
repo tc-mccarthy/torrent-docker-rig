@@ -2,6 +2,8 @@ import logger from './logger';
 import File from '../models/files';
 import calculateComputeScore from './calculateComputeScore';
 import getFileDiskUsage from './getFileDiskUsage';
+import { getEpisodesByTag } from './sonarr_api';
+import { getMovieFilesByTag } from './radarr_api';
 
 /**
  * Converts a value in kilobytes (KB) to another byte unit.
@@ -16,9 +18,9 @@ function convertKilobytes (valueInKB, targetUnit) {
     B: 1024, // 1 KB = 1024 Bytes
     KB: 1, // 1 KB = 1 KB
     MB: 1 / 1024, // 1 KB = 1/1024 MB
-    GB: 1 / (1024 ** 2), // 1 KB = 1/1,048,576 GB
-    TB: 1 / (1024 ** 3), // 1 KB = 1/1,073,741,824 TB
-    PB: 1 / (1024 ** 4) // 1 KB = 1/1,099,511,627,776 PB
+    GB: 1 / 1024 ** 2, // 1 KB = 1/1,048,576 GB
+    TB: 1 / 1024 ** 3, // 1 KB = 1/1,073,741,824 TB
+    PB: 1 / 1024 ** 4 // 1 KB = 1/1,099,511,627,776 PB
   };
 
   // Normalize the target unit to uppercase for consistent comparison
@@ -46,10 +48,37 @@ function convertKilobytes (valueInKB, targetUnit) {
  */
 export async function default_priority (video) {
   try {
+    const { path } = video;
+    const type = path.includes('/Movies/') ? 'radarr' : 'sonarr';
+    const match_path = path.replace('/source_media', '/media/tc');
+
+    if (type === 'radarr') {
+      // check if the file belongs to a movie in radarr with a priority-transcode tag
+      const movieFiles = await getMovieFilesByTag(
+        'priority-transcode'
+      );
+      if (movieFiles.some((file) => file.path === match_path)) {
+        return 90; // Set priority for movies that need transcoding
+      }
+    }
+
+    if (type === 'sonarr') {
+      // check if the file belongs to a series in sonarr
+      const seriesFiles = await getEpisodesByTag(
+        'priority-transcode'
+      );
+      if (seriesFiles.some((file) => file.path === match_path)) {
+        return 90; // Set priority for series that need transcoding
+      }
+    }
+
     // --- If the size is less than or equal to 1GB in kilobytes ---
     if (convertKilobytes(video.probe.format.size, 'GB') <= 1) {
       // If the video is HEVC encoded, set a slightly higher priority for quick remux
-      if (video.probe.streams.find((s) => s.codec_type === 'video')?.codec_name === 'hevc') {
+      if (
+        video.probe.streams.find((s) => s.codec_type === 'video')
+          ?.codec_name === 'hevc'
+      ) {
         return 96; // Give priority to videos that can be remuxed quickly
       }
     }
@@ -115,7 +144,8 @@ export default async function upsert_video (video) {
     // --- Priority logic ---
     // If a priority is already set on the video or file and it's less than 90, preserve it.
     // Otherwise, use the computed default priority.
-    const preset_priority = video.sortFields?.priority || file?.sortFields?.priority;
+    const preset_priority =
+      video.sortFields?.priority || file?.sortFields?.priority;
     let priority = await default_priority(video);
     if (preset_priority && preset_priority < 90) {
       priority = preset_priority;

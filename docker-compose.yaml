@@ -320,6 +320,10 @@ services:
       - ENV=${ENV:-prod}
       - TMDB_READ_ACCESS_TOKEN
       - COMPUTE_SCORE_FACTOR
+      - SONARR_API_KEY
+      - RADARR_API_KEY
+      - SONARR_URL=https://${TORRENT_SSL_HOST}/sonarr
+      - RADARR_URL=https://${TORRENT_SSL_HOST}/radarr
     volumes:
       - ${TRANSCODE_STORAGE}:/source_media
       - ./transcode:/usr/app
