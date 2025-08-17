@@ -404,12 +404,12 @@ services:
       - ${SONARR_STORAGE}:${SONARR_STORAGE}
       - ./sonarr:/config
       - ./scripts:/scripts
-    healthcheck:
-      test: bash /scripts/arr-health-check
-      interval: 10s
-      retries: 3
-      timeout: 5s
-      start_period: 60s
+    # healthcheck:
+    #   test: bash /scripts/arr-health-check
+    #   interval: 10s
+    #   retries: 3
+    #   timeout: 5s
+    #   start_period: 60s
     restart: unless-stopped
     labels:
       - "autoheal=true"
@@ -440,12 +440,12 @@ services:
       - ${RADARR_STORAGE}:${RADARR_STORAGE}
       - ./radarr:/config
       - ./scripts:/scripts
-    healthcheck:
-      test: bash /scripts/arr-health-check
-      interval: 10s
-      retries: 3
-      timeout: 5s
-      start_period: 60s
+    # healthcheck:
+    #   test: bash /scripts/arr-health-check
+    #   interval: 10s
+    #   retries: 3
+    #   timeout: 5s
+    #   start_period: 60s
     restart: unless-stopped
     labels:
       - "autoheal=true"
