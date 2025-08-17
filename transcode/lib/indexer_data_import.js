@@ -60,6 +60,7 @@ export async function importIndexerData () {
         poster: movie.images?.find((img) => img.coverType === 'poster')?.remoteUrl || ''
       };
 
+      logger.info(`Updating indexer data for movie: ${movie.title} (${movie.tmdbId})`, { indexerData });
       // Update File records in MongoDB where record path includes movie folderName (case-insensitive)
       await File.updateMany(
         { path: { $regex: movie.folderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
@@ -105,6 +106,8 @@ export async function importIndexerData () {
         tags: (series.tags || []).map((id) => sonarrTagMap[id] || id),
         poster: series.images?.find((img) => img.coverType === 'poster')?.remoteUrl || ''
       };
+
+      logger.info(`Updating indexer data for series: ${series.title} (${series.tvdbId})`, { indexerData });
 
       // Update File records in MongoDB where record path includes series folderName (case-insensitive)
       await File.updateMany(
