@@ -63,9 +63,10 @@ export async function importIndexerData () {
       };
 
       logger.info(`Updating indexer data for movie: ${movie.title} (${movie.tmdbId})`, { indexerData, path: { $regex: indexerData.folderName, $options: 'i' }});
-      // Update File records in MongoDB where record path includes movie folderName (case-insensitive)
+      // Update File records in MongoDB where record path starts with movie folderName (case-insensitive, escapes special chars)
+      const escapedFolderName = indexerData.folderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       await File.updateMany(
-        { path: { $regex: indexerData.folderName, $options: 'i' } },
+        { path: { $regex: `^${escapedFolderName}`, $options: 'i' } },
         { $set: { indexerData } }
       );
 
@@ -111,9 +112,10 @@ export async function importIndexerData () {
 
       logger.info(`Updating indexer data for series: ${series.title} (${series.tvdbId})`, { indexerData });
 
-      // Update File records in MongoDB where record path includes series folderName (case-insensitive)
+      // Update File records in MongoDB where record path starts with series folderName (case-insensitive, escapes special chars)
+      const escapedSeriesFolderName = indexerData.folderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       await File.updateMany(
-        { path: { $regex: indexerData.folderName, $options: 'i' } },
+        { path: { $regex: `^${escapedSeriesFolderName}`, $options: 'i' } },
         { $set: { indexerData } }
       );
 
