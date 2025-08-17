@@ -404,21 +404,17 @@ services:
       - ${SONARR_STORAGE}:${SONARR_STORAGE}
       - ./sonarr:/config
       - ./scripts:/scripts
-    healthcheck:
-      test: bash /scripts/arr-health-check
-      interval: 10s
-      retries: 3
-      timeout: 5s
-      start_period: 60s
+    # healthcheck:
+    #   test: bash /scripts/arr-health-check
+    #   interval: 10s
+    #   retries: 3
+    #   timeout: 5s
+    #   start_period: 60s
     restart: unless-stopped
     labels:
       - "autoheal=true"
     depends_on:
-      vpn:
-        condition: service_healthy
       prowlarr:
-        condition: service_healthy
-      torrent:
         condition: service_healthy
     logging: 
       driver: "json-file"
@@ -444,21 +440,17 @@ services:
       - ${RADARR_STORAGE}:${RADARR_STORAGE}
       - ./radarr:/config
       - ./scripts:/scripts
-    healthcheck:
-      test: bash /scripts/arr-health-check
-      interval: 10s
-      retries: 3
-      timeout: 5s
-      start_period: 60s
+    # healthcheck:
+    #   test: bash /scripts/arr-health-check
+    #   interval: 10s
+    #   retries: 3
+    #   timeout: 5s
+    #   start_period: 60s
     restart: unless-stopped
     labels:
       - "autoheal=true"
     depends_on:
-      vpn:
-        condition: service_healthy
       prowlarr:
-        condition: service_healthy
-      torrent:
         condition: service_healthy
     logging: 
       driver: "json-file"
