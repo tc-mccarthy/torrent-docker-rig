@@ -66,7 +66,7 @@ export async function importIndexerData () {
       // Update File records in MongoDB where record path includes movie folderName (case-insensitive)
       await File.updateMany(
         { path: { $regex: indexerData.folderName, $options: 'i' } },
-        { $set: { indexer_data: indexerData } }
+        { $set: { indexerData } }
       );
 
       return true;
@@ -114,7 +114,7 @@ export async function importIndexerData () {
       // Update File records in MongoDB where record path includes series folderName (case-insensitive)
       await File.updateMany(
         { path: { $regex: indexerData.folderName, $options: 'i' } },
-        { $set: { indexer_data: indexerData } }
+        { $set: { indexerData } }
       );
 
       return true;
