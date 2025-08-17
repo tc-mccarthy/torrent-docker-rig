@@ -77,7 +77,7 @@ async function run () {
 
     // Start the main transcode queue (handles video jobs)
     const transcodeQueue = new TranscodeQueue({ maxMemoryComputeScore: max_memory_score, maxCpuComputeScore: max_cpu_score, pollDelay: 10000 });
-    transcodeQueue.start();
+    // transcodeQueue.start();
     global.transcodeQueue = transcodeQueue; // Make the queue globally accessible
 
     // Start the integrity queue (handles file integrity checks)
