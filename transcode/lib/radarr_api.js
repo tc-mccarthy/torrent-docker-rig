@@ -173,7 +173,7 @@ export async function getMoviesByTag (tagName) {
 
     // Try to acquire lock
     const gotLock = await memcached.get(lockKey, 'locked', lockTtl);
-    if (!gotLock) {
+    if (gotLock) {
       // Wait for cache to be built by another invocation
       let waited = 0;
       while (waited < lockTtl * 1000) {
