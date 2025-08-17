@@ -65,7 +65,7 @@ export async function importIndexerData () {
       logger.info(`Updating indexer data for movie: ${movie.title} (${movie.tmdbId})`, { indexerData });
       // Update File records in MongoDB where record path includes movie folderName (case-insensitive)
       await File.updateMany(
-        { path: { $regex: movie.folderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+        { path: { $regex: indexerData.folderName, $options: 'i' } },
         { $set: { indexer_data: indexerData } }
       );
 
@@ -113,7 +113,7 @@ export async function importIndexerData () {
 
       // Update File records in MongoDB where record path includes series folderName (case-insensitive)
       await File.updateMany(
-        { path: { $regex: series.folderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+        { path: { $regex: indexerData.folderName, $options: 'i' } },
         { $set: { indexer_data: indexerData } }
       );
 
