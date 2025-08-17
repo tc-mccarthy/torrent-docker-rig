@@ -2,8 +2,8 @@ import logger from './logger';
 import File from '../models/files';
 import calculateComputeScore from './calculateComputeScore';
 import getFileDiskUsage from './getFileDiskUsage';
-import { getEpisodesByTag } from './sonarr_api';
-import { getMovieFilesByTag } from './radarr_api';
+// import { getEpisodesByTag } from './sonarr_api';
+// import { getMovieFilesByTag } from './radarr_api';
 
 /**
  * Converts a value in kilobytes (KB) to another byte unit.
