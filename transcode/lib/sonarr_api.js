@@ -154,7 +154,7 @@ export async function getSeriesByTag (tagName) {
     }
 
     // Try to acquire lock
-    const gotLock = await memcached.get(lockKey, 'locked', lockTtl);
+    const gotLock = await memcached.get(lockKey);
 
     if (gotLock) {
     // Wait for cache to be built by another invocation
