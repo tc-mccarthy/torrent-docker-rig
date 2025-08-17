@@ -188,7 +188,7 @@ export async function getMoviesByTag (tagName) {
     }
 
     await memcached.set(lockKey, 'locked', lockTtl);
-    
+
     // Build cache
     const tags = await radarrRequest('/api/v3/tag');
     const tagObj = tags.find((t) => t.label === tagName);
