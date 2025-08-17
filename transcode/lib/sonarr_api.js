@@ -154,9 +154,9 @@ export async function getSeriesByTag (tagName) {
     }
 
     // Try to acquire lock
-    const gotLock = await memcached.add(lockKey, 'locked', lockTtl);
+    const gotLock = await memcached.get(lockKey, 'locked', lockTtl);
 
-    if (!gotLock) {
+    if (gotLock) {
     // Wait for cache to be built by another invocation
       let waited = 0;
       while (waited < lockTtl * 1000) {
@@ -171,7 +171,7 @@ export async function getSeriesByTag (tagName) {
     }
 
     // Build cache
-
+    await memcached.set(lockKey, 'locked', lockTtl);
     const tags = await sonarrRequest('/api/v3/tag');
     const tagObj = tags.find((t) => t.label === tagName);
     if (!tagObj) {
