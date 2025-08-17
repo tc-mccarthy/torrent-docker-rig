@@ -59,29 +59,29 @@ export async function default_priority (video) {
       }
     }
 
-    const { path } = video;
-    const type = path.includes('/Movies/') ? 'radarr' : 'sonarr';
-    const match_path = path.replace('/source_media', '/media/tc');
+    // const { path } = video;
+    // const type = path.includes('/Movies/') ? 'radarr' : 'sonarr';
+    // const match_path = path.replace('/source_media', '/media/tc');
 
-    if (type === 'radarr') {
-      // check if the file belongs to a movie in radarr with a priority-transcode tag
-      const movieFiles = await getMovieFilesByTag(
-        'priority-transcode'
-      );
-      if (movieFiles.some((file) => file.path === match_path)) {
-        return 91; // Set priority for movies that need transcoding
-      }
-    }
+    // if (type === 'radarr') {
+    //   // check if the file belongs to a movie in radarr with a priority-transcode tag
+    //   const movieFiles = await getMovieFilesByTag(
+    //     'priority-transcode'
+    //   );
+    //   if (movieFiles.some((file) => file.path === match_path)) {
+    //     return 91; // Set priority for movies that need transcoding
+    //   }
+    // }
 
-    if (type === 'sonarr') {
-      // check if the file belongs to a series in sonarr
-      const seriesFiles = await getEpisodesByTag(
-        'priority-transcode'
-      );
-      if (seriesFiles.some((file) => file.path === match_path)) {
-        return 91; // Set priority for series that need transcoding
-      }
-    }
+    // if (type === 'sonarr') {
+    //   // check if the file belongs to a series in sonarr
+    //   const seriesFiles = await getEpisodesByTag(
+    //     'priority-transcode'
+    //   );
+    //   if (seriesFiles.some((file) => file.path === match_path)) {
+    //     return 91; // Set priority for series that need transcoding
+    //   }
+    // }
 
     // --- Check disk utilization for the volume containing the video file ---
     // If the file path is available, determine the mount point and check usage
