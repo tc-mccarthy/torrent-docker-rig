@@ -37,6 +37,8 @@ export async function importIndexerData () {
     // Fetch all movies from Radarr
     const movies = await getMovies();
 
+    logger.info('Radarr list captured, indexing...');
+
     // Iterate over movies and update File records with indexer data (5 at a time)
     await async.eachLimit(movies, 5, asyncify(async (movie) => {
       /**
