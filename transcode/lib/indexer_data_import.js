@@ -62,7 +62,7 @@ export async function importIndexerData () {
         poster: movie.images?.find((img) => img.coverType === 'poster')?.remoteUrl || ''
       };
 
-      logger.info(`Updating indexer data for movie: ${movie.title} (${movie.tmdbId})`, { indexerData });
+      logger.info(`Updating indexer data for movie: ${movie.title} (${movie.tmdbId})`, { indexerData, path: { $regex: indexerData.folderName, $options: 'i' }});
       // Update File records in MongoDB where record path includes movie folderName (case-insensitive)
       await File.updateMany(
         { path: { $regex: indexerData.folderName, $options: 'i' } },
