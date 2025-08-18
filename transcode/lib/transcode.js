@@ -107,7 +107,7 @@ export default function transcode (file) {
                 if (runningJobIndex !== -1) {
                   Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], {
                     percent,
-                    eta: est_completed_timestamp,
+                    est_completed_timestamp,
                     time_remaining,
                     action: 'staging'
                   });
@@ -275,7 +275,6 @@ export default function transcode (file) {
                 Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], {
                   action: 'finalizing',
                   percent: 100,
-                  eta: null,
                   time_remaining: null
                 });
               }
