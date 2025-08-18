@@ -6,6 +6,10 @@ const transcode_config = {
   application_version: packageInfo.version,
   sources: [
     {
+      path: '/source_media/Barton/Movies',
+      scratch: '/source_media/transcode_scratch'
+    },
+    {
       path: '/source_media/Drax/Movies',
       scratch: '/source_media/transcode_scratch'
     },
