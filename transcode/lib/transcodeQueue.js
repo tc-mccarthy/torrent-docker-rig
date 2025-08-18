@@ -170,6 +170,13 @@ export default class TranscodeQueue {
    * Honors priority order and introduces starvation detection for blocked jobs.
    */
   async scheduleJobs () {
+    // Block scheduling if any job is in 'staging' or 'finalizing' action
+    const blockingJob = this.runningJobs.find((j) => j.action === 'staging' || j.action === 'finalizing');
+    if (blockingJob) {
+      logger.debug(`[QUEUE] Blocking new jobs: job ${blockingJob._id} is in '${blockingJob.action}' stage.`);
+      return;
+    }
+
     const availableMemory = this.getAvailableMemoryCompute();
     const availableCpu = this.getAvailableCpuCompute();
     const availableCompute = this.getAvailableCompute();
