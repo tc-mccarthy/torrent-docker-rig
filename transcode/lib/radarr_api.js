@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'timers/promises';
 import async, { asyncify } from 'async';
+import { Agent } from 'undici';
 import memcached from './memcached';
 import logger from './logger';
 
@@ -26,6 +27,40 @@ if (!RADARR_API_KEY) {
 }
 
 /**
+ * TCP keep-alive agent for Radarr API requests.
+ * Tune via RADARR_KEEPALIVE_MS env var. Default is no keep-alive (fresh TCP per request).
+ */
+const KEEPALIVE_MS = Number(process.env.RADARR_KEEPALIVE_MS ?? '0');
+const RADARR_AGENT = new Agent(
+  KEEPALIVE_MS > 0
+    ? { keepAliveTimeout: KEEPALIVE_MS, keepAliveMaxTimeout: KEEPALIVE_MS }
+    : { keepAliveTimeout: 0, keepAliveMaxTimeout: 0 }
+);
+
+/**
+ * Builds a brand-new, no-keep-alive agent for retrying socket errors.
+ * @returns {Agent} New undici Agent with keep-alive disabled
+ */
+function freshNoKeepAliveAgent () {
+  return new Agent({ keepAliveTimeout: 0, keepAliveMaxTimeout: 0 });
+}
+
+/**
+ * Detects transient socket errors for retry logic.
+ * @param {Error} err - Error object
+ * @returns {boolean} True if error is a transient socket error
+ */
+function isTransientSocketError (err) {
+  const s = String(err?.message || err);
+  return (
+    s.includes('UND_ERR_SOCKET') ||
+    s.includes('und_sock_err') ||
+    s.includes('ECONNRESET') ||
+    s.includes('EPIPE')
+  );
+}
+
+/**
  * Helper to build Radarr API URLs.
  * @param {string} path - API endpoint path (e.g., '/api/v3/movie')
  * @returns {string} Full URL to the Radarr API endpoint
@@ -47,39 +82,51 @@ function buildHeaders () {
 }
 
 /**
- * Utility function to make Radarr API requests.
+ * Makes a Radarr API request with socket error retry logic and keep-alive tuning.
  * Handles endpoint, method, body, and error handling.
  *
  * @param {string} endpoint - API endpoint path (e.g., '/api/v3/movie')
  * @param {string} [method='GET'] - HTTP method
  * @param {Object|null} [body=null] - Request body (for POST/PUT)
  * @returns {Promise<Object>} Parsed JSON response
- * @throws {Error} If the request fails
- */
-/**
- * Makes a Radarr API request with a 5-minute timeout using AbortController.
- * @param {string} endpoint - API endpoint path
- * @param {string} [method='GET'] - HTTP method
- * @param {Object|null} [body=null] - Request body
- * @returns {Promise<Object>} Parsed JSON response
- * @throws {Error} If the request fails or times out
+ * @throws {Error} If the request fails or a socket error occurs
  */
 async function radarrRequest (endpoint, method = 'GET', body = null) {
+  const url = buildUrl(endpoint);
   const options = {
     method,
-    headers: buildHeaders()
+    headers: buildHeaders(),
+    dispatcher: RADARR_AGENT
   };
-  if (body) {
-    options.body = JSON.stringify(body);
-  }
-  const url = buildUrl(endpoint);
+  if (body) options.body = JSON.stringify(body);
+
   logger.info(`[Radarr] Request: ${method} ${url}`);
-  const res = await fetch(url, options);
-  if (!res.ok) {
-    throw new Error(`Radarr API request failed: ${res.status} ${res.statusText} (${endpoint})`);
+
+  /**
+   * Inner fetch function to allow swapping dispatcher on retry.
+   * @param {Object} opts - Fetch options
+   * @returns {Promise<Object>} Parsed JSON response
+   */
+  async function doFetch (opts) {
+    const res = await fetch(url, opts);
+    if (!res.ok) {
+      throw new Error(`Radarr API request failed: ${res.status} ${res.statusText} (${endpoint})`);
+    }
+    // Fully drain + parse before returning (releases the socket)
+    return res.json();
   }
-  logger.info(`[Radarr] Complete: ${method} ${url}`);
-  return res.json();
+
+  try {
+    return doFetch(options);
+  } catch (err) {
+    // One-shot retry on socket-level failures, using a brand-new no-keep-alive agent
+    if (isTransientSocketError(err)) {
+      logger.warn(`[Radarr] Socket error, retrying once with fresh agent: ${err}`);
+      const retryOpts = { ...options, dispatcher: freshNoKeepAliveAgent() };
+      return doFetch(retryOpts);
+    }
+    throw err;
+  }
 }
 
 /**
@@ -147,7 +194,7 @@ export async function getMoviesByTag (tagName) {
 
     await memcached.set(lockKey, 'locked', lockTtl);
 
-    // Build cache
+    // Build cache: fetch all tags, find tag ID, filter movies by tag
     const tags = await radarrRequest('/api/v3/tag');
     const tagObj = tags.find((t) => t.label === tagName);
     if (!tagObj) {
