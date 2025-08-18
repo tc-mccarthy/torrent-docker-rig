@@ -26,6 +26,7 @@ import IntegrityQueue from './lib/integrityQueue';
 import TranscodeQueue from './lib/transcodeQueue';
 import update_status from './lib/update_status';
 import { importIndexerData } from './lib/indexer_data_import';
+import assessPriority from './lib/assess_priority';
 
 const {
   max_memory_score, max_cpu_score,
@@ -96,7 +97,14 @@ async function run () {
 
     // Schedule queue update every day at midnight
     cron.schedule('0 0 * * *', () => {
-      update_queue().then(() => importIndexerData());
+      update_queue();
+    });
+
+    // update indexer data every hour
+    cron.schedule('0 * * * *', () => {
+      importIndexerData().then(() => assessPriority()).catch((err) => {
+        logger.error('Failed to import indexer data:', err);
+      });
     });
   } catch (e) {
     logger.error(e, { label: 'RUN ERROR', message: e.message });
