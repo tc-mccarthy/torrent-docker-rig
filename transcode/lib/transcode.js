@@ -217,11 +217,22 @@ export default function transcode (file) {
         .on('end', async () => {
           try {
             await wait(5);
+
             if (!fs.existsSync(scratch_file)) {
               throw new Error(`Scratch file ${scratch_file} not found after transcode complete.`);
             }
 
             await moveFile(scratch_file, dest_file);
+
+            // Delete stage_file if it exists
+            if (stage_file && fs.existsSync(stage_file)) {
+              try {
+                await fs.promises.unlink(stage_file);
+                logger.info(`Deleted stage_file after transcode: ${stage_file}`);
+              } catch (stageDelErr) {
+                logger.warn(`Failed to delete stage_file: ${stage_file}`, stageDelErr);
+              }
+            }
 
             await fs.promises.utimes(dest_file, new Date(), new Date());
             global.processed_files_delta += 1;
@@ -251,7 +262,17 @@ export default function transcode (file) {
         .on('error', async (err, stdout, stderr) => {
           logger.error(err, { label: 'Cannot process video', stdout, stderr });
           fs.appendFileSync('/usr/app/logs/ffmpeg.log', JSON.stringify({ error: err.message, stdout, stderr, ffmpeg_cmd, trace: err.stack }, null, 4));
+
           await trash(scratch_file, false);
+          // Delete stage_file if it exists
+          if (stage_file && fs.existsSync(stage_file)) {
+            try {
+              await fs.promises.unlink(stage_file);
+              logger.info(`Deleted stage_file after error: ${stage_file}`);
+            } catch (stageDelErr) {
+              logger.warn(`Failed to delete stage_file: ${stage_file}`, stageDelErr);
+            }
+          }
 
           // FFmpeg error 251 typically means a hardware decoder failed to initialize (e.g., unsupported GPU or corrupted driver).
           // Disabling hardware decode ensures fallback to software on retry.
