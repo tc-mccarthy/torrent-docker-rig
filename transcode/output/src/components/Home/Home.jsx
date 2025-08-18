@@ -173,7 +173,7 @@ function Home () {
           {data && (
             <div className="widget">
               <strong>File Progress</strong>
-              <LinearProgressWithLabel value={data.percent} />
+              <LinearProgressWithLabel value={+data.percent} />
             </div>
           )}
         </div>
@@ -228,7 +228,7 @@ function Home () {
         </div>
       )}
 
-      {data && (
+      {data?.size && (
         <div className="flex">
           <div className="widget">
             <strong>Original Size</strong>
