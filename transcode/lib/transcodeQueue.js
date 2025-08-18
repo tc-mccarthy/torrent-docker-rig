@@ -126,7 +126,7 @@ export default class TranscodeQueue {
         if (memUsedPercent > 90) penalty += this.maxMemoryComputeScore / 2;
 
         this.memoryPenalty = penalty;
-        console.log(`[ResourceMonitor] Memory Penalty: ${penalty.toFixed(2)} | Avg Mem Used: ${memUsedPercent.toFixed(1)}%`);
+        logger.debug(`[ResourceMonitor] Memory Penalty: ${penalty.toFixed(2)} | Avg Mem Used: ${memUsedPercent.toFixed(1)}%`);
       } catch (err) {
         console.error('[ResourceMonitor] Memory Error:', err);
       }
@@ -157,7 +157,7 @@ export default class TranscodeQueue {
         if (avgCpuRatio > 6.0) penalty += this.maxCpuComputeScore / 2;
 
         this.cpuPenalty = penalty;
-        console.log(`[ResourceMonitor] CPU Penalty: ${penalty} | Avg Load Ratio (10 min): ${avgCpuRatio.toFixed(2)}x per core`);
+        logger.debug(`[ResourceMonitor] CPU Penalty: ${penalty} | Avg Load Ratio (10 min): ${avgCpuRatio.toFixed(2)}x per core`);
       } catch (err) {
         console.error('[ResourceMonitor] CPU Error:', err);
       }

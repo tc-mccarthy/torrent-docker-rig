@@ -72,23 +72,9 @@ async function radarrRequest (endpoint, method = 'GET', body = null) {
   if (body) {
     options.body = JSON.stringify(body);
   }
-  // Set up a 5-minute timeout using AbortController
-  const controller = new AbortController();
-  options.signal = controller.signal;
-  const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
   const url = buildUrl(endpoint);
   logger.info(`[Radarr] Request: ${method} ${url}`);
-  let res;
-  try {
-    res = await fetch(url, options);
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error(`Radarr API request timed out after 5 minutes (${endpoint})`);
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-  }
+  const res = await fetch(url, options);
   if (!res.ok) {
     throw new Error(`Radarr API request failed: ${res.status} ${res.statusText} (${endpoint})`);
   }
