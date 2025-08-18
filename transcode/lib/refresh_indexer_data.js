@@ -1,4 +1,4 @@
-import importIndexerData from './indexer_data_import';
+import {importIndexerData} from './indexer_data_import';
 import assessPriority from './assess_priority';
 import logger from './logger';
 /**
