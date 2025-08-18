@@ -143,7 +143,7 @@ export default class TranscodeQueue {
       try {
         const { loadPercent, loadRatio } = await getCpuLoadPercentage();
 
-        logger.info({ loadPercent, loadRatio }, { label: `[ResourceMonitor] CPU Load Ratio` });
+        logger.debug({ loadPercent, loadRatio }, { label: `[ResourceMonitor] CPU Load Ratio` });
 
         this.cpuUsageSamples.push(loadRatio);
         if (this.cpuUsageSamples.length > this.maxResourceSamples) {
