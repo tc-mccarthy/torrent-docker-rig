@@ -84,41 +84,53 @@ export default function transcode (file) {
       // If stage_file is set, copy the source file to stage_file and use stage_file for transcoding
       if (stage_file) {
         try {
-          logger.info(`Copying source file to stage_file: ${stage_file}`);
           const totalSize = (await stat(file)).size;
-          let copied = 0;
-          const startTime = Date.now();
-          await new Promise((resolve, reject) => {
-            const readStream = fs.createReadStream(file);
-            const writeStream = fs.createWriteStream(stage_file);
-            readStream.on('data', (chunk) => {
-              copied += chunk.length;
-              const percent = ((copied / totalSize) * 100).toFixed(2);
-              const elapsed = (Date.now() - startTime) / 1000;
-              const pct_per_second = percent / elapsed;
-              const seconds_pct = pct_per_second > 0 ? 1 / pct_per_second : Infinity;
-              const pct_remaining = 100 - percent;
-              const est_completed_seconds = pct_remaining * seconds_pct;
-              const est_completed_timestamp = Date.now() + (est_completed_seconds * 1000);
-              const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
-              logger.info(`${stage_file} copy progress: ${percent}% (${copied}/${totalSize} bytes)`);
-              if (global.transcodeQueue && video_record && video_record._id) {
-                const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
-                if (runningJobIndex !== -1) {
-                  Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], {
-                    percent,
-                    est_completed_timestamp,
-                    time_remaining,
-                    action: 'staging'
-                  });
+          let skipCopy = false;
+          if (fs.existsSync(stage_file)) {
+            const stageStats = await stat(stage_file);
+            if (stageStats.size === totalSize) {
+              logger.info(`Stage file already exists and matches source size (${totalSize} bytes). Skipping copy.`);
+              skipCopy = true;
+            } else {
+              logger.info(`Stage file exists but size mismatch (source: ${totalSize}, stage: ${stageStats.size}). Re-copying.`);
+            }
+          }
+          if (!skipCopy) {
+            logger.info(`Copying source file to stage_file: ${stage_file}`);
+            let copied = 0;
+            const startTime = Date.now();
+            await new Promise((resolve, reject) => {
+              const readStream = fs.createReadStream(file);
+              const writeStream = fs.createWriteStream(stage_file);
+              readStream.on('data', (chunk) => {
+                copied += chunk.length;
+                const percent = ((copied / totalSize) * 100).toFixed(2);
+                const elapsed = (Date.now() - startTime) / 1000;
+                const pct_per_second = percent / elapsed;
+                const seconds_pct = pct_per_second > 0 ? 1 / pct_per_second : Infinity;
+                const pct_remaining = 100 - percent;
+                const est_completed_seconds = pct_remaining * seconds_pct;
+                const est_completed_timestamp = Date.now() + (est_completed_seconds * 1000);
+                const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
+                logger.info(`${stage_file} copy progress: ${percent}% (${copied}/${totalSize} bytes)`);
+                if (global.transcodeQueue && video_record && video_record._id) {
+                  const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
+                  if (runningJobIndex !== -1) {
+                    Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], {
+                      percent,
+                      est_completed_timestamp,
+                      time_remaining,
+                      action: 'staging'
+                    });
+                  }
                 }
-              }
+              });
+              readStream.on('error', reject);
+              writeStream.on('error', reject);
+              writeStream.on('close', resolve);
+              readStream.pipe(writeStream);
             });
-            readStream.on('error', reject);
-            writeStream.on('error', reject);
-            writeStream.on('close', resolve);
-            readStream.pipe(writeStream);
-          });
+          }
           file = stage_file;
         } catch (copyErr) {
           logger.error(copyErr, { label: 'STAGE FILE COPY ERROR', file, stage_file });
