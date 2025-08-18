@@ -27,6 +27,8 @@ export default async function assessPriority () {
   const files = await File.find(query);
   let updatedCount = 0;
 
+  logger.info(`Assessing priority for ${files.length} files with priority >= 90`);
+
   // Use async.eachLimit to process files concurrently (limit 5 at a time)
   await async.eachLimit(
     files,
@@ -53,6 +55,7 @@ export default async function assessPriority () {
     })
   );
 
+  logger.info(`Finished assessing priority for ${files.length} files with priority >= 90. Updated ${updatedCount} files.`);
   // Return the number of updated documents
   return updatedCount;
 }
