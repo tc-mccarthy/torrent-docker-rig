@@ -138,9 +138,11 @@ export default function transcode (file) {
                     const est_completed_seconds = pct_remaining * seconds_pct;
                     const est_completed_timestamp = Date.now() + (est_completed_seconds * 1000);
                     const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
+                    // Calculate currentKbps (kilobits per second)
+                    const currentKbps = elapsed > 0 ? ((copied * 8) / 1024) / elapsed : 0;
                     // Log progress only if percent changed
                     if (percent !== lastPercent) {
-                      logger.info(`${stage_file} copy progress: ${percent}% (${copied}/${totalSize} bytes)`);
+                      logger.info(`${stage_file} copy progress: ${percent}% (${copied}/${totalSize} bytes, ${currentKbps.toFixed(2)} kbps)`);
                       lastPercent = percent;
                     }
                     // Update running job status for UI/monitoring
@@ -151,7 +153,9 @@ export default function transcode (file) {
                           percent,
                           est_completed_timestamp,
                           time_remaining,
-                          action: 'staging'
+                          action: 'staging',
+                          currentKbps,
+                          startTime
                         });
                       }
                     }
@@ -169,7 +173,8 @@ export default function transcode (file) {
             const percent = 100;
             const time_remaining = formatSecondsToHHMMSS(0);
             const est_completed_timestamp = Date.now();
-            logger.info(`${stage_file} copy complete: 100% (${totalSize}/${totalSize} bytes)`);
+            const currentKbps = ((totalSize * 8) / 1024) / ((est_completed_timestamp - startTime) / 1000);
+            logger.info(`${stage_file} copy complete: 100% (${totalSize}/${totalSize} bytes, ${currentKbps.toFixed(2)} kbps)`);
             if (global.transcodeQueue && video_record && video_record._id) {
               const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
               if (runningJobIndex !== -1) {
@@ -177,7 +182,9 @@ export default function transcode (file) {
                   percent,
                   est_completed_timestamp,
                   time_remaining,
-                  action: 'staging'
+                  action: 'staging',
+                  currentKbps,
+                  startTime
                 });
               }
             }
