@@ -32,9 +32,9 @@ export default function Nav ({ data, setDataSelection, dataSelection, availableC
               <button type="button" className={dataSelection === index && 'active'} onClick={() => setDataSelection(index)}>
                 {item.indexerData?.poster && (<div className="poster"><img src={item.indexerData.poster} alt={item.indexerData.title} /></div>)}
                 <div>
-                  {item.indexerData?.title || display_file_name(item.path)}
-                  {' '}
                   <strong>
+                    {item.indexerData?.title || display_file_name(item.path)}
+                    {' '}
                     (
                     {Math.round(item.percent)}
                     %)

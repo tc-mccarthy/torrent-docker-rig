@@ -59,7 +59,7 @@ export async function default_priority (video) {
       }
     }
 
-    if (video.indexer_data?.tags?.includes('priority-transcode')) {
+    if (video.indexerData?.tags?.includes('priority-transcode')) {
       // If the video has a priority-transcode tag, set high priority
       return 91;
     }
