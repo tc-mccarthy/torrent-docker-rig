@@ -358,17 +358,68 @@ export default function transcode (file) {
             }
 
             // Finalizing step: move scratch_file to dest_file
+            // Track progress of scratch_file -> dest_file move
+            const moveStartTime = Date.now();
+            let moveInterval;
+            const scratchSize = (await stat(scratch_file)).size;
+            if (scratchSize > 0) {
+              moveInterval = setInterval(() => {
+                try {
+                  if (fs.existsSync(dest_file)) {
+                    const destStats = fs.statSync(dest_file);
+                    const copied = destStats.size;
+                    const percent = Math.min(((copied / scratchSize) * 100), 100).toFixed(2);
+                    const elapsed = (Date.now() - moveStartTime) / 1000;
+                    const pct_per_second = percent / elapsed;
+                    const seconds_pct = pct_per_second > 0 ? 1 / pct_per_second : Infinity;
+                    const pct_remaining = 100 - percent;
+                    const est_completed_seconds = pct_remaining * seconds_pct;
+                    const est_completed_timestamp = Date.now() + (est_completed_seconds * 1000);
+                    const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
+                    const currentKbps = elapsed > 0 ? ((copied * 8) / 1024) / elapsed : 0;
+                    // Log progress only if percent changed
+                    logger.info(`${dest_file} move progress: ${percent}% (${copied}/${scratchSize} bytes, ${currentKbps.toFixed(2)} kbps)`);
+                    // Update running job status for UI/monitoring
+                    if (global.transcodeQueue && video_record && video_record._id) {
+                      const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
+                      if (runningJobIndex !== -1) {
+                        Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], {
+                          percent,
+                          est_completed_timestamp,
+                          time_remaining,
+                          action: 'finalizing',
+                          currentKbps,
+                          moveStartTime
+                        });
+                      }
+                    }
+                  }
+                } catch (e) {
+                  logger.error(e, { label: 'Dest file move progress error' });
+                }
+              }, 1000);
+            }
+            await moveFile(scratch_file, dest_file);
+            if (moveInterval) clearInterval(moveInterval);
+            // After move, report 100% progress
+            const percent = 100;
+            const time_remaining = formatSecondsToHHMMSS(0);
+            const est_completed_timestamp = Date.now();
+            const currentKbps = ((scratchSize * 8) / 1024) / ((est_completed_timestamp - moveStartTime) / 1000);
+            logger.info(`${dest_file} move complete: 100% (${scratchSize}/${scratchSize} bytes, ${currentKbps.toFixed(2)} kbps)`);
             if (global.transcodeQueue && video_record && video_record._id) {
               const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
               if (runningJobIndex !== -1) {
                 Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], {
+                  percent,
+                  est_completed_timestamp,
+                  time_remaining,
                   action: 'finalizing',
-                  percent: 100,
-                  time_remaining: null
+                  currentKbps,
+                  moveStartTime
                 });
               }
             }
-            await moveFile(scratch_file, dest_file);
 
             // Delete stage_file if it exists
             if (stage_file && fs.existsSync(stage_file)) {
