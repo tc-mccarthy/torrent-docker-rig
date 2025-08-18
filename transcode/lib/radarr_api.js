@@ -56,6 +56,14 @@ function buildHeaders () {
  * @returns {Promise<Object>} Parsed JSON response
  * @throws {Error} If the request fails
  */
+/**
+ * Makes a Radarr API request with a 5-minute timeout using AbortController.
+ * @param {string} endpoint - API endpoint path
+ * @param {string} [method='GET'] - HTTP method
+ * @param {Object|null} [body=null] - Request body
+ * @returns {Promise<Object>} Parsed JSON response
+ * @throws {Error} If the request fails or times out
+ */
 async function radarrRequest (endpoint, method = 'GET', body = null) {
   const options = {
     method,
@@ -64,22 +72,26 @@ async function radarrRequest (endpoint, method = 'GET', body = null) {
   if (body) {
     options.body = JSON.stringify(body);
   }
-  const res = await fetch(buildUrl(endpoint), options);
+  // Set up a 5-minute timeout using AbortController
+  const controller = new AbortController();
+  options.signal = controller.signal;
+  const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+  let res;
+  try {
+    res = await fetch(buildUrl(endpoint), options);
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Radarr API request timed out after 5 minutes (${endpoint})`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!res.ok) {
     throw new Error(`Radarr API request failed: ${res.status} ${res.statusText} (${endpoint})`);
   }
   return res.json();
 }
-
-/**
- * Fetch all movies from Radarr.
- * @returns {Promise<Array>} Array of movie objects
- */
-
-/**
- * Fetch all series from Sonarr.
- * @returns {Promise<Array>} Array of series objects
- */
 
 /**
  * Fetch all movies from Radarr.
@@ -95,20 +107,6 @@ export async function getMovies () {
  * @param {Object} movieData - The full movie object to update
  * @returns {Promise<Object>} The updated movie object
  */
-
-/**
- * Update a series in Sonarr.
- * @param {number} seriesId - The Sonarr series ID
- * @param {Object} seriesData - The full series object to update
- * @returns {Promise<Object>} The updated series object
- */
-
-/**
- * Update a movie in Radarr.
- * @param {number} movieId - The Radarr movie ID
- * @param {Object} movieData - The full movie object to update
- * @returns {Promise<Object>} The updated movie object
- */
 export async function updateMovie (movieId, movieData) {
   return radarrRequest(`/api/v3/movie/${movieId}`, 'PUT', movieData);
 }
@@ -117,37 +115,9 @@ export async function updateMovie (movieId, movieData) {
  * Get Radarr system status.
  * @returns {Promise<Object>} System status info
  */
-
-/**
- * Get Sonarr system status.
- * @returns {Promise<Object>} System status info
- */
-
-/**
- * Get Radarr system status.
- * @returns {Promise<Object>} System status info
- */
 export async function getSystemStatus () {
   return radarrRequest('/api/v3/system/status');
 }
-
-/**
- * List all movies that have a specific tag.
- * Resolves the tag name to its ID, then filters movies by tag ID.
- *
- * @param {string} tagName - The tag value to filter by (case-sensitive)
- * @returns {Promise<Array>} Array of movie objects with the specified tag
- * @throws {Error} If the tag is not found or API calls fail
- */
-
-/**
- * List all series that have a specific tag.
- * Resolves the tag name to its ID, then filters series by tag ID.
- *
- * @param {string} tagName - The tag value to filter by (case-sensitive)
- * @returns {Promise<Array>} Array of series objects with the specified tag
- * @throws {Error} If the tag is not found or API calls fail
- */
 
 /**
  * List all movies that have a specific tag.
@@ -206,14 +176,6 @@ export async function getMoviesByTag (tagName) {
 }
 
 /**
- * List all files in a series by series ID.
- *
- * @param {number} seriesId - The Sonarr series ID
- * @returns {Promise<Array>} Array of file objects for the series
- * @throws {Error} If the API call fails
- */
-
-/**
  * List all files in a movie by movie ID.
  *
  * @param {number} movieId - The Radarr movie ID
@@ -225,25 +187,6 @@ export async function getMovieFiles (movieId) {
   const files = await radarrRequest(`/api/v3/moviefile?movieId=${movieId}`);
   return files;
 }
-
-/**
- * Get all episode files for all series matching a tag.
- * Calls getSeriesByTag, then gets episode files for each series.
- * Returns a flat array of all episode files found.
- *
- * @param {string} tagName - The tag value to filter by (case-sensitive)
- * @returns {Promise<Array>} Array of episode file objects across all matching series
- * @throws {Error} If the tag is not found or API calls fail
- */
-/**
- * Get all episode files for all series matching a tag.
- * Uses async.eachSeries for sequential async processing.
- * Returns a flat array of all episode files found.
- *
- * @param {string} tagName - The tag value to filter by (case-sensitive)
- * @returns {Promise<Array>} Array of episode file objects across all matching series
- * @throws {Error} If the tag is not found or API calls fail
- */
 
 /**
  * Get all movie files for all movies matching a tag.

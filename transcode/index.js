@@ -25,8 +25,7 @@ import generate_filelist from './lib/generate_filelist';
 import IntegrityQueue from './lib/integrityQueue';
 import TranscodeQueue from './lib/transcodeQueue';
 import update_status from './lib/update_status';
-import { importIndexerData } from './lib/indexer_data_import';
-import assessPriority from './lib/assess_priority';
+import refresh_indexer_data from './lib/refresh_indexer_data';
 
 const {
   max_memory_score, max_cpu_score,
@@ -75,7 +74,7 @@ async function run () {
     update_status();
     update_queue();
     generate_filelist({ limit: 1000, writeToFile: true });
-    importIndexerData().then(() => assessPriority());
+    refresh_indexer_data();
 
     // Start the main transcode queue (handles video jobs)
     const transcodeQueue = new TranscodeQueue({ maxMemoryComputeScore: max_memory_score, maxCpuComputeScore: max_cpu_score, pollDelay: 10000 });
@@ -103,9 +102,7 @@ async function run () {
 
     // update indexer data every hour
     cron.schedule('0 * * * *', () => {
-      importIndexerData().then(() => assessPriority()).catch((err) => {
-        logger.error('Failed to import indexer data:', err);
-      });
+      refresh_indexer_data();
     });
   } catch (e) {
     logger.error(e, { label: 'RUN ERROR', message: e.message });
