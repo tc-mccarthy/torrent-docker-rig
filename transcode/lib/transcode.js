@@ -85,7 +85,32 @@ export default function transcode (file) {
       if (stage_file) {
         try {
           logger.info(`Copying source file to stage_file: ${stage_file}`);
-          await fs.promises.copyFile(file, stage_file);
+          const totalSize = (await stat(file)).size;
+          let copied = 0;
+          await new Promise((resolve, reject) => {
+            const readStream = fs.createReadStream(file);
+            const writeStream = fs.createWriteStream(stage_file);
+            readStream.on('data', (chunk) => {
+              copied += chunk.length;
+              const percent = ((copied / totalSize) * 100).toFixed(2);
+              logger.info(`${stage_file} copy progress: ${percent}% (${copied}/${totalSize} bytes)`);
+              if (global.transcodeQueue && video_record && video_record._id) {
+                // Optionally update running job progress
+                const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
+                if (runningJobIndex !== -1) {
+                  Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], {
+                    stageCopyProgress: percent,
+                    stageCopyBytes: copied,
+                    stageCopyTotal: totalSize
+                  });
+                }
+              }
+            });
+            readStream.on('error', reject);
+            writeStream.on('error', reject);
+            writeStream.on('close', resolve);
+            readStream.pipe(writeStream);
+          });
           file = stage_file;
         } catch (copyErr) {
           logger.error(copyErr, { label: 'STAGE FILE COPY ERROR', file, stage_file });
