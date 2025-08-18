@@ -26,32 +26,42 @@ export function escape_file_path (file) {
  * @throws {Error} If the filename format is invalid.
  */
 export function generate_file_paths (file) {
-  // Find the scratch path for the source
-  const scratch_path = config.sources.find((p) =>
-    file.startsWith(p.path)).scratch;
+  // Find the source config for the file
+  const source = config.sources.find((p) => file.startsWith(p.path));
+  if (!source) {
+    throw new Error(`No source config found for file: ${file}`);
+  }
+  const scratch_path = source.scratch;
+  const stage_path = source.stage_path;
 
   // Extract the filename from the path
   const filename = file.match(/([^/]+)$/)[1];
 
   // Capture the filename and extension in separate variables
   const match = filename.match(/(.+)[.]([A-Za-z0-9]+)$/);
-
   if (!match) {
     throw new Error(`Invalid filename format: ${filename}`);
   }
-
   const name = match[1];
 
-  // Build the scratch file path using a normalized name
-  const scratch_file = `${scratch_path}/${name
-    .replace(/[^A-Za-z0-9]+/g, '-')
-    .toLowerCase()}.mkv`;
+  // Build the normalized base name
+  const normalized = name.replace(/[^A-Za-z0-9]+/g, '-').toLowerCase();
+
+  // Build the scratch file path with _scratch suffix
+  const scratch_file = `${scratch_path}/${normalized}_scratch.mkv`;
+
+  // Build the stage file path with _stage suffix, or false if stage_path is falsey
+  let stage_file = false;
+  if (stage_path) {
+    stage_file = `${stage_path}/${normalized}_stage.mkv`;
+  }
 
   // Build the destination file path by replacing the extension with .mkv
   const dest_file = file.replace(/\.[A-Za-z0-9]+$/, '.mkv');
 
   return {
     scratch_file,
+    stage_file,
     dest_file
   };
 }

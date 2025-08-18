@@ -79,7 +79,20 @@ export default function transcode (file) {
         throw new Error('No video stream found');
       }
 
-      const { scratch_file, dest_file } = generate_file_paths(file);
+
+      const { scratch_file, dest_file, stage_file } = generate_file_paths(file);
+
+      // If stage_file is set, copy the source file to stage_file and use stage_file for transcoding
+      if (stage_file) {
+        try {
+          logger.info(`Copying source file to stage_file: ${stage_file}`);
+          await fs.promises.copyFile(file, stage_file);
+          file = stage_file;
+        } catch (copyErr) {
+          logger.error(copyErr, { label: 'STAGE FILE COPY ERROR', file, stage_file });
+          throw new Error(`Failed to copy source file to stage_file: ${copyErr.message}`);
+        }
+      }
 
       // Short-circuit if this encode version already exists
       if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
