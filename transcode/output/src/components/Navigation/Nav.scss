@@ -9,6 +9,12 @@ nav {
   max-height: 20vh;
   margin: 0 auto 22px;
 
+  .poster {
+    display: block;
+    width: 100%;
+    max-width: 150px;
+  }
+
   ul {
     margin: 0;
     padding: 0;

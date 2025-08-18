@@ -30,6 +30,7 @@ export default function Nav ({ data, setDataSelection, dataSelection, availableC
           {data.map((item, index) => (
             <li key={filename_hash(item.file)}>
               <button type="button" className={dataSelection === index && 'active'} onClick={() => setDataSelection(index)}>
+                {item.indexerData?.poster && (<img src={item.indexerData.poster} alt={item.indexerData.title} className="poster" />)}
                 {display_file_name(item.file)}
                 {' '}
                 <strong>
