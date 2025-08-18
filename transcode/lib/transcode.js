@@ -87,21 +87,29 @@ export default function transcode (file) {
           logger.info(`Copying source file to stage_file: ${stage_file}`);
           const totalSize = (await stat(file)).size;
           let copied = 0;
+          const startTime = Date.now();
           await new Promise((resolve, reject) => {
             const readStream = fs.createReadStream(file);
             const writeStream = fs.createWriteStream(stage_file);
             readStream.on('data', (chunk) => {
               copied += chunk.length;
               const percent = ((copied / totalSize) * 100).toFixed(2);
+              const elapsed = (Date.now() - startTime) / 1000;
+              const pct_per_second = percent / elapsed;
+              const seconds_pct = pct_per_second > 0 ? 1 / pct_per_second : Infinity;
+              const pct_remaining = 100 - percent;
+              const est_completed_seconds = pct_remaining * seconds_pct;
+              const est_completed_timestamp = Date.now() + (est_completed_seconds * 1000);
+              const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
               logger.info(`${stage_file} copy progress: ${percent}% (${copied}/${totalSize} bytes)`);
               if (global.transcodeQueue && video_record && video_record._id) {
-                // Optionally update running job progress
                 const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
                 if (runningJobIndex !== -1) {
                   Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], {
-                    stageCopyProgress: percent,
-                    stageCopyBytes: copied,
-                    stageCopyTotal: totalSize
+                    percent,
+                    eta: est_completed_timestamp,
+                    time_remaining,
+                    action: 'staging'
                   });
                 }
               }
@@ -183,6 +191,18 @@ export default function transcode (file) {
             source_codec: `${source_video_codec}_${source_audio_codec}`
           };
           await video_record.saveDebounce();
+          // Set action to 'transcoding' at start
+          if (global.transcodeQueue && video_record && video_record._id) {
+            const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
+            if (runningJobIndex !== -1) {
+              Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], {
+                action: 'transcoding',
+                percent: 0,
+                eta: null,
+                time_remaining: null
+              });
+            }
+          }
         })
         .on('progress', (progress) => {
           const elapsed = dayjs().diff(start_time, 'seconds');
@@ -231,7 +251,7 @@ export default function transcode (file) {
                 gb: ffprobe_data.format.size / 1024 / 1024
               }
             },
-            action: 'transcode'
+            action: 'transcoding'
           };
 
           // find the job in the transcodeQueue and update it
@@ -247,6 +267,19 @@ export default function transcode (file) {
               throw new Error(`Scratch file ${scratch_file} not found after transcode complete.`);
             }
 
+
+            // Finalizing step: move scratch_file to dest_file
+            if (global.transcodeQueue && video_record && video_record._id) {
+              const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
+              if (runningJobIndex !== -1) {
+                Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], {
+                  action: 'finalizing',
+                  percent: 100,
+                  eta: null,
+                  time_remaining: null
+                });
+              }
+            }
             await moveFile(scratch_file, dest_file);
 
             // Delete stage_file if it exists
