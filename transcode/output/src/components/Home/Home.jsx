@@ -159,7 +159,7 @@ function Home () {
       {dataSource && dataSource.length > 0 && <Nav data={dataSource} availableCompute={availableCompute} dataSelection={dataSelection} setDataSelection={setDataSelection} />}
       {data && (
         <div className="widget center">
-          <strong>{data.file}</strong>
+          <strong>{data.path}</strong>
           {' '}
           (
           {data.source_video_codec}
