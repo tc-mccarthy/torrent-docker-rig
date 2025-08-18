@@ -30,20 +30,22 @@ export default function Nav ({ data, setDataSelection, dataSelection, availableC
           {data.map((item, index) => (
             <li key={filename_hash(item.file)}>
               <button type="button" className={dataSelection === index && 'active'} onClick={() => setDataSelection(index)}>
-                {item.indexerData?.poster && (<img src={item.indexerData.poster} alt={item.indexerData.title} className="poster" />)}
-                {display_file_name(item.file)}
-                {' '}
-                <strong>
-                  (
-                  {Math.round(item.percent)}
-                  %)
-                </strong>
+                {item.indexerData?.poster && (<div className="poster"><img src={item.indexerData.poster} alt={item.indexerData.title} /></div>)}
                 <div>
-                  {time_remaining(item.est_completed_timestamp).formatted}
+                  {display_file_name(item.file)}
                   {' '}
-                  {item.name && `- ${item.name}`}
+                  <strong>
+                    (
+                    {Math.round(item.percent)}
+                    %)
+                  </strong>
+                  <div>
+                    {time_remaining(item.est_completed_timestamp).formatted}
+                    {' '}
+                    {item.name && `- ${item.name}`}
+                  </div>
+                  <div><em>{item.action}</em></div>
                 </div>
-                <div><em>{item.action}</em></div>
               </button>
             </li>
           ))}
