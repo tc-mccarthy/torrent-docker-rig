@@ -8,11 +8,20 @@ nav {
   -webkit-overflow-scrolling: touch;
   max-height: 20vh;
   margin: 0 auto 22px;
+  display: flex;
+
+  > div {
+    padding: 0 22px;
+  }
 
   .poster {
-    display: block;
-    width: 100%;
-    max-width: 150px;
+    flex-basis: 43%;
+    padding: 0;
+
+    > img {
+      display: block;
+      width: 100%;
+    }
   }
 
   ul {
