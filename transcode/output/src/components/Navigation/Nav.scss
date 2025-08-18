@@ -1,24 +1,49 @@
+h4 {
+  /* Navigation section header, right-aligned for visual separation */
+  text-align: right;
+}
+
 @import '../variables';
 h4 {
   text-align: right;
 }
+/*
+ * Main navigation container
+ * - Enables vertical scrolling with momentum on iOS
+ * - Restricts height for compact UI
+ */
 nav {
   overflow-y: auto;
-  /* momentum scrolling */
+  /* momentum scrolling for iOS */
   -webkit-overflow-scrolling: touch;
   max-height: 20vh;
   margin: 0 auto 22px;
 
+  /*
+   * Navigation list
+   * - Removes default list styling and spacing
+   */
   ul {
     margin: 0;
     padding: 0;
 
+    /*
+     * Navigation item
+     * - Block display for vertical stacking
+     * - Padding/margin for touch targets
+     */
     li {
       list-style: none;
       display: block;
       padding: 10px;
       margin: 10px;
 
+      /*
+       * Navigation button
+       * - Uses surface color for background
+       * - Full width, large padding for accessibility
+       * - Flex layout for poster and label alignment
+       */
       button {
         background: transparent;
         border: 0;
@@ -30,19 +55,35 @@ nav {
         color: $color-text-primary;
         display: flex;
 
+        /*
+         * Active navigation button
+         * - Highlights with a left border for selection feedback
+         */
         &.active {
           border-left: 8px solid $color-focus-ring;
         }
 
+        /*
+         * Main label container
+         * - Flexible to fill remaining space
+         */
         > div {
           padding: 0 22px;
           flex: 1;
         }
 
+        /*
+         * Poster image container
+         * - Fixed width for consistent layout
+         */
         .poster {
-          flex: 0 0 43%;
+          flex: 0 0 25%;
           padding: 0;
 
+          /*
+           * Poster image
+           * - Responsive block display
+           */
           > img {
             display: block;
             width: 100%;
