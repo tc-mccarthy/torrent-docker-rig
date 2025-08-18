@@ -175,6 +175,7 @@ export default function transcode (file) {
             est_completed_timestamp,
             computeScore: video_record.computeScore,
             priority: video_record.sortFields.priority,
+            indexerData: video_record.indexerData || {},
             size: {
               progress: {
                 kb: progress.targetSize,
