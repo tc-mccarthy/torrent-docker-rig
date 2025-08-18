@@ -8,21 +8,6 @@ nav {
   -webkit-overflow-scrolling: touch;
   max-height: 20vh;
   margin: 0 auto 22px;
-  display: flex;
-
-  > div {
-    padding: 0 22px;
-  }
-
-  .poster {
-    flex-basis: 43%;
-    padding: 0;
-
-    > img {
-      display: block;
-      width: 100%;
-    }
-  }
 
   ul {
     margin: 0;
@@ -43,9 +28,24 @@ nav {
         width: 100%;
         padding: 22px;
         color: $color-text-primary;
+        display: flex;
 
         &.active {
           border-left: 8px solid $color-focus-ring;
+        }
+
+        > div {
+          padding: 0 22px;
+        }
+
+        .poster {
+          flex-basis: 43%;
+          padding: 0;
+
+          > img {
+            display: block;
+            width: 100%;
+          }
         }
       }
     }
