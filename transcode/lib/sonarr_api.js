@@ -47,14 +47,12 @@ function buildHeaders () {
 }
 
 /**
- * Utility function to make Sonarr API requests.
- * Handles endpoint, method, body, and error handling.
- *
- * @param {string} endpoint - API endpoint path (e.g., '/api/v3/series')
+ * Makes a Sonarr API request with a 5-minute timeout using AbortController.
+ * @param {string} endpoint - API endpoint path
  * @param {string} [method='GET'] - HTTP method
- * @param {Object|null} [body=null] - Request body (for POST/PUT)
+ * @param {Object|null} [body=null] - Request body
  * @returns {Promise<Object>} Parsed JSON response
- * @throws {Error} If the request fails
+ * @throws {Error} If the request fails or times out
  */
 async function sonarrRequest (endpoint, method = 'GET', body = null) {
   const options = {
@@ -64,17 +62,26 @@ async function sonarrRequest (endpoint, method = 'GET', body = null) {
   if (body) {
     options.body = JSON.stringify(body);
   }
-  const res = await fetch(buildUrl(endpoint), options);
+  // Set up a 5-minute timeout using AbortController
+  const controller = new AbortController();
+  options.signal = controller.signal;
+  const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+  let res;
+  try {
+    res = await fetch(buildUrl(endpoint), options);
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Sonarr API request timed out after 5 minutes (${endpoint})`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!res.ok) {
     throw new Error(`Sonarr API request failed: ${res.status} ${res.statusText} (${endpoint})`);
   }
   return res.json();
 }
-
-/**
- * Fetch all movies from Radarr.
- * @returns {Promise<Array>} Array of movie objects
- */
 
 /**
  * Fetch all series from Sonarr.
@@ -83,13 +90,6 @@ async function sonarrRequest (endpoint, method = 'GET', body = null) {
 export async function getSeries () {
   return sonarrRequest('/api/v3/series');
 }
-
-/**
- * Update a movie in Radarr.
- * @param {number} movieId - The Radarr movie ID
- * @param {Object} movieData - The full movie object to update
- * @returns {Promise<Object>} The updated movie object
- */
 
 /**
  * Update a series in Sonarr.
@@ -102,11 +102,6 @@ export async function updateSeries (seriesId, seriesData) {
 }
 
 /**
- * Get Radarr system status.
- * @returns {Promise<Object>} System status info
- */
-
-/**
  * Get Sonarr system status.
  * @returns {Promise<Object>} System status info
  */
@@ -115,17 +110,9 @@ export async function getSystemStatus () {
 }
 
 /**
- * List all movies that have a specific tag.
- * Resolves the tag name to its ID, then filters movies by tag ID.
- *
- * @param {string} tagName - The tag value to filter by (case-sensitive)
- * @returns {Promise<Array>} Array of movie objects with the specified tag
- * @throws {Error} If the tag is not found or API calls fail
- */
-
-/**
  * List all series that have a specific tag.
  * Resolves the tag name to its ID, then filters series by tag ID.
+ * Uses a 10-minute memcached cache and lock/wait for concurrency.
  *
  * @param {string} tagName - The tag value to filter by (case-sensitive)
  * @returns {Promise<Array>} Array of series objects with the specified tag
@@ -203,15 +190,6 @@ export async function getSeriesFiles (seriesId) {
   return files;
 }
 
-/**
- * Get all episode files for all series matching a tag.
- * Calls getSeriesByTag, then gets episode files for each series.
- * Returns a flat array of all episode files found.
- *
- * @param {string} tagName - The tag value to filter by (case-sensitive)
- * @returns {Promise<Array>} Array of episode file objects across all matching series
- * @throws {Error} If the tag is not found or API calls fail
- */
 /**
  * Get all episode files for all series matching a tag.
  * Uses async.eachSeries for sequential async processing.
