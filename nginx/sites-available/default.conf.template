@@ -44,29 +44,62 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
   }
 
-  location /sonarr {
-    proxy_pass         http://vpn:8989;
-
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-
+  location /radarr/ {
+    proxy_pass         http://vpn:8989;   # no trailing slash → upstream sees /sonarr/...
     proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection $http_connection;
+
+    # Don’t forward the client’s Connection header upstream; enable upstream keep-alive
+    proxy_set_header   Connection "";
+
+    # Standard forwards
+    proxy_set_header   Host               $host;
+    proxy_set_header   X-Real-IP          $remote_addr;
+    proxy_set_header   X-Forwarded-For    $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto  $scheme;
+
+    # Timeouts for large/slow responses
+    proxy_connect_timeout  30s;
+    proxy_send_timeout     300s;
+    proxy_read_timeout     300s;
+    send_timeout           300s;
+
+    # Buffering helps with big JSON bodies
+    proxy_buffering        on;
+    proxy_buffers          16 64k;
+    proxy_buffer_size      16k;
+
+    # No WebSocket upgrade for Sonarr API
+    # (remove any Upgrade/Connection: $http_connection directives)
   }
 
-  location /radarr {
-    proxy_pass         http://vpn:7878;
+  location /radarr/ {
+    proxy_pass         http://vpn:7878;   # no trailing slash → upstream sees /radarr/...
+    proxy_http_version 1.1;
 
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    
-    proxy_http_version 1.1; 
-    proxy_set_header Upgrade $http_upgrade; 
-    proxy_set_header Connection $http_connection;
+    # Don’t forward the client’s Connection header upstream; enable upstream keep-alive
+    proxy_set_header   Connection "";
+
+    # Standard forwards
+    proxy_set_header   Host               $host;
+    proxy_set_header   X-Real-IP          $remote_addr;
+    proxy_set_header   X-Forwarded-For    $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto  $scheme;
+
+    # Timeouts for large/slow responses
+    proxy_connect_timeout  30s;
+    proxy_send_timeout     300s;
+    proxy_read_timeout     300s;
+    send_timeout           300s;
+
+    # Buffering helps with big JSON bodies
+    proxy_buffering        on;
+    proxy_buffers          16 64k;
+    proxy_buffer_size      16k;
+
+    # No WebSocket upgrade for Radarr API
+    # (remove any Upgrade/Connection: $http_connection directives)
   }
+
 
   location /bazarr {
     proxy_pass         http://vpn:6767;
