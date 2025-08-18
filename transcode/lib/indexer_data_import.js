@@ -123,8 +123,10 @@ export async function importIndexerData () {
     }));
 
     logger.info('Indexer data import complete.');
+    return true;
   } catch (err) {
     // Log error and stack trace for debugging
     logger.error('Indexer data import failed:', err);
+    throw err;
   }
 }
