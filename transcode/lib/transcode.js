@@ -79,7 +79,6 @@ export default function transcode (file) {
         throw new Error('No video stream found');
       }
 
-
       const { scratch_file, dest_file, stage_file } = generate_file_paths(file);
 
       // If stage_file is set, copy the source file to stage_file and use stage_file for transcoding

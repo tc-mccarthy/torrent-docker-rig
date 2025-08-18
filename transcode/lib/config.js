@@ -8,7 +8,6 @@
 import base_config from './base-config';
 import packageInfo from '../package.json';
 
-
 /**
  * Transcode configuration object.
  *
@@ -79,7 +78,6 @@ const transcode_config = {
     }
   ]
 };
-
 
 /**
  * Exports the transcode configuration object for use in transcode jobs and service orchestration.

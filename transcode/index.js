@@ -96,11 +96,7 @@ async function run () {
 
     // Schedule queue update every day at midnight
     cron.schedule('0 0 * * *', () => {
-      update_queue();
-    });
-
-    cron.schedule('0 4 * * *', () => {
-      importIndexerData();
+      update_queue().then(() => importIndexerData());
     });
   } catch (e) {
     logger.error(e, { label: 'RUN ERROR', message: e.message });
