@@ -44,7 +44,7 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
   }
 
-  location /radarr/ {
+  location /sonarr/ {
     proxy_pass         http://vpn:8989;   # no trailing slash → upstream sees /sonarr/...
     proxy_http_version 1.1;
 
