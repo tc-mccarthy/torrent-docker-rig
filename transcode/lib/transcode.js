@@ -112,14 +112,14 @@ export default function transcode (file) {
           if (fs.existsSync(stage_file)) {
             const stageStats = await stat(stage_file);
             if (stageStats.size === totalSize) {
-              logger.info(`Stage file already exists and matches source size (${totalSize} bytes). Skipping copy.`);
+              logger.debug(`Stage file already exists and matches source size (${totalSize} bytes). Skipping copy.`);
               skipCopy = true;
             } else {
-              logger.info(`Stage file exists but size mismatch (source: ${totalSize}, stage: ${stageStats.size}). Re-copying.`);
+              logger.debug(`Stage file exists but size mismatch (source: ${totalSize}, stage: ${stageStats.size}). Re-copying.`);
             }
           }
           if (!skipCopy) {
-            logger.info(`Copying source file to stage_file: ${stage_file}`);
+            logger.debug(`Copying source file to stage_file: ${stage_file}`);
             const startTime = Date.now();
             let lastPercent = 0;
             let interval;
@@ -142,7 +142,7 @@ export default function transcode (file) {
                     const currentKbps = elapsed > 0 ? Math.round(((copied * 8) / 1024) / elapsed) : 0;
                     // Log progress only if percent changed
                     if (percent !== lastPercent) {
-                      logger.info(`${stage_file} copy progress: ${percent}% (${copied}/${totalSize} bytes, ${currentKbps} kbps)`);
+                      logger.debug(`${stage_file} copy progress: ${percent}% (${copied}/${totalSize} bytes, ${currentKbps} kbps)`);
                       lastPercent = percent;
                     }
                     // Update running job status for UI/monitoring
@@ -174,7 +174,7 @@ export default function transcode (file) {
             const time_remaining = formatSecondsToHHMMSS(0);
             const est_completed_timestamp = Date.now();
             const currentKbps = Math.round(((totalSize * 8) / 1024) / ((est_completed_timestamp - startTime) / 1000));
-            logger.info(`${stage_file} copy complete: 100% (${totalSize}/${totalSize} bytes, ${currentKbps} kbps)`);
+            logger.debug(`${stage_file} copy complete: 100% (${totalSize}/${totalSize} bytes, ${currentKbps} kbps)`);
             if (global.transcodeQueue && video_record && video_record._id) {
               const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
               if (runningJobIndex !== -1) {
@@ -379,7 +379,7 @@ export default function transcode (file) {
                     // Calculate currentKbps (kilobits per second), rounded
                     const currentKbps = elapsed > 0 ? Math.round(((copied * 8) / 1024) / elapsed) : 0;
                     // Log progress only if percent changed
-                    logger.info(`${dest_file} move progress: ${percent}% (${copied}/${scratchSize} bytes, ${currentKbps} kbps)`);
+                    logger.debug(`${dest_file} move progress: ${percent}% (${copied}/${scratchSize} bytes, ${currentKbps} kbps)`);
                     // Update running job status for UI/monitoring
                     if (global.transcodeQueue && video_record && video_record._id) {
                       const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
@@ -407,7 +407,7 @@ export default function transcode (file) {
             const time_remaining = formatSecondsToHHMMSS(0);
             const est_completed_timestamp = Date.now();
             const currentKbps = Math.round(((scratchSize * 8) / 1024) / ((est_completed_timestamp - moveStartTime) / 1000));
-            logger.info(`${dest_file} move complete: 100% (${scratchSize}/${scratchSize} bytes, ${currentKbps} kbps)`);
+            logger.debug(`${dest_file} move complete: 100% (${scratchSize}/${scratchSize} bytes, ${currentKbps} kbps)`);
             if (global.transcodeQueue && video_record && video_record._id) {
               const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
               if (runningJobIndex !== -1) {
@@ -426,7 +426,7 @@ export default function transcode (file) {
             if (stage_file && fs.existsSync(stage_file)) {
               try {
                 await fs.promises.unlink(stage_file);
-                logger.info(`Deleted stage_file after transcode: ${stage_file}`);
+                logger.debug(`Deleted stage_file after transcode: ${stage_file}`);
               } catch (stageDelErr) {
                 logger.warn(`Failed to delete stage_file: ${stage_file}`, stageDelErr);
               }
@@ -469,7 +469,7 @@ export default function transcode (file) {
           if (stage_file && fs.existsSync(stage_file)) {
             try {
               await fs.promises.unlink(stage_file);
-              logger.info(`Deleted stage_file after error: ${stage_file}`);
+              logger.debug(`Deleted stage_file after error: ${stage_file}`);
             } catch (stageDelErr) {
               logger.warn(`Failed to delete stage_file: ${stage_file}`, stageDelErr);
             }
