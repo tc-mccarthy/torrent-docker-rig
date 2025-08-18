@@ -37,7 +37,6 @@ import { generateTranscodeInstructions } from './generate_transcode_instructions
 
 const { encode_version } = config;
 
-
 /**
  * Converts seconds into a zero-padded HH:mm:ss string.
  * Used for ETA and progress reporting.
@@ -74,7 +73,6 @@ export default function transcode (file) {
       if (!video_record || !video_record?._id) {
         throw new Error(`Video record not found for file: ${file}`);
       }
-
 
       // Ensure file exists before proceeding
       if (!fs.existsSync(file)) {
@@ -160,6 +158,7 @@ export default function transcode (file) {
                   }
                 } catch (e) {
                   // Ignore stat errors during copy
+                  logger.error(e, { label: 'Stage file copy progress error' });
                 }
               }, 1000);
             }
@@ -191,7 +190,6 @@ export default function transcode (file) {
         }
       }
 
-
       // Short-circuit if this encode version already exists (prevents double-encoding)
       if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
         logger.debug({ file, encode_version }, { label: 'File already encoded' });
@@ -200,13 +198,11 @@ export default function transcode (file) {
         return resolve({ locked: true });
       }
 
-
       // Check file integrity if not previously validated
       if (!video_record.integrityCheck) {
         logger.debug("File hasn't been integrity checked. Checking before transcode");
         await integrityCheck(video_record);
       }
-
 
       // Hardware acceleration and codec info
       const hwaccel = video_record.permitHWDecode ? 'auto' : 'none';
@@ -230,7 +226,6 @@ export default function transcode (file) {
         totalFrames = 0;
       }
 
-
       // Build FFmpeg command with all input/output options
       let cmd = ffmpeg(file)
         .inputOptions(['-v fatal', '-stats', `-hwaccel ${hwaccel}`].filter(Boolean))
@@ -253,7 +248,6 @@ export default function transcode (file) {
             `-map_metadata:s:s:${idx} 0:s:s:${idx}`
           ]))
         .outputOptions(`-metadata encode_version=${encode_version}`);
-
 
       // Track ffmpeg command, start time, and original file size for reporting
       let ffmpeg_cmd;
