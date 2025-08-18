@@ -92,6 +92,7 @@ async function radarrRequest (endpoint, method = 'GET', body = null) {
   if (!res.ok) {
     throw new Error(`Radarr API request failed: ${res.status} ${res.statusText} (${endpoint})`);
   }
+  logger.info(`[Radarr] Complete: ${method} ${url}`);
   return res.json();
 }
 
