@@ -1,36 +1,55 @@
+/**
+ * Navigation section header
+ *
+ * Styles the section header for navigation, right-aligning for visual separation.
+ *
+ * Example:
+ *   <h4>Section Title</h4>
+ */
 h4 {
-  /* Navigation section header, right-aligned for visual separation */
   text-align: right;
 }
 
 @import '../variables';
-h4 {
-  text-align: right;
-}
-/*
+
+/**
  * Main navigation container
- * - Enables vertical scrolling with momentum on iOS
- * - Restricts height for compact UI
+ *
+ * Enables vertical scrolling with momentum on iOS and restricts height for compact UI.
+ * Responsive max-height for different screen sizes.
+ *
+ * Example:
+ *   <nav>...</nav>
  */
 nav {
   overflow-y: auto;
-  /* momentum scrolling for iOS */
   -webkit-overflow-scrolling: touch;
   max-height: 20vh;
   margin: 0 auto 22px;
 
-  /*
+  @media (min-width: 768px) {
+    max-height: 315px;
+  }
+
+  /**
    * Navigation list
-   * - Removes default list styling and spacing
+   *
+   * Removes default list styling and spacing.
+   *
+   * Example:
+   *   <ul>...</ul>
    */
   ul {
     margin: 0;
     padding: 0;
 
-    /*
+    /**
      * Navigation item
-     * - Block display for vertical stacking
-     * - Padding/margin for touch targets
+     *
+     * Block display for vertical stacking, padding/margin for touch targets.
+     *
+     * Example:
+     *   <li>...</li>
      */
     li {
       list-style: none;
@@ -38,11 +57,14 @@ nav {
       padding: 10px;
       margin: 10px;
 
-      /*
+      /**
        * Navigation button
-       * - Uses surface color for background
-       * - Full width, large padding for accessibility
-       * - Flex layout for poster and label alignment
+       *
+       * Uses surface color for background, full width, large padding for accessibility.
+       * Flex layout for poster and label alignment. Vertically centers content.
+       *
+       * Example:
+       *   <button>...</button>
        */
       button {
         background: transparent;
@@ -54,35 +76,52 @@ nav {
         padding: 22px;
         color: $color-text-primary;
         display: flex;
+        align-items: center;
 
-        /*
+        /**
          * Active navigation button
-         * - Highlights with a left border for selection feedback
+         *
+         * Highlights with a left border for selection feedback.
+         *
+         * Example:
+         *   <button class="active">...</button>
          */
         &.active {
           border-left: 8px solid $color-focus-ring;
         }
 
-        /*
+        /**
          * Main label container
-         * - Flexible to fill remaining space
+         *
+         * Flexible to fill remaining space.
+         *
+         * Example:
+         *   <div>Label</div>
          */
         > div {
           padding: 0 22px;
           flex: 1;
         }
 
-        /*
+        /**
          * Poster image container
-         * - Fixed width for consistent layout
+         *
+         * Fixed width for consistent layout.
+         *
+         * Example:
+         *   <div class="poster">...</div>
          */
         .poster {
           flex: 0 0 25%;
           padding: 0;
 
-          /*
+          /**
            * Poster image
-           * - Responsive block display
+           *
+           * Responsive block display.
+           *
+           * Example:
+           *   <img src="..." />
            */
           > img {
             display: block;
