@@ -1,3 +1,4 @@
+import async, { asyncify } from 'async';
 import { getMovies, getTags as getRadarrTags } from './radarr_api';
 import { getSeries, getTags as getSonarrTags } from './sonarr_api';
 import File from '../models/files';
@@ -71,8 +72,16 @@ export async function importIndexerData () {
       };
     });
     logger.info(`Radarr bulkWrite operations prepared for ${radarrBulkOps.length} movies.`);
+    // Chunk Radarr bulkWrite operations into arrays of arrays (max 150 per chunk)
     if (radarrBulkOps.length > 0) {
-      await File.bulkWrite(radarrBulkOps);
+      const radarrChunks = [];
+      for (let i = 0; i < radarrBulkOps.length; i += 150) {
+        radarrChunks.push(radarrBulkOps.slice(i, i + 150));
+      }
+      await async.eachLimit(radarrChunks, 1, asyncify(async (chunk) => {
+        await File.bulkWrite(chunk);
+        return true;
+      }));
     }
     logger.info(`Radarr bulkWrite operations completed for ${radarrBulkOps.length} movies.`);
 
@@ -112,8 +121,17 @@ export async function importIndexerData () {
       };
     });
     logger.info(`Sonarr bulkWrite operations prepared for ${sonarrBulkOps.length} series.`);
+    // Chunk Sonarr bulkWrite operations into arrays of arrays (max 150 per chunk)
     if (sonarrBulkOps.length > 0) {
-      await File.bulkWrite(sonarrBulkOps);
+      const sonarrChunks = [];
+      for (let i = 0; i < sonarrBulkOps.length; i += 150) {
+        sonarrChunks.push(sonarrBulkOps.slice(i, i + 150));
+      }
+
+      await async.eachLimit(sonarrChunks, 1, asyncify(async (chunk) => {
+        await File.bulkWrite(chunk);
+        return true;
+      }));
     }
 
     logger.info(`Sonarr bulkWrite operations completed for ${sonarrBulkOps.length} series.`);
