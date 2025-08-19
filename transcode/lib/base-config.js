@@ -189,7 +189,7 @@ const config = {
     conversion_profile = copy(conversion_profile);
 
     // add a function to add flags to the output video profile
-    conversion_profile.output.video.addFlags = function (flags) {
+    conversion_profile.output.video.addFlags = function addFlags(flags) {
       Object.assign(conversion_profile.output.video.flags, flags);
     };
 
