@@ -11,6 +11,7 @@
   "dependencies": {
     "amqplib": "^0.10.5",
     "async": "^3.2.6",
+    "axios": "^1.11.0",
     "chokidar": "^4.0.3",
     "dayjs": "^1.11.13",
     "fast-copy": "^3.0.2",
@@ -20,11 +21,8 @@
     "mongoose": "^8.10.1",
     "node-cron": "^4.1.0",
     "redis": "^4.7.0",
-    "stream-chain": "^3.4.0",
-    "stream-json": "^1.9.1",
     "systeminformation": "^5.27.7",
     "trash-cli": "^6.0.0",
-    "undici": "^7.14.0",
     "webpack-node-externals": "^3.0.0",
     "winston": "^3.17.0",
     "xml2js": "^0.6.2"
