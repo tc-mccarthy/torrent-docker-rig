@@ -1,29 +1,22 @@
-// radarr_api.js (Axios refactor, ESModule)
-/**
- * Radarr API Client (Axios, ESModule)
- *
- * Provides functions to interact with a Radarr server using its REST API.
- * Uses Axios for HTTP requests, with non-keepalive agents for reliability.
- * All functions throw on error and return parsed JSON responses.
- *
- * Usage:
- *   import { getMovies, updateMovie, getSystemStatus, getTags, getMoviesByTag, getMovieFiles, getMovieFilesByTag } from './radarr_api.js';
- *
- *   const movies = await getMovies();
- *   await updateMovie(movieId, movieData);
- */
+// radarr_api.js (streaming JSON, native fetch, ESModule)
+//
+// Radarr API client for Node.js 22+ using native fetch and stream-json for efficient large payload handling.
+// All requests are streamed and parsed for minimal memory usage.
+// Usage:
+//   import { getMovies, updateMovie, getSystemStatus, getTags, getMoviesByTag, getMovieFiles, getMovieFilesByTag } from './radarr_api.js';
+//   const movies = await getMovies();
+//   await updateMovie(movieId, movieData);
 
-import axios from 'axios';
 import http from 'node:http';
 import https from 'node:https';
 import { setTimeout as delay } from 'timers/promises';
 import async, { asyncify } from 'async';
-import memcached from './memcached';
+import { parser } from 'stream-json';
+import { streamArray } from 'stream-json/streamers/StreamArray';
+import { chain } from 'stream-chain';
 import logger from './logger';
+import memcached from './memcached';
 
-/**
- * Radarr API Client (Axios)
- */
 const RADARR_API_KEY = process.env.RADARR_API_KEY;
 const RADARR_URL = process.env.RADARR_URL || 'http://localhost:7878';
 
@@ -31,177 +24,122 @@ if (!RADARR_API_KEY) {
   throw new Error('RADARR_API_KEY environment variable is not set');
 }
 
-/**
- * Non-keepalive agents (closest to curl/curl --no-keepalive behavior).
- * Prevents socket reuse issues seen with some Node.js HTTP clients.
- */
 const httpAgent = new http.Agent({ keepAlive: false, maxSockets: 50 });
 const httpsAgent = new https.Agent({ keepAlive: false, maxSockets: 50 });
 
-/**
- * Axios instance for Radarr API requests.
- * Configured for long timeouts and non-keepalive agents.
- */
-const client = axios.create({
-  baseURL: RADARR_URL,
-  timeout: 300_000, // 5 minutes for large payloads
-  httpAgent,
-  httpsAgent,
-  headers: {
-    'X-Api-Key': RADARR_API_KEY,
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-    Connection: 'close'
-  }
-  // Axios buffers the full response; no streaming JSON here.
-});
-
-/**
- * Detects transient socket errors for retry logic.
- * @param {Error} error - Error object from Axios
- * @returns {boolean} True if error is a transient socket error
- */
-function isTransientSocketError (error) {
-  const msg = String(error?.message || '');
-  const code = String(error?.code || '');
-  return (
-    /UND_ERR_SOCKET|und_sock_err|socket|EAI_AGAIN/i.test(msg) ||
-    code === 'ECONNRESET' ||
-    code === 'EPIPE' ||
-    code === 'ETIMEDOUT'
-  );
-}
-
-/**
- * Axios one-shot retry interceptor for transient socket errors.
- * Retries once per request if a transient error is detected.
- */
-client.interceptors.response.use(
-  (res) => res,
-  async (error) => {
-    const cfg = error?.config || {};
-    if (!cfg || cfg.__retryOnceDone) {
-      return Promise.reject(error);
-    }
-    if (isTransientSocketError(error)) {
-      cfg.__retryOnceDone = true;
-      logger.warn(`[Radarr] transient error, retrying once: ${error.code || error.message}`);
-      return client.request(cfg);
-    }
-    return Promise.reject(error);
-  }
-);
-
-/**
- * Helper to build Radarr API URLs (for logging).
- * @param {string} path - API endpoint path (e.g., '/api/v3/movie')
- * @returns {string} API endpoint path (baseURL is already applied)
- */
+// Returns the API endpoint path for logging and request construction.
 function buildUrl (path) {
   return path;
 }
 
 /**
- * Helper to build headers for Radarr API requests.
- * @returns {Object} Headers for per-request overrides (default headers are set in Axios instance)
- */
-function buildHeaders () {
-  return {};
-}
-
-/**
- * Makes a Radarr API request using Axios.
- * Handles endpoint, method, body, and error handling.
+ * Makes a Radarr API request using native fetch and streams JSON responses for efficiency.
+ * Handles endpoint, method, body, and error handling. Returns parsed JSON or text.
+ * Throws on HTTP errors.
  *
  * @param {string} endpoint - API endpoint path (e.g., '/api/v3/movie')
  * @param {string} [method='GET'] - HTTP method
- * @param {Object|null} [body=null] - Request body (for POST/PUT)
- * @returns {Promise<Object>} Parsed JSON response
- * @throws {Error} If the request fails or a socket error occurs
+ * @param {Object|null} [body=null] - Request body for POST/PUT
+ * @returns {Promise<Object|Array|string>} Parsed JSON or text response
  */
 async function radarrRequest (endpoint, method = 'GET', body = null) {
   const url = buildUrl(endpoint);
   logger.info(`[Radarr] Request: ${method} ${RADARR_URL}${endpoint}`);
 
-  const res = await client.request({
-    url,
+  const fetchOptions = {
     method,
-    headers: buildHeaders(),
-    data: body ?? undefined,
-    // If you ever need raw text instead of JSON:
-    // responseType: 'text',
-    // transformResponse: [(data) => data],
-    validateStatus: (status) => status >= 200 && status < 300
-  });
-
-  return res.data;
-}
-
-/**
- * Fetch movies from Radarr with optional pagination and caching.
- * @param {Object} [opts] - Options for pagination and caching
- * @param {number} [opts.page=1] - Page number (Radarr pages start at 1)
- * @param {number} [opts.pageSize=100] - Number of movies per page
- * @param {number} [opts.cacheTtl=0] - Cache TTL in seconds (0 disables cache)
- * @returns {Promise<Array>} Array of movie objects
- */
-export async function getMovies (opts = {}) {
-  const { pageSize = 100 } = opts;
-  let page = 1;
-  const allMovies = [];
-  while (true) {
-    const endpoint = `/api/v3/movie?page=${page}&pageSize=${pageSize}`;
-    const movies = await radarrRequest(endpoint);
-    if (!Array.isArray(movies) || movies.length === 0) break;
-    allMovies.push(...movies);
-    if (movies.length < pageSize) break;
-    page += 1;
+    headers: {
+      'X-Api-Key': RADARR_API_KEY,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Connection: 'close',
+      'Accept-Encoding': 'gzip'
+    },
+    agent: url.startsWith('https') ? httpsAgent : httpAgent
+  };
+  if (body) {
+    fetchOptions.body = JSON.stringify(body);
   }
-  return allMovies;
+  const response = await fetch(`${RADARR_URL}${endpoint}`, fetchOptions);
+  if (!response.ok) {
+    throw new Error(`RadarrRequest failed: ${response.status} ${response.statusText}`);
+  }
+  const contentType = response.headers.get('content-type') || '';
+  if (!/application\/json/i.test(contentType)) {
+    return response.text();
+  }
+  // Stream and parse large JSON array/object efficiently
+  return new Promise((resolve, reject) => {
+    const result = {};
+    let isArray = false;
+    const items = [];
+    const pipeline = chain([
+      response.body,
+      parser(),
+      (data) => {
+        if (!isArray && data.name === 'startArray') {
+          isArray = true;
+          return streamArray();
+        }
+        return data;
+      }
+    ]);
+    pipeline.on('data', (data) => {
+      if (isArray) {
+        items.push(data.value);
+      } else if (data.name === 'keyValue') {
+        result[data.key] = data.value;
+      }
+    });
+    pipeline.on('end', () => resolve(isArray ? items : result));
+    pipeline.on('error', reject);
+  });
 }
 
 /**
- * Update a movie in Radarr.
- * @param {number} movieId - The Radarr movie ID
- * @param {Object} movieData - The full movie object to update
- * @returns {Promise<Object>} The updated movie object
+ * Fetches all movies from Radarr.
+ * Returns an array of movie objects.
+ */
+export async function getMovies () {
+  return radarrRequest('/api/v3/movie');
+}
+
+/**
+ * Updates a movie in Radarr by ID.
+ * Returns the updated movie object.
  */
 export async function updateMovie (movieId, movieData) {
   return radarrRequest(`/api/v3/movie/${movieId}`, 'PUT', movieData);
 }
 
 /**
- * Get Radarr system status.
- * @returns {Promise<Object>} System status info
+ * Gets Radarr system status info.
  */
 export async function getSystemStatus () {
   return radarrRequest('/api/v3/system/status');
 }
 
 /**
- * Fetch all tags from Radarr.
- * @returns {Promise<Array>} Array of tag objects
+ * Fetches all tags from Radarr.
+ * Returns an array of tag objects.
  */
 export async function getTags () {
   return radarrRequest('/api/v3/tag');
 }
 
 /**
- * List all files in a movie by movie ID.
- * @param {number} movieId - The Radarr movie ID
- * @returns {Promise<Array>} Array of file objects for the movie
+ * Lists all files in a movie by Radarr movie ID.
+ * Returns an array of file objects for the movie.
  */
 export async function getMovieFiles (movieId) {
   return radarrRequest(`/api/v3/moviefile?movieId=${movieId}`);
 }
 
 /**
- * List all movies with a specific tag (cached with lock/wait).
+ * Lists all movies with a specific tag (cached with lock/wait).
  * Uses memcached for 10-minute cache and lock/wait for concurrency.
- *
- * @param {string} tagName - The tag value to filter by (case-sensitive)
- * @returns {Promise<Array>} Array of movie objects with the specified tag
- * @throws {Error} If the tag is not found or API calls fail
+ * Returns an array of movie objects with the specified tag.
+ * Throws if the tag is not found or API calls fail.
  */
 export async function getMoviesByTag (tagName) {
   try {
@@ -249,13 +187,10 @@ export async function getMoviesByTag (tagName) {
 }
 
 /**
- * Get all movie files for all movies matching a tag.
+ * Gets all movie files for all movies matching a tag.
  * Uses async.eachSeries for sequential async processing to avoid overloading the server.
  * Returns a flat array of all movie files found.
- *
- * @param {string} tagName - The tag value to filter by (case-sensitive)
- * @returns {Promise<Array>} Array of movie file objects across all matching movies
- * @throws {Error} If the tag is not found or API calls fail
+ * Throws if the tag is not found or API calls fail.
  */
 export async function getMovieFilesByTag (tagName) {
   const movieList = await getMoviesByTag(tagName);
