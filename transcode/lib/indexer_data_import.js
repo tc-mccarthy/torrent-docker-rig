@@ -51,19 +51,8 @@ export async function importIndexerData () {
 
     logger.info(`Radarr list captured, indexing ${movies.length} movies on disk...`);
 
-    // Iterate over movies and update File records with indexer data (5 at a time)
-    await async.eachLimit(movies, 5, asyncify(async (movie) => {
-      /**
-       * @type {Object}
-       * @property {string} title - Movie title
-       * @property {number} year - Release year
-       * @property {number} tmdbId - TMDB ID
-       * @property {string} imdbId - IMDB ID
-       * @property {string} path - File path
-       * @property {Array<string|number>} tags - Tag names (or IDs if missing)
-       * @property {boolean} monitored - Monitored status
-       * @property {string} status - Movie status
-       */
+    // Build bulkWrite operations for all Radarr movies
+    const radarrBulkOps = movies.map((movie) => {
       const indexerData = {
         title: movie.title,
         overview: movie.overview,
@@ -73,17 +62,18 @@ export async function importIndexerData () {
         tags: (movie.tags || []).map((id) => radarrTagMap[id] || id),
         poster: movie.images?.find((img) => img.coverType === 'poster')?.remoteUrl || ''
       };
-
-      logger.debug(`Updating indexer data for movie: ${movie.title} (${movie.tmdbId})`, { indexerData, path: { $regex: indexerData.folderName, $options: 'i' } });
-      // Update File records in MongoDB where record path starts with movie folderName (case-insensitive, escapes special chars)
       const escapedFolderName = indexerData.folderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      await File.updateMany(
-        { path: { $regex: `^${escapedFolderName}`, $options: 'i' } },
-        { $set: { indexerData } }
-      );
-
-      return true;
-    }));
+      logger.debug(`BulkWrite: Updating indexer data for movie: ${movie.title} (${movie.tmdbId})`, { indexerData, path: { $regex: `^${escapedFolderName}`, $options: 'i' } });
+      return {
+        updateMany: {
+          filter: { path: { $regex: `^${escapedFolderName}`, $options: 'i' } },
+          update: { $set: { indexerData } }
+        }
+      };
+    });
+    if (radarrBulkOps.length > 0) {
+      await File.bulkWrite(radarrBulkOps);
+    }
 
     // --- SONARR ---
     logger.info('Importing Sonarr indexer data...');
@@ -101,18 +91,8 @@ export async function importIndexerData () {
     // Fetch all series from Sonarr and filter to those that exist on disk
     const seriesList = (await getSeries()).filter((s) => s.statistics?.sizeOnDisk > 0);
 
-    // Iterate over series and update File records with indexer data (5 at a time)
-    await async.eachLimit(seriesList, 5, asyncify(async (series) => {
-      /**
-       * @type {Object}
-       * @property {string} title - Series title
-       * @property {number} tvdbId - TVDB ID
-       * @property {string} imdbId - IMDB ID
-       * @property {string} path - File path
-       * @property {Array<string|number>} tags - Tag names (or IDs if missing)
-       * @property {boolean} monitored - Monitored status
-       * @property {string} status - Series status
-       */
+    // Build bulkWrite operations for all Sonarr series
+    const sonarrBulkOps = seriesList.map((series) => {
       const indexerData = {
         title: series.title,
         tvdbId: series.tvdbId,
@@ -121,18 +101,18 @@ export async function importIndexerData () {
         tags: (series.tags || []).map((id) => sonarrTagMap[id] || id),
         poster: series.images?.find((img) => img.coverType === 'poster')?.remoteUrl || ''
       };
-
-      logger.debug(`Updating indexer data for series: ${series.title} (${series.tvdbId})`, { indexerData });
-
-      // Update File records in MongoDB where record path starts with series folderName (case-insensitive, escapes special chars)
       const escapedSeriesFolderName = indexerData.folderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      await File.updateMany(
-        { path: { $regex: `^${escapedSeriesFolderName}`, $options: 'i' } },
-        { $set: { indexerData } }
-      );
-
-      return true;
-    }));
+      logger.debug(`BulkWrite: Updating indexer data for series: ${series.title} (${series.tvdbId})`, { indexerData });
+      return {
+        updateMany: {
+          filter: { path: { $regex: `^${escapedSeriesFolderName}`, $options: 'i' } },
+          update: { $set: { indexerData } }
+        }
+      };
+    });
+    if (sonarrBulkOps.length > 0) {
+      await File.bulkWrite(sonarrBulkOps);
+    }
 
     logger.info('Indexer data import complete.');
     await memcached.delete(LOCK_KEY);
