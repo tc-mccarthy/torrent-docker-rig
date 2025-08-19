@@ -37,6 +37,8 @@ export async function importIndexerData () {
     // Fetch all Radarr tags using radarr_api.js
     const radarrTagObjs = await getRadarrTags();
 
+    logger.info(radarrTagObjs, { label: 'Radarr Tags Fetched' });
+
     // Build an array of tag names indexed by tag ID for Radarr
     /** @type {Array<string>} */
     const radarrTagMap = [];
