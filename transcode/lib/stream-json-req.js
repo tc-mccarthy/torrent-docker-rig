@@ -48,7 +48,7 @@ export default async function streamJsonReq ({
       'Content-Type': 'application/json',
       ...headers
     },
-    signal: AbortSignal.timeout(120_000), // Hard timeout for fetch
+    signal: AbortSignal.timeout(600_000), // Hard timeout for fetch
     dispatcher: agent // undici uses 'dispatcher' instead of 'agent'
   };
   // Only set body if provided (for POST/PUT)
