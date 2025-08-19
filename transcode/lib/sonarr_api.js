@@ -22,7 +22,7 @@ if (!SONARR_API_KEY) {
 
 // Returns the API endpoint path for logging and request construction.
 function buildUrl (path) {
-  return path;
+  return SONARR_URL + path;
 }
 
 /**
