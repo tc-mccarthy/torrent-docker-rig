@@ -1,7 +1,7 @@
 import logger from './logger';
 import File from '../models/files';
 import calculateComputeScore from './calculateComputeScore';
-import getFileDiskUsage from './getFileDiskUsage';
+// import getFileDiskUsage from './getFileDiskUsage';
 // import { getEpisodesByTag } from './sonarr_api';
 // import { getMovieFilesByTag } from './radarr_api';
 
