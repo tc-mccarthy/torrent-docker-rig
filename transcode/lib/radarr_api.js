@@ -70,28 +70,35 @@ async function radarrRequest (endpoint, method = 'GET', body = null) {
   }
   // Stream and parse large JSON array/object efficiently
   return new Promise((resolve, reject) => {
-    const result = {};
-    let isArray = false;
-    const items = [];
+    let rootType = null;
+    let result = {};
+    let items = [];
     const pipeline = chain([
       response.body,
       parser(),
       (data) => {
-        if (!isArray && data.name === 'startArray') {
-          isArray = true;
-          return streamArray();
+        if (!rootType) {
+          if (data.name === 'startArray') {
+            rootType = 'array';
+            items = [];
+            return streamArray();
+          }
+          if (data.name === 'startObject') {
+            rootType = 'object';
+            result = {};
+          }
         }
         return data;
       }
     ]);
     pipeline.on('data', (data) => {
-      if (isArray) {
+      if (rootType === 'array') {
         items.push(data.value);
-      } else if (data.name === 'keyValue') {
+      } else if (rootType === 'object' && data.name === 'keyValue') {
         result[data.key] = data.value;
       }
     });
-    pipeline.on('end', () => resolve(isArray ? items : result));
+    pipeline.on('end', () => resolve(rootType === 'array' ? items : result));
     pipeline.on('error', reject);
   });
 }
