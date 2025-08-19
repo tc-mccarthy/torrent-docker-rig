@@ -7,15 +7,11 @@
 //   const series = await getSeries();
 //   await updateSeries(seriesId, seriesData);
 
-import http from 'node:http';
-import https from 'node:https';
 import { setTimeout as delay } from 'timers/promises';
 import async, { asyncify } from 'async';
-import { parser } from 'stream-json';
-import { streamArray } from 'stream-json/streamers/StreamArray';
-import { chain } from 'stream-chain';
 import logger from './logger';
 import memcached from './memcached';
+import streamJsonReq from './stream-json-req';
 
 const SONARR_API_KEY = process.env.SONARR_API_KEY;
 const SONARR_URL = process.env.SONARR_URL || 'http://localhost:8989';
@@ -23,9 +19,6 @@ const SONARR_URL = process.env.SONARR_URL || 'http://localhost:8989';
 if (!SONARR_API_KEY) {
   throw new Error('SONARR_API_KEY environment variable is not set');
 }
-
-const httpAgent = new http.Agent({ keepAlive: false, maxSockets: 50 });
-const httpsAgent = new https.Agent({ keepAlive: false, maxSockets: 50 });
 
 // Returns the API endpoint path for logging and request construction.
 function buildUrl (path) {
@@ -46,53 +39,13 @@ async function sonarrRequest (endpoint, method = 'GET', body = null) {
   const url = buildUrl(endpoint);
   logger.info(`[Sonarr] Request: ${method} ${SONARR_URL}${endpoint}`);
 
-  const fetchOptions = {
+  return streamJsonReq({
+    url,
     method,
     headers: {
-      'X-Api-Key': SONARR_API_KEY,
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Connection: 'close',
-      'Accept-Encoding': 'gzip'
+      'X-Api-Key': SONARR_API_KEY
     },
-    agent: url.startsWith('https') ? httpsAgent : httpAgent
-  };
-  if (body) {
-    fetchOptions.body = JSON.stringify(body);
-  }
-  const response = await fetch(`${SONARR_URL}${endpoint}`, fetchOptions);
-  if (!response.ok) {
-    throw new Error(`SonarrRequest failed: ${response.status} ${response.statusText}`);
-  }
-  const contentType = response.headers.get('content-type') || '';
-  if (!/application\/json/i.test(contentType)) {
-    return response.text();
-  }
-  // Stream and parse large JSON array/object efficiently
-  return new Promise((resolve, reject) => {
-    const result = {};
-    let isArray = false;
-    const items = [];
-    const pipeline = chain([
-      response.body,
-      parser(),
-      (data) => {
-        if (!isArray && data.name === 'startArray') {
-          isArray = true;
-          return streamArray();
-        }
-        return data;
-      }
-    ]);
-    pipeline.on('data', (data) => {
-      if (isArray) {
-        items.push(data.value);
-      } else if (data.name === 'keyValue') {
-        result[data.key] = data.value;
-      }
-    });
-    pipeline.on('end', () => resolve(isArray ? items : result));
-    pipeline.on('error', reject);
+    body
   });
 }
 
@@ -176,12 +129,16 @@ export async function getSeriesByTag (tagName) {
     const tagId = tagObj.id;
 
     const series = await getSeries();
-    const result = series.filter((s) => Array.isArray(s.tags) && s.tags.includes(tagId));
+    const result = series.filter(
+      (s) => Array.isArray(s.tags) && s.tags.includes(tagId)
+    );
 
     await memcached.set(cacheKey, JSON.stringify(result), cacheTtl);
     return result;
   } catch (err) {
-    logger.error(`Sonarr getSeriesByTag: error fetching tag '${tagName}': ${err.message}`);
+    logger.error(
+      `Sonarr getSeriesByTag: error fetching tag '${tagName}': ${err.message}`
+    );
     throw err;
   }
 }
@@ -202,7 +159,9 @@ export async function getEpisodeFilesByTag (tagName) {
         const files = await getEpisodeFiles(series.id);
         allFiles.push(...files);
       } catch (err) {
-        logger.error(`Sonarr getEpisodeFilesByTag: error fetching files for series ID ${series.id}: ${err.message}`);
+        logger.error(
+          `Sonarr getEpisodeFilesByTag: error fetching files for series ID ${series.id}: ${err.message}`
+        );
       } finally {
         return true;
       }

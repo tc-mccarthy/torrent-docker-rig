@@ -7,15 +7,11 @@
 //   const movies = await getMovies();
 //   await updateMovie(movieId, movieData);
 
-import http from 'node:http';
-import https from 'node:https';
 import { setTimeout as delay } from 'timers/promises';
 import async, { asyncify } from 'async';
-import { parser } from 'stream-json';
-import { chain } from 'stream-chain';
-import { streamValues } from 'stream-json/streamers/StreamValues';
 import logger from './logger';
 import memcached from './memcached';
+import streamJsonReq from './stream-json-req';
 
 const RADARR_API_KEY = process.env.RADARR_API_KEY;
 const RADARR_URL = process.env.RADARR_URL || 'http://localhost:7878';
@@ -23,9 +19,6 @@ const RADARR_URL = process.env.RADARR_URL || 'http://localhost:7878';
 if (!RADARR_API_KEY) {
   throw new Error('RADARR_API_KEY environment variable is not set');
 }
-
-const httpAgent = new http.Agent({ keepAlive: false, maxSockets: 50 });
-const httpsAgent = new https.Agent({ keepAlive: false, maxSockets: 50 });
 
 // Returns the API endpoint path for logging and request construction.
 function buildUrl (path) {
@@ -47,51 +40,12 @@ async function radarrRequest (endpoint, method = 'GET', body = null) {
   const url = buildUrl(endpoint);
   logger.info(`[Radarr] Request: ${method} ${RADARR_URL}${endpoint}`);
 
-  const fetchOptions = {
+  return streamJsonReq({
+    url,
     method,
     headers: {
-      'X-Api-Key': RADARR_API_KEY,
-      Accept: 'application/json',
-      'Content-Type': 'application/json'
-      // 'Accept-Encoding' and 'Connection' are unnecessary with fetch and can cause issues
-    },
-    agent: url.startsWith('https') ? httpsAgent : httpAgent
-  };
-  if (body) fetchOptions.body = JSON.stringify(body);
-
-  const response = await fetch(`${RADARR_URL}${endpoint}`, fetchOptions);
-  if (!response.ok) {
-    throw new Error(`RadarrRequest failed: ${response.status} ${response.statusText}`);
-  }
-
-  const contentType = response.headers.get('content-type') || '';
-  if (!/application\/json/i.test(contentType)) {
-    return response.text();
-  }
-
-  // Works for either a top-level array or object without switching pipeline stages
-  return new Promise((resolve, reject) => {
-    let isArray = null; // decide based on first item
-    const items = [];
-    const obj = {};
-
-    const pipeline = chain([
-      response.body, // Node.js Readable stream
-      parser(), // tokenizes JSON
-      streamValues() // emits { key, value } for both arrays and objects
-    ]);
-
-    pipeline.on('data', ({ key, value }) => {
-      if (isArray === null) {
-        // For arrays, streamValues uses numeric keys; for objects, string keys
-        isArray = typeof key === 'number';
-      }
-      if (isArray) items.push(value);
-      else obj[key] = value;
-    });
-
-    pipeline.on('end', () => resolve(isArray ? items : obj));
-    pipeline.on('error', reject);
+      'X-Api-Key': RADARR_API_KEY
+    }
   });
 }
 
@@ -175,12 +129,16 @@ export async function getMoviesByTag (tagName) {
     const tagId = tagObj.id;
 
     const movies = await getMovies();
-    const result = movies.filter((m) => Array.isArray(m.tags) && m.tags.includes(tagId));
+    const result = movies.filter(
+      (m) => Array.isArray(m.tags) && m.tags.includes(tagId)
+    );
 
     await memcached.set(cacheKey, JSON.stringify(result), cacheTtl);
     return result;
   } catch (err) {
-    logger.error(`Radarr getMoviesByTag: error fetching tag '${tagName}': ${err.message}`);
+    logger.error(
+      `Radarr getMoviesByTag: error fetching tag '${tagName}': ${err.message}`
+    );
     throw err;
   }
 }
@@ -201,7 +159,9 @@ export async function getMovieFilesByTag (tagName) {
         const files = await getMovieFiles(movie.id);
         allFiles.push(...files);
       } catch (err) {
-        logger.error(`Radarr getMovieFilesByTag: error fetching files for movie ID ${movie.id}: ${err.message}`);
+        logger.error(
+          `Radarr getMovieFilesByTag: error fetching files for movie ID ${movie.id}: ${err.message}`
+        );
       } finally {
         return true;
       }
