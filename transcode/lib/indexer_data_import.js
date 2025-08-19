@@ -34,10 +34,10 @@ export async function importIndexerData () {
       radarrTagMap[tag.id] = tag.label;
     });
 
-    // Fetch all movies from Radarr
-    const movies = await getMovies();
+    // Fetch all movies from Radarr and filter to those that exist on disk
+    const movies = (await getMovies()).filter(m => m.statistics?.sizeOnDisk > 0);
 
-    logger.info('Radarr list captured, indexing...');
+    logger.info(`Radarr list captured, indexing ${movies.length} movies on disk...`);
 
     // Iterate over movies and update File records with indexer data (5 at a time)
     await async.eachLimit(movies, 5, asyncify(async (movie) => {
@@ -86,8 +86,8 @@ export async function importIndexerData () {
       sonarrTagMap[tag.id] = tag.label;
     });
 
-    // Fetch all series from Sonarr
-    const seriesList = await getSeries();
+    // Fetch all series from Sonarr and filter to those that exist on disk
+    const seriesList = (await getSeries()).filter(s => s.statistics?.sizeOnDisk > 0);
 
     // Iterate over series and update File records with indexer data (5 at a time)
     await async.eachLimit(seriesList, 5, asyncify(async (series) => {
