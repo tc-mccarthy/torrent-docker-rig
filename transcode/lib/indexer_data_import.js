@@ -3,6 +3,7 @@ import { getMovies, getTags as getRadarrTags } from './radarr_api';
 import { getSeries, getTags as getSonarrTags } from './sonarr_api';
 import File from '../models/files';
 import logger from './logger';
+import memcached from './memcached';
 
 /**
  * @fileoverview Imports indexer data from Radarr and Sonarr, mapping tag IDs to names and updating File records in MongoDB.
@@ -20,6 +21,15 @@ import logger from './logger';
  * @returns {Promise<void>} Resolves when import is complete.
  */
 export async function importIndexerData () {
+  const LOCK_KEY = 'indexer-data-import-lock';
+  const LOCK_TTL = 1800; // 30 minutes in seconds
+  // Check for lock and short-circuit if found
+  if (await memcached.get(LOCK_KEY)) {
+    logger.warn('Indexer data import already in progress (lock found). Aborting.');
+    return false;
+  }
+  // Set lock before starting
+  await memcached.set(LOCK_KEY, 'locked', LOCK_TTL);
   try {
     // --- RADARR ---
     logger.info('Importing Radarr indexer data...');
@@ -35,7 +45,7 @@ export async function importIndexerData () {
     });
 
     // Fetch all movies from Radarr and filter to those that exist on disk
-    const movies = (await getMovies()).filter(m => m.statistics?.sizeOnDisk > 0);
+    const movies = (await getMovies()).filter((m) => m.statistics?.sizeOnDisk > 0);
 
     logger.info(`Radarr list captured, indexing ${movies.length} movies on disk...`);
 
@@ -87,7 +97,7 @@ export async function importIndexerData () {
     });
 
     // Fetch all series from Sonarr and filter to those that exist on disk
-    const seriesList = (await getSeries()).filter(s => s.statistics?.sizeOnDisk > 0);
+    const seriesList = (await getSeries()).filter((s) => s.statistics?.sizeOnDisk > 0);
 
     // Iterate over series and update File records with indexer data (5 at a time)
     await async.eachLimit(seriesList, 5, asyncify(async (series) => {
@@ -123,10 +133,12 @@ export async function importIndexerData () {
     }));
 
     logger.info('Indexer data import complete.');
+    await memcached.delete(LOCK_KEY);
     return true;
   } catch (err) {
     // Log error and stack trace for debugging
     logger.error('Indexer data import failed:', err);
+    await memcached.delete(LOCK_KEY);
     throw err;
   }
 }

@@ -26,6 +26,7 @@ import IntegrityQueue from './lib/integrityQueue';
 import TranscodeQueue from './lib/transcodeQueue';
 import update_status from './lib/update_status';
 import refresh_indexer_data from './lib/refresh_indexer_data';
+import assessPriority from './lib/assess_priority';
 
 const {
   max_memory_score, max_cpu_score,
@@ -74,7 +75,7 @@ async function run () {
     update_status();
     update_queue();
     generate_filelist({ limit: 1000, writeToFile: true });
-    refresh_indexer_data();
+    assessPriority();
 
     // Start the main transcode queue (handles video jobs)
     const transcodeQueue = new TranscodeQueue({ maxMemoryComputeScore: max_memory_score, maxCpuComputeScore: max_cpu_score, pollDelay: 10000 });
@@ -97,11 +98,11 @@ async function run () {
 
     // Schedule queue update every day at midnight
     cron.schedule('0 0 * * *', () => {
-      update_queue();
+      update_queue().then(() => { refresh_indexer_data(); });
     });
 
     // update indexer data every hour
-    cron.schedule('0 * * * *', () => {
+    cron.schedule('0 1-23 * * *', () => {
       refresh_indexer_data();
     });
   } catch (e) {
