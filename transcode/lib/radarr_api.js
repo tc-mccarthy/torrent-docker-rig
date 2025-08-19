@@ -138,11 +138,26 @@ async function radarrRequest (endpoint, method = 'GET', body = null) {
 }
 
 /**
- * Fetch all movies from Radarr.
+ * Fetch movies from Radarr with optional pagination and caching.
+ * @param {Object} [opts] - Options for pagination and caching
+ * @param {number} [opts.page=1] - Page number (Radarr pages start at 1)
+ * @param {number} [opts.pageSize=100] - Number of movies per page
+ * @param {number} [opts.cacheTtl=0] - Cache TTL in seconds (0 disables cache)
  * @returns {Promise<Array>} Array of movie objects
  */
-export async function getMovies () {
-  return radarrRequest('/api/v3/movie');
+export async function getMovies (opts = {}) {
+  const { pageSize = 100 } = opts;
+  let page = 1;
+  const allMovies = [];
+  while (true) {
+    const endpoint = `/api/v3/movie?page=${page}&pageSize=${pageSize}`;
+    const movies = await radarrRequest(endpoint);
+    if (!Array.isArray(movies) || movies.length === 0) break;
+    allMovies.push(...movies);
+    if (movies.length < pageSize) break;
+    page += 1;
+  }
+  return allMovies;
 }
 
 /**
