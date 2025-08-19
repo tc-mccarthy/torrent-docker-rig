@@ -97,11 +97,11 @@ async function run () {
 
     // Schedule queue update every day at midnight
     cron.schedule('0 0 * * *', () => {
-      update_queue();
+      update_queue().then(() => { refresh_indexer_data(); });
     });
 
     // update indexer data every hour
-    cron.schedule('0 * * * *', () => {
+    cron.schedule('0 1-23 * * *', () => {
       refresh_indexer_data();
     });
   } catch (e) {

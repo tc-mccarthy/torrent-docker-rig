@@ -138,7 +138,9 @@ export default async function update_queue () {
 
     // clear the lock
     await redisClient.del('update_queue_lock');
+    return true;
   } catch (e) {
     logger.error(e, { label: 'UPDATE QUEUE ERROR' });
+    throw e;
   }
 }
