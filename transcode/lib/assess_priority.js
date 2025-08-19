@@ -23,7 +23,7 @@ import logger from './logger';
  */
 export default async function assessPriority () {
   // Query for files with high priority
-  const query = { 'sortFields.priority': { $gte: 90 } };
+  const query = { 'sortFields.priority': { $gte: 90 }, status: 'pending' };
   const files = await File.find(query);
   let updatedCount = 0;
 
