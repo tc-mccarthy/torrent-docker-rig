@@ -25,37 +25,37 @@ export default async function assessPriority () {
   // Query for files with high priority
   const query = { 'sortFields.priority': { $gte: 90 }, status: 'pending' };
   const files = await File.find(query);
-  let updatedCount = 0;
 
   logger.info(`Assessing priority for ${files.length} files with priority >= 90`);
 
-  // Use async.eachLimit to process files concurrently (limit 5 at a time)
+  // Prepare bulk operations for files needing priority update
+  const bulkOps = [];
   await async.eachLimit(
     files,
-    5,
+    20,
     asyncify(async (file) => {
       try {
-        // Calculate new priority using default_priority logic
         const newPriority = await default_priority(file);
-        // Only update if priority has changed
         if (file.sortFields.priority !== newPriority) {
-          file.sortFields.priority = newPriority;
-          await file.save();
-          updatedCount += 1;
+          bulkOps.push({
+            updateOne: {
+              filter: { _id: file._id },
+              update: { $set: { 'sortFields.priority': newPriority } }
+            }
+          });
         }
       } catch (err) {
-        // Log error but continue processing other files
-        logger.info(
-          `Error updating priority for file ${file._id}: ${err.message}`
-        );
+        logger.info(`Error updating priority for file ${file._id}: ${err.message}`);
       } finally {
-        // Signal completion for async.eachLimit
         return true;
       }
     })
   );
 
-  logger.info(`Finished assessing priority for ${files.length} files with priority >= 90. Updated ${updatedCount} files.`);
-  // Return the number of updated documents
-  return updatedCount;
+  let result = { modifiedCount: 0 };
+  if (bulkOps.length > 0) {
+    result = await File.bulkWrite(bulkOps, { ordered: false });
+  }
+  logger.info(`Finished assessing priority for ${files.length} files with priority >= 90. Updated ${result.modifiedCount} files.`);
+  return result.modifiedCount;
 }
