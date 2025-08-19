@@ -4,32 +4,17 @@
 // Uses a custom undici Agent for IPv4-only DNS lookup and keepalive, and converts WHATWG streams to Node streams for compatibility.
 
 import { Agent, fetch as undiciFetch, setGlobalDispatcher } from 'undici';
-import dns from 'node:dns';
-import net from 'node:net';
 import { Readable } from 'node:stream';
 import { chain } from 'stream-chain';
 import { parser } from 'stream-json';
 import { streamValues } from 'stream-json/streamers/StreamValues';
 import logger from './logger';
 
-function preferIPv4ButSafe (hostname, options, cb) {
-  // If the URL already contains an IP literal, just return it unchanged.
-  const ipFamily = net.isIP(hostname);
-  if (ipFamily) return cb(null, hostname, ipFamily);
-
-  // Try IPv4 first…
-  dns.lookup(hostname, { family: 4 }, (err, address, family) => {
-    if (!err) return cb(null, address, family);
-    // …then fall back to the system default (lets IPv6 work).
-    dns.lookup(hostname, {}, cb);
-  });
-}
 
 // Create a single undici Agent for all requests (handles both HTTP and HTTPS).
 const agent = new Agent({
   keepAliveTimeout: 30_000, // Keep connections alive for 30s
   keepAliveMaxTimeout: 60_000, // Max keepalive duration
-  connect: { lookup: preferIPv4ButSafe } // Use IPv4-only DNS lookup
 });
 
 // Set the global undici dispatcher so all fetches use our custom agent.
