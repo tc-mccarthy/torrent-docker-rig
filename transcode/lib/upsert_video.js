@@ -66,19 +66,19 @@ export async function default_priority (video) {
 
     // --- Check disk utilization for the volume containing the video file ---
     // If the file path is available, determine the mount point and check usage
-    if (video.path) {
-      try {
-        const percentUsed = await getFileDiskUsage(video.path);
+    // if (video.path) {
+    //   try {
+    //     const percentUsed = await getFileDiskUsage(video.path);
 
-        if (percentUsed >= 90) {
-          // If the disk is 90% or more full, set high priority
-          return 97;
-        }
-      } catch (diskErr) {
-        // If disk usage check fails, log but do not block processing
-        logger.warn(diskErr, { label: 'DISK USAGE CHECK FAILED' });
-      }
-    }
+    //     if (percentUsed >= 90) {
+    //       // If the disk is 90% or more full, set high priority
+    //       return 97;
+    //     }
+    //   } catch (diskErr) {
+    //     // If disk usage check fails, log but do not block processing
+    //     logger.warn(diskErr, { label: 'DISK USAGE CHECK FAILED' });
+    //   }
+    // }
 
     // --- Default case: normal priority ---
     return 100;
