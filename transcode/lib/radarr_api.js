@@ -12,8 +12,8 @@ import https from 'node:https';
 import { setTimeout as delay } from 'timers/promises';
 import async, { asyncify } from 'async';
 import { parser } from 'stream-json';
-import { streamArray } from 'stream-json/streamers/StreamArray';
 import { chain } from 'stream-chain';
+import { streamValues } from 'stream-json/streamers/StreamValues';
 import logger from './logger';
 import memcached from './memcached';
 
@@ -42,6 +42,7 @@ function buildUrl (path) {
  * @param {Object|null} [body=null] - Request body for POST/PUT
  * @returns {Promise<Object|Array|string>} Parsed JSON or text response
  */
+
 async function radarrRequest (endpoint, method = 'GET', body = null) {
   const url = buildUrl(endpoint);
   logger.info(`[Radarr] Request: ${method} ${RADARR_URL}${endpoint}`);
@@ -51,54 +52,45 @@ async function radarrRequest (endpoint, method = 'GET', body = null) {
     headers: {
       'X-Api-Key': RADARR_API_KEY,
       Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Connection: 'close',
-      'Accept-Encoding': 'gzip'
+      'Content-Type': 'application/json'
+      // 'Accept-Encoding' and 'Connection' are unnecessary with fetch and can cause issues
     },
     agent: url.startsWith('https') ? httpsAgent : httpAgent
   };
-  if (body) {
-    fetchOptions.body = JSON.stringify(body);
-  }
+  if (body) fetchOptions.body = JSON.stringify(body);
+
   const response = await fetch(`${RADARR_URL}${endpoint}`, fetchOptions);
   if (!response.ok) {
     throw new Error(`RadarrRequest failed: ${response.status} ${response.statusText}`);
   }
+
   const contentType = response.headers.get('content-type') || '';
   if (!/application\/json/i.test(contentType)) {
     return response.text();
   }
-  // Stream and parse large JSON array/object efficiently
+
+  // Works for either a top-level array or object without switching pipeline stages
   return new Promise((resolve, reject) => {
-    let rootType = null;
-    let result = {};
-    let items = [];
+    let isArray = null; // decide based on first item
+    const items = [];
+    const obj = {};
+
     const pipeline = chain([
-      response.body,
-      parser(),
-      (data) => {
-        if (!rootType) {
-          if (data.name === 'startArray') {
-            rootType = 'array';
-            items = [];
-            return streamArray();
-          }
-          if (data.name === 'startObject') {
-            rootType = 'object';
-            result = {};
-          }
-        }
-        return data;
-      }
+      response.body, // Node.js Readable stream
+      parser(), // tokenizes JSON
+      streamValues() // emits { key, value } for both arrays and objects
     ]);
-    pipeline.on('data', (data) => {
-      if (rootType === 'array') {
-        items.push(data.value);
-      } else if (rootType === 'object' && data.name === 'keyValue') {
-        result[data.key] = data.value;
+
+    pipeline.on('data', ({ key, value }) => {
+      if (isArray === null) {
+        // For arrays, streamValues uses numeric keys; for objects, string keys
+        isArray = typeof key === 'number';
       }
+      if (isArray) items.push(value);
+      else obj[key] = value;
     });
-    pipeline.on('end', () => resolve(rootType === 'array' ? items : result));
+
+    pipeline.on('end', () => resolve(isArray ? items : obj));
     pipeline.on('error', reject);
   });
 }
