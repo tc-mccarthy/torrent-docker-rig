@@ -1,20 +1,34 @@
 // stream-json-req.js
-// Utility for streaming and parsing large JSON HTTP responses efficiently using native fetch and stream-json.
-// Handles both root-level arrays and objects, returning the correct structure.
+//
+// Efficiently stream and parse large JSON HTTP responses using undici fetch and stream-json.
+// Uses a custom undici Agent for IPv4-only DNS lookup and keepalive, and converts WHATWG streams to Node streams for compatibility.
 
-import http from 'node:http';
-import https from 'node:https';
-import { parser } from 'stream-json';
+import { Agent, fetch as undiciFetch, setGlobalDispatcher } from 'undici';
+import dns from 'node:dns';
+import { Readable } from 'node:stream';
 import { chain } from 'stream-chain';
+import { parser } from 'stream-json';
 import { streamValues } from 'stream-json/streamers/StreamValues';
 import logger from './logger';
 
-const httpAgent = new http.Agent({ keepAlive: false, maxSockets: 50 });
-const httpsAgent = new https.Agent({ keepAlive: false, maxSockets: 50 });
+// Force IPv4 DNS resolution to avoid slow IPv6/Happy-Eyeballs delays on some networks.
+const lookup4 = (hostname, opts, cb) => dns.lookup(hostname, { family: 4 }, cb);
+
+// Create a single undici Agent for all requests (handles both HTTP and HTTPS).
+const agent = new Agent({
+  keepAliveTimeout: 30_000, // Keep connections alive for 30s
+  keepAliveMaxTimeout: 60_000, // Max keepalive duration
+  connect: { lookup: lookup4 } // Use IPv4-only DNS lookup
+});
+
+// Set the global undici dispatcher so all fetches use our custom agent.
+setGlobalDispatcher(agent);
 
 /**
- * Streams and parses a JSON HTTP response efficiently, handling both arrays and objects.
- * Uses stream-json to tokenize and emit values as they arrive, minimizing memory usage.
+ * Streams and parses a large JSON HTTP response efficiently using undici fetch and stream-json.
+ * Handles both root-level arrays and objects, returning the correct structure.
+ * Converts WHATWG ReadableStream to Node.js Readable for compatibility with stream-json.
+ * Logs timing and progress for observability.
  *
  * @param {Object} options - Request options
  * @param {string} options.url - The full URL to request
@@ -24,20 +38,34 @@ const httpsAgent = new https.Agent({ keepAlive: false, maxSockets: 50 });
  * @returns {Promise<Object|Array|string>} Parsed JSON object, array, or text response
  * @throws {Error} If the request fails or response is not OK
  */
-export default async function streamJsonReq ({ url, method = 'GET', headers = {}, body = false }) {
-  // Build fetch options, including agents for keepalive and custom headers
+export default async function streamJsonReq ({
+  url,
+  method = 'GET',
+  headers = {},
+  body = false
+}) {
+  // Build fetch options, including dispatcher for custom agent and timeout signal
   const fetchOptions = {
     method,
-    headers: { ...headers, Accept: 'application/json', 'Content-Type': 'application/json' },
-    agent: url.startsWith('https') ? httpsAgent : httpAgent
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...headers
+    },
+    signal: AbortSignal.timeout(120_000), // Hard timeout for fetch
+    dispatcher: agent // undici uses 'dispatcher' instead of 'agent'
   };
   // Only set body if provided (for POST/PUT)
   if (body) fetchOptions.body = JSON.stringify(body);
 
-  // Make the HTTP request using native fetch
-  const response = await fetch(url, fetchOptions);
+  // Track timing for request and header receipt
+  const t0 = Date.now();
+  const response = await undiciFetch(url, fetchOptions);
+  const t1 = Date.now();
+  logger.info(`streamJsonReq: headers in ${t1 - t0} ms`);
+
+  // Throw on HTTP error status
   if (!response.ok) {
-    // Throw on HTTP error status
     throw new Error(`streamJsonReq failed: ${response.status} ${response.statusText}`);
   }
 
@@ -46,6 +74,9 @@ export default async function streamJsonReq ({ url, method = 'GET', headers = {}
   if (!/application\/json/i.test(contentType)) {
     return response.text();
   }
+
+  // Convert WHATWG ReadableStream to Node.js Readable for stream-json compatibility
+  const nodeStream = Readable.fromWeb(response.body);
 
   // Stream and parse JSON efficiently, handling both arrays and objects
   // streamValues emits { key, value } for each item in the root array or object
@@ -56,26 +87,29 @@ export default async function streamJsonReq ({ url, method = 'GET', headers = {}
 
     // Set up the streaming pipeline
     const pipeline = chain([
-      response.body, // Node.js Readable stream
-      parser(), // Tokenizes JSON
-      streamValues() // Emits { key, value } for both arrays and objects
+      nodeStream,
+      parser(),
+      streamValues()
     ]);
 
+    // Log progress every 1000 items for observability
+    let count = 0;
     pipeline.on('data', ({ key, value }) => {
-      // Log each parsed key/value for debugging
-      logger.info(`streamJsonReq: Parsed key=${key}, value=${typeof value}`, {
-        label: 'PIPELINE JSON PARSE'
-      });
-      // Decide if root is array or object based on first key type
-      if (isArray === null) {
-        // Numeric keys mean array, string keys mean object
-        isArray = typeof key === 'number';
-      }
+      if (isArray === null) isArray = typeof key === 'number';
       if (isArray) items.push(value);
       else obj[key] = value;
+
+      count += 1;
+      if (count % 1000 === 0) {
+        logger.info(`streamJsonReq: parsed ${count} items so far`);
+      }
     });
 
-    pipeline.on('end', () => resolve(isArray ? items : obj));
-    pipeline.on('error', reject);
+    pipeline.once('end', () => {
+      const t2 = Date.now();
+      logger.info(`streamJsonReq: done in ${t2 - t1} ms after headers; total ${t2 - t0} ms`);
+      resolve(isArray ? items : obj);
+    });
+    pipeline.once('error', reject);
   });
 }
