@@ -179,7 +179,7 @@ export function generateTranscodeInstructions (mongoDoc) {
   // Only include English/und subtitle streams in supported formats
   result.subtitles = subtitleStreams.filter((stream) => {
     const lang = (stream.tags?.language || 'und').toLowerCase();
-    const codec = stream.codec_name.toLowerCase();
+    const codec = stream.codec_name?.toLowerCase();
     // Only keep English/und and supported subtitle codecs
     return (['en', 'eng', 'und'].includes(lang) && /subrip|hdmv_pgs_subtitle|substation/i.test(codec));
   }).map((stream) => ({
