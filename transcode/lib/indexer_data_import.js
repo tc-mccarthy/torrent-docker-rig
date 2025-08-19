@@ -1,4 +1,3 @@
-import async, { asyncify } from 'async';
 import { getMovies, getTags as getRadarrTags } from './radarr_api';
 import { getSeries, getTags as getSonarrTags } from './sonarr_api';
 import File from '../models/files';
