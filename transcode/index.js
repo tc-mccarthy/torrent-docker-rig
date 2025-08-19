@@ -72,8 +72,9 @@ async function run () {
 
     // Update the transcode queue and status, and generate the initial filelist
     update_status();
-    update_queue().then(() => { refresh_indexer_data(); });
+    // update_queue().then(() => { refresh_indexer_data(); });
     generate_filelist({ limit: 1000, writeToFile: true });
+    refresh_indexer_data();
 
     // Start the main transcode queue (handles video jobs)
     const transcodeQueue = new TranscodeQueue({ maxMemoryComputeScore: max_memory_score, maxCpuComputeScore: max_cpu_score, pollDelay: 10000 });
