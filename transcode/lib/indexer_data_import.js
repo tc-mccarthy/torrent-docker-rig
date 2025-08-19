@@ -70,9 +70,11 @@ export async function importIndexerData () {
         }
       };
     });
+    logger.info(`Radarr bulkWrite operations prepared for ${radarrBulkOps.length} movies.`);
     if (radarrBulkOps.length > 0) {
       await File.bulkWrite(radarrBulkOps);
     }
+    logger.info(`Radarr bulkWrite operations completed for ${radarrBulkOps.length} movies.`);
 
     // --- SONARR ---
     logger.info('Importing Sonarr indexer data...');
@@ -109,10 +111,12 @@ export async function importIndexerData () {
         }
       };
     });
+    logger.info(`Sonarr bulkWrite operations prepared for ${sonarrBulkOps.length} series.`);
     if (sonarrBulkOps.length > 0) {
       await File.bulkWrite(sonarrBulkOps);
     }
 
+    logger.info(`Sonarr bulkWrite operations completed for ${sonarrBulkOps.length} series.`);
     logger.info('Indexer data import complete.');
     await memcached.delete(LOCK_KEY);
     return true;
