@@ -16,58 +16,116 @@ const { Schema, model } = mongoose;
 const model_name = 'File';
 
 // establish types and defaults for keys
+/**
+ * @typedef {Object} FileDocument
+ * @property {string} path - File path (unique)
+ * @property {string} encode_version - Encode version
+ * @property {string} status - File status (default: 'pending')
+ * @property {Object} probe - Probe data (ffprobe output)
+ * @property {Date} last_probe - Last probe date
+ * @property {Object} transcode_details - Transcode details
+ * @property {Object} sortFields - Sorting fields (priority, width, size, etc.)
+ * @property {Array} audio_language - Audio language(s)
+ * @property {Object} error - Error details
+ * @property {Boolean} hasError - Error flag
+ * @property {Boolean} integrityCheck - Integrity check flag
+ * @property {Number} computeScore - Compute score (auto-calculated)
+ * @property {Boolean} permitHWDecode - Hardware decode permission
+ * @property {Number} reclaimedSpace - Space reclaimed by file
+ * @property {Object} indexerData - Indexer metadata (Radarr/Sonarr)
+ */
+
+/**
+ * Mongoose schema for File documents.
+ * Includes all metadata, probe info, transcode details, and indexer enrichment.
+ */
 const schema = new Schema(
   {
+    /**
+     * File path (unique identifier for each file)
+     */
     path: {
       type: String,
       required: false,
       unique: true
     },
+    /**
+     * Encode version (for tracking encoding changes)
+     */
     encode_version: {
       type: String,
       required: false,
       index: true
     },
+    /**
+     * File status (pending, complete, error, etc.)
+     */
     status: {
       type: String,
       required: true,
       index: true,
       default: 'pending'
     },
+    /**
+     * Probe data (ffprobe output)
+     */
     probe: {
       type: Object,
-      required: false // making this false so that we can easily add registration to the site without needing a subscription
+      required: false
     },
+    /**
+     * Last probe date
+     */
     last_probe: {
       type: Date,
       required: false
     },
+    /**
+     * Transcode details (metadata about transcode operation)
+     */
     transcode_details: {
       type: Object,
       required: false
     },
+    /**
+     * Sorting fields (priority, width, size, etc.)
+     */
     sortFields: {
       type: Object,
       required: true
     },
+    /**
+     * Audio language(s)
+     */
     audio_language: {
       type: Array,
       required: false
     },
+    /**
+     * Error details
+     */
     error: {
       type: Object,
       required: false
     },
+    /**
+     * Error flag
+     */
     hasError: {
       type: Boolean,
       required: false
     },
+    /**
+     * Integrity check flag
+     */
     integrityCheck: {
       type: Boolean,
       required: false,
       default: false
     },
-
+    /**
+     * Compute score (auto-calculated from probe data)
+     */
     computeScore: {
       type: Number,
       required: false,
@@ -77,8 +135,8 @@ const schema = new Schema(
           if (value && value >= getMinimum()) {
             return value;
           }
-
-          return calculateComputeScore(this); // Calculate the compute score based on the probe data
+          // Calculate the compute score based on the probe data
+          return calculateComputeScore(this);
         } catch (e) {
           // Gracefully handle any probe data issues and default conservatively
           logger.error(e, { label: 'COMPUTE SCORE ERROR' });
@@ -87,16 +145,25 @@ const schema = new Schema(
         }
       }
     },
+    /**
+     * Hardware decode permission
+     */
     permitHWDecode: {
       type: Boolean,
       required: false,
       default: true
     },
+    /**
+     * Space reclaimed by file (in bytes)
+     */
     reclaimedSpace: {
       type: Number,
       required: false,
       default: 0
     },
+    /**
+     * Indexer metadata (Radarr/Sonarr enrichment)
+     */
     indexerData: {
       type: Object,
       required: false
@@ -105,7 +172,15 @@ const schema = new Schema(
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 
-schema.methods.saveDebounce = async function () {
+/**
+ * Debounced save method for File documents.
+ * Prevents rapid consecutive saves from causing parallel write errors.
+ * Retries on parallel error with a random delay.
+ *
+ * @function saveDebounce
+ * @memberof FileDocument
+ */
+schema.methods.saveDebounce = async function saveDebounce () {
   if (this.saveTimeout) {
     clearTimeout(this.saveTimeout);
   }
@@ -115,32 +190,23 @@ schema.methods.saveDebounce = async function () {
       this.saveTimeout = null;
     } catch (e) {
       if (/parallel/i.test(e.message)) {
-        await wait(getRandomDelay(0.25, 0.5)); // wait a random time between 1/4 and 1/2 seconds
-
+        await wait(getRandomDelay(0.25, 0.5));
         console.error('Retrying save after parallel error');
-        this.saveDebounce(); // retry saving after an error
+        this.saveDebounce();
       }
     }
   }, 250);
 };
 
+/**
+ * Indexes for efficient queries on File documents.
+ * Includes compound and single-field indexes for sortFields, status, probe, and error fields.
+ */
 schema.index({ 'probe.format.size': 1 });
 schema.index({ 'sortFields.width': -1, 'sortFields.size': 1 });
-schema.index({
-  'sortFields.priority': 1,
-  'sortFields.width': -1,
-  'sortFields.size': 1
-});
-schema.index({
-  'sortFields.priority': 1,
-  'sortFields.width': -1,
-  'sortFields.size': -1
-});
-schema.index({
-  'sortFields.priority': 1,
-  'sortFields.size': -1,
-  'sortFields.width': -1
-});
+schema.index({ 'sortFields.priority': 1, 'sortFields.width': -1, 'sortFields.size': 1 });
+schema.index({ 'sortFields.priority': 1, 'sortFields.width': -1, 'sortFields.size': -1 });
+schema.index({ 'sortFields.priority': 1, 'sortFields.size': -1, 'sortFields.width': -1 });
 schema.index({ 'sortFields.priority': 1 });
 schema.index({ 'sortFields.size': 1 });
 schema.index({ 'sortFields.width': -1 });
@@ -151,6 +217,10 @@ schema.index({ last_probe: -1 });
 schema.index({ hasError: 1 });
 schema.index({ encode_version: 1, status: 1 });
 schema.index({ integrityCheck: 1, status: 1 });
+/**
+ * Compound index for priority and status (for queries like: priority >= 90 and status = 'pending')
+ */
+schema.index({ 'sortFields.priority': 1, status: 1 });
 
 // create a model object that uses the above schema
 export default model(model_name, schema);
