@@ -26,7 +26,6 @@ import IntegrityQueue from './lib/integrityQueue';
 import TranscodeQueue from './lib/transcodeQueue';
 import update_status from './lib/update_status';
 import refresh_indexer_data from './lib/refresh_indexer_data';
-import assessPriority from './lib/assess_priority';
 
 const {
   max_memory_score, max_cpu_score,
@@ -75,7 +74,7 @@ async function run () {
     update_status();
     update_queue();
     generate_filelist({ limit: 1000, writeToFile: true });
-    assessPriority();
+    refresh_indexer_data();
 
     // Start the main transcode queue (handles video jobs)
     const transcodeQueue = new TranscodeQueue({ maxMemoryComputeScore: max_memory_score, maxCpuComputeScore: max_cpu_score, pollDelay: 10000 });
