@@ -54,19 +54,27 @@
  *   }>
  * }} - Transcoding instruction object.
  */
+/**
+ * Generates transcoding instructions for video, audio, and subtitles based on ffprobe and metadata.
+ *
+ * This function analyzes the input media file and determines the optimal transcoding strategy for Plex/streaming:
+ * - Video: Copies HEVC if small, otherwise transcodes to AV1 with HDR and rate control.
+ * - Audio: Copies AAC/AC3/EAC3, otherwise encodes stereo to AAC and multichannel to EAC3.
+ * - Subtitles: Copies English/und streams in supported formats.
+ *
+ * @param {Object} mongoDoc - MongoDB document containing ffprobe and metadata info.
+ * @returns {Object} Transcoding instruction object for video, audio, and subtitles.
+ */
 export function generateTranscodeInstructions (mongoDoc) {
   // Extract ffprobe and language info from the document
-  const {
-    probe: ffprobe,
-    audio_language = []
-  } = mongoDoc;
+  const { probe: ffprobe, audio_language = [] } = mongoDoc;
 
   // Defensive: ensure streams and format are always objects
   const streams = ffprobe.streams || [];
   const format = ffprobe.format || {};
   // File size in kilobytes, then convert to gigabytes for logic
   const fileSizeKB = parseInt(format.size || 0, 10);
-  const fileSizeGB = fileSizeKB / (1024 ** 2);
+  const fileSizeGB = fileSizeKB / 1024 ** 2;
 
   // Split streams by type for easier processing
   const videoStreams = streams.filter((s) => s.codec_type === 'video');
@@ -85,7 +93,7 @@ export function generateTranscodeInstructions (mongoDoc) {
 
   // Main video stream is always the first video stream
   const mainVideo = videoStreams[0];
-  if (!mainVideo) throw new Error('No video stream found');
+  if (!mainVideo) throw new Error('No video stream found'); // Defensive: must have a video stream
 
   // Gather video stream properties
   const videoCodec = mainVideo.codec_name;
@@ -94,9 +102,13 @@ export function generateTranscodeInstructions (mongoDoc) {
   const isUHD = width >= 3840;
 
   // Log the video stream being processed for debugging
-  console.log(`Processing video stream: ${videoCodec}, width: ${width}, size: ${fileSizeGB.toFixed(2)} GB`);
+  console.log(
+    `Processing video stream: ${videoCodec}, width: ${width}, size: ${fileSizeGB.toFixed(
+      2
+    )} GB`
+  );
 
-  // If the file is small and already HEVC, just copy the video stream
+  // If the file is small and already HEVC, just copy the video stream (saves time/resources)
   if (fileSizeGB <= 1 && isHEVC) {
     // No need to transcode, just copy the stream
     result.video = {
@@ -105,9 +117,9 @@ export function generateTranscodeInstructions (mongoDoc) {
       arguments: {}
     };
   } else {
-    // Otherwise, build a full transcode instruction
+    // Otherwise, build a full transcode instruction for AV1
     const hdrProps = {};
-    // If HDR (PQ/2084), preserve HDR metadata
+    // If HDR (PQ/2084), preserve HDR metadata for Plex/quality
     if (mainVideo.color_transfer?.includes('2084')) {
       // Copy HDR color primaries, transfer, and colorspace
       hdrProps.color_primaries = mainVideo.color_primaries;
@@ -116,8 +128,12 @@ export function generateTranscodeInstructions (mongoDoc) {
 
       // Extract HDR mastering and content light level metadata if present
       const sideData = mainVideo.side_data_list || [];
-      const masteringDisplay = sideData.find((d) => d.side_data_type === 'Mastering display metadata');
-      const contentLightLevel = sideData.find((d) => d.side_data_type === 'Content light level metadata');
+      const masteringDisplay = sideData.find(
+        (d) => d.side_data_type === 'Mastering display metadata'
+      );
+      const contentLightLevel = sideData.find(
+        (d) => d.side_data_type === 'Content light level metadata'
+      );
 
       if (masteringDisplay?.mastering_display_metadata) {
         hdrProps.master_display = masteringDisplay.mastering_display_metadata;
@@ -127,18 +143,13 @@ export function generateTranscodeInstructions (mongoDoc) {
       }
     }
 
-    // Calculate GOP size for Plex compatibility
+    // Calculate GOP size for Plex compatibility (2s interval)
     const gop = calculateGOP(mainVideo);
 
     // Build SVT-AV1 specific encoder parameters into a single string
-    const svtParams = [
-      'fast-decode=1',
-      'scd=1',
-      'usage=0',
-      'tier=0'
-    ].join(':');
+    const svtParams = ['fast-decode=1', 'scd=1', 'usage=0', 'tier=0'].join(':');
 
-    // Build the video transcode instruction
+    // Build the video transcode instruction for AV1
     result.video = {
       stream_index: mainVideo.index,
       codec: 'libsvtav1',
@@ -157,13 +168,12 @@ export function generateTranscodeInstructions (mongoDoc) {
     };
   }
 
-  // Filter audio streams to only those matching spoken languages
-  const filteredAudio = audioStreams
-    .filter((s) => {
-      // Only include streams with a language in the spokenLangs list
-      const lang = (s.tags?.language || 'und').toLowerCase();
-      return spokenLangs.includes(lang);
-    });
+  // Filter audio streams to only those matching spoken languages (from TMDb/TVDb)
+  const filteredAudio = audioStreams.filter((s) => {
+    // Only include streams with a language in the spokenLangs list
+    const lang = (s.tags?.language || 'und').toLowerCase();
+    return spokenLangs.includes(lang);
+  });
 
   // Map filtered audio streams to encoding instructions
   result.audio = filteredAudio.map((stream) => {
@@ -176,16 +186,21 @@ export function generateTranscodeInstructions (mongoDoc) {
     };
   });
 
-  // Only include English/und subtitle streams in supported formats
-  result.subtitles = subtitleStreams.filter((stream) => {
-    const lang = (stream.tags?.language || 'und').toLowerCase();
-    const codec = stream.codec_name?.toLowerCase();
-    // Only keep English/und and supported subtitle codecs
-    return (['en', 'eng', 'und'].includes(lang) && /subrip|hdmv_pgs_subtitle|substation/i.test(codec));
-  }).map((stream) => ({
-    stream_index: stream.index,
-    codec: 'copy'
-  }));
+  // Only include English/und subtitle streams in supported formats (SRT, PGS, ASS)
+  result.subtitles = subtitleStreams
+    .filter((stream) => {
+      const lang = (stream.tags?.language || 'und').toLowerCase();
+      const codec = stream.codec_name?.toLowerCase();
+      // Only keep English/und and supported subtitle codecs
+      return (
+        ['en', 'eng', 'und'].includes(lang) &&
+        /subrip|hdmv_pgs_subtitle|substation/i.test(codec)
+      );
+    })
+    .map((stream) => ({
+      stream_index: stream.index,
+      codec: 'copy'
+    }));
 
   // Return the full transcoding instruction object
   return result;
@@ -285,21 +300,31 @@ function mapChannelLayout (channels) {
  */
 function determineAudioCodec (stream) {
   const codec = stream.codec_name.toLowerCase();
-  // Limit to 6 channels max due to EAC3 limitations
+  // Limit to 6 channels max due to EAC3 limitations (surround audio)
   const channels = Math.min(parseInt(stream.channels || 2, 10), 6);
 
-  // If already a supported codec, just copy
+  // If already a supported codec, just copy (no need to re-encode)
   if (['aac', 'ac3', 'eac3'].includes(codec)) {
     return { codec: 'copy' };
   }
 
-  // Use libfdk_aac for mono/stereo
+  // Use libfdk_aac for mono/stereo (best quality for Plex)
   if (channels <= 2) {
-    return { codec: 'libfdk_aac', bitrate: `${(96000 * channels) / 1000}k`, channels, channel_layout: mapChannelLayout(channels) };
+    return {
+      codec: 'libfdk_aac', // always use libfdk_aac for mono/stereo
+      bitrate: `${(96000 * channels) / 1000}k`, // 96k per channel
+      channels: 2, // always mix to stereo -- mono gets mixed to stereo
+      channel_layout: mapChannelLayout(2) // always stereo layout
+    };
   }
 
-  // Use EAC3 for multichannel
-  return { codec: 'eac3', bitrate: `${(Math.min(128000 * channels, 768000) / 1000)}k`, channels, channel_layout: mapChannelLayout(channels) };
+  // Use EAC3 for multichannel (surround audio)
+  return {
+    codec: 'eac3',
+    bitrate: `${Math.min(128000 * channels, 768000) / 1000}k`,
+    channels,
+    channel_layout: mapChannelLayout(channels)
+  };
 }
 
 /**
@@ -313,7 +338,7 @@ function calculateGOP (stream) {
   // Use avg_frame_rate if available, else r_frame_rate
   const fpsStr = stream.avg_frame_rate || stream.r_frame_rate;
   const [num, den] = fpsStr.split('/').map((n) => parseInt(n, 10));
-  if (!den || Number.isNaN(num)) return 48; // fallback default
+  if (!den || Number.isNaN(num)) return 48; // fallback default (24fps * 2s)
   // Calculate GOP as 2 seconds worth of frames
   return Math.round((num / den) * 2);
 }
