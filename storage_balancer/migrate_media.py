@@ -172,6 +172,17 @@ def rsync_until_stable(src: Path, dest: Path) -> bool:
             and not line.endswith("/")  # filter out dir-only updates
         ]
 
+        # Check for interrupted files by comparing file sizes
+        for root, _, files in os.walk(src):
+            for fname in files:
+                src_file = Path(root) / fname
+                dest_file = dest / src_file.relative_to(src)
+                if dest_file.exists():
+                    if src_file.stat().st_size != dest_file.stat().st_size:
+                        print(f"⚠️ File size mismatch: {src_file} ({src_file.stat().st_size}) vs {dest_file} ({dest_file.stat().st_size}). Will restart this file.")
+                        # Remove the incomplete file so rsync will restart it
+                        dest_file.unlink()
+
         if not changes:
             print(f"✅ Sync stable for {src.name}")
             return True
@@ -245,6 +256,20 @@ def migrate_dirs(dirs):
             print(f"\n🔁 Migrating {src} → {dest} ({format_size(size)})")
             # Use rsync to copy and verify stability
             if rsync_until_stable(src, dest):
+                # --- Integrity check: compare file counts and sizes ---
+                src_files = sorted([f for f in src.rglob("*") if f.is_file()])
+                dest_files = sorted([f for f in dest.rglob("*") if f.is_file()])
+                if len(src_files) != len(dest_files):
+                    print(f"❌ Integrity check failed: file count mismatch for {src}")
+                    continue
+                mismatch = False
+                for sfile, dfile in zip(src_files, dest_files):
+                    if sfile.stat().st_size != dfile.stat().st_size:
+                        print(f"❌ Integrity check failed: {sfile} size {sfile.stat().st_size} != {dfile} size {dfile.stat().st_size}")
+                        mismatch = True
+                        break
+                if mismatch:
+                    continue
                 # Only delete after successful Radarr/Sonarr update
                 api_update_success = True
                 try:
