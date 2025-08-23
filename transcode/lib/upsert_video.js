@@ -1,12 +1,11 @@
 import logger from './logger';
 import File from '../models/files';
 import calculateComputeScore from './calculateComputeScore';
-// import getFileDiskUsage from './getFileDiskUsage';
-// import { getEpisodesByTag } from './sonarr_api';
-// import { getMovieFilesByTag } from './radarr_api';
+import { computeEffectiveBitrate } from './calculate_effective_bitrate';
 
 /**
  * Converts a value in kilobytes (KB) to another byte unit.
+ * Used for file size calculations and priority logic.
  *
  * @param {number} valueInKB - The value in kilobytes to convert.
  * @param {string} targetUnit - The unit to convert to. Supported values: B, KB, MB, GB, TB, PB.
@@ -40,61 +39,51 @@ function convertKilobytes (valueInKB, targetUnit) {
  *
  * Priority logic:
  *   - If the file's volume is over 90% utilized, set priority to 97 (high urgency for freeing space)
- *   - If the video is less than or equal to 1GB and is HEVC encoded, set priority to 96 (quick remux)
+ *   - If the video is less than or equal to 1GB and is HEVC encoded, set priority to 90 (quick remux)
+ *   - If the video has a 'priority-transcode' tag, set priority to 91
+ *   - If the video's effective bitrate exceeds 60Mbps, set priority to 92 (on-demand transcode for Plex)
  *   - Otherwise, default to 100 (normal priority)
  *
- * @param {object} video - The video object, including probe and path info
- * @returns {number} - The computed priority
+ * @async
+ * @function default_priority
+ * @param {object} video - The video object, including probe, path, and indexerData
+ * @returns {Promise<number>} - The computed priority
  */
 export async function default_priority (video) {
   try {
-    // --- If the size is less than or equal to 1GB in kilobytes ---
+    // --- Priority: Quick remux for small HEVC files ---
     if (convertKilobytes(video.probe.format.size, 'GB') <= 1) {
       // If the video is HEVC encoded, set a slightly higher priority for quick remux
       if (
         video.probe.streams.find((s) => s.codec_type === 'video')
           ?.codec_name === 'hevc'
       ) {
-        return 90; // Give priority to videos that can be remuxed quickly
+        return 90; // Give priority to videos that can be remuxed quickly (small HEVC)
       }
     }
 
+    // --- Priority: Tag-based override for urgent transcodes ---
     if (video.indexerData?.tags?.includes('priority-transcode')) {
       // If the video has a priority-transcode tag, set high priority
       return 91;
     }
 
-    // --- Check for excessive bitrate that will cause buffering on Plex direct play ---
-    // 60Mbps = 60,000,000 bits/sec; ffprobe reports bitrate in bits/sec
-    // Defensive: use video.probe.format.bit_rate if available
-    const bitRate = parseInt(video.probe.format?.bit_rate || 0, 10);
-    if (bitRate > 60000000) {
-      // If bitrate exceeds 60Mbps, set high priority for on-demand transcode
+    // --- Priority: Excessive bitrate triggers on-demand transcode for Plex ---
+    // 80Mbps = 80,000,000 bits/sec; ffprobe reports bitrate in bits/sec
+    // Defensive: use video.effectiveBitrate (computed from probe)
+    const bitRate = video.effectiveBitrate;
+    if (bitRate > 80000000) {
+      // If bitrate exceeds 80Mbps, set high priority for on-demand transcode
       return 92;
     }
-
-    // --- Check disk utilization for the volume containing the video file ---
-    // If the file path is available, determine the mount point and check usage
-    // if (video.path) {
-    //   try {
-    //     const percentUsed = await getFileDiskUsage(video.path);
-
-    //     if (percentUsed >= 90) {
-    //       // If the disk is 90% or more full, set high priority
-    //       return 97;
-    //     }
-    //   } catch (diskErr) {
-    //     // If disk usage check fails, log but do not block processing
-    //     logger.warn(diskErr, { label: 'DISK USAGE CHECK FAILED' });
-    //   }
     // }
 
     // --- Default case: normal priority ---
-    return 100;
+    return 100; // No special conditions met, normal priority
   } catch (e) {
     // Log any errors and fall back to default priority
     logger.error(e, { label: 'DEFAULT PRIORITY ERROR' });
-    return 100;
+    return 100; // Fallback to normal priority on error
   }
 }
 
@@ -103,11 +92,16 @@ export async function default_priority (video) {
  *
  * - Attempts to find an existing file by record_id or path.
  * - If not found, creates a new File instance.
+ * - Preserves any existing indexerData before updating.
+ * - Computes and assigns effectiveBitrate for playback/transcode logic.
  * - Determines the appropriate priority for processing, preserving any preset priority < 90.
  * - Merges sortFields and updates computeScore.
  * - Saves the file with debounce to avoid rapid duplicate writes.
  *
- * @param {object} video - The video object to upsert
+ * @async
+ * @function upsert_video
+ * @param {object} video - The video object to upsert (probe, path, indexerData, etc.)
+ * @returns {Promise<void>} Resolves when upsert completes.
  */
 export default async function upsert_video (video) {
   try {
@@ -116,17 +110,17 @@ export default async function upsert_video (video) {
     path = path.replace(/\n+$/, '');
     let file;
 
-    // Try to find the file by record_id first
+    // Try to find the file by record_id first (most reliable unique identifier)
     if (record_id) {
       file = await File.findOne({ _id: record_id });
     }
 
-    // If not found, try to find by path
+    // If not found, try to find by path (fallback to path uniqueness)
     if (!file) {
       file = await File.findOne({ path });
     }
 
-    // If still not found, create a new File instance
+    // If still not found, create a new File instance (new file in DB)
     if (!file) {
       file = new File(video);
     }
@@ -135,6 +129,9 @@ export default async function upsert_video (video) {
     if (file.indexerData && !video.indexerData) {
       video.indexerData = file.indexerData;
     }
+
+    // --- Compute and assign effective bitrate for playback/transcode logic ---
+    video.effectiveBitrate = computeEffectiveBitrate(video.probe);
 
     // --- Priority logic ---
     // If a priority is already set on the video or file and it's less than 90, preserve it.
@@ -152,7 +149,7 @@ export default async function upsert_video (video) {
     // Merge the file object with the video object and override with sortFields
     file = Object.assign(file, video, { sortFields });
 
-    // Calculate the compute score for this file
+    // Calculate the compute score for this file (used for scheduling/transcode queue)
     file.computeScore = calculateComputeScore(file);
 
     // Save the file, debounced to avoid rapid duplicate writes

@@ -147,6 +147,8 @@ const schema = new Schema(
     },
     /**
      * Hardware decode permission
+     * Indicates if hardware decoding is permitted for this file (e.g., for GPU acceleration).
+     * Default is true to allow hardware decode unless explicitly disabled.
      */
     permitHWDecode: {
       type: Boolean,
@@ -155,6 +157,8 @@ const schema = new Schema(
     },
     /**
      * Space reclaimed by file (in bytes)
+     * Tracks the amount of disk space freed by deleting or transcoding this file.
+     * Useful for reporting and disk management.
      */
     reclaimedSpace: {
       type: Number,
@@ -163,22 +167,39 @@ const schema = new Schema(
     },
     /**
      * Indexer metadata (Radarr/Sonarr enrichment)
+     * Stores metadata imported from Radarr/Sonarr, such as tags, IDs, and poster URLs.
+     * Used for UI enrichment and advanced filtering.
      */
     indexerData: {
       type: Object,
       required: false
+    },
+
+    /**
+     * Effective bitrate (in bits/sec)
+     * Calculated or imported bitrate for the file, used for playback and transcode decisions.
+     */
+    effectiveBitrate: {
+      type: Number,
+      required: false,
+      default: 0
     }
   },
+  /**
+   * Mongoose schema options:
+   * - timestamps: Automatically adds created_at and updated_at fields for audit/history.
+   */
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 
 /**
  * Debounced save method for File documents.
  * Prevents rapid consecutive saves from causing parallel write errors.
- * Retries on parallel error with a random delay.
+ * Retries on parallel error with a random delay between 250ms and 500ms.
  *
  * @function saveDebounce
  * @memberof FileDocument
+ * @returns {Promise<void>} Resolves when save completes or retries.
  */
 schema.methods.saveDebounce = async function saveDebounce () {
   if (this.saveTimeout) {
@@ -201,6 +222,7 @@ schema.methods.saveDebounce = async function saveDebounce () {
 /**
  * Indexes for efficient queries on File documents.
  * Includes compound and single-field indexes for sortFields, status, probe, and error fields.
+ * These indexes optimize queries for sorting, filtering, and bulk operations in the transcode pipeline.
  */
 schema.index({ 'probe.format.size': 1 });
 schema.index({ 'sortFields.width': -1, 'sortFields.size': 1 });
@@ -218,7 +240,9 @@ schema.index({ hasError: 1 });
 schema.index({ encode_version: 1, status: 1 });
 schema.index({ integrityCheck: 1, status: 1 });
 /**
- * Compound index for priority and status (for queries like: priority >= 90 and status = 'pending')
+ * Compound index for priority and status.
+ * Used for queries like: priority >= 90 and status = 'pending'.
+ * This enables efficient scheduling and prioritization in the transcode queue.
  */
 schema.index({ 'sortFields.priority': 1, status: 1 });
 
