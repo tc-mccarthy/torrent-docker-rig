@@ -64,6 +64,15 @@ export async function default_priority (video) {
       return 91;
     }
 
+    // --- Check for excessive bitrate that will cause buffering on Plex direct play ---
+    // 60Mbps = 60,000,000 bits/sec; ffprobe reports bitrate in bits/sec
+    // Defensive: use video.probe.format.bit_rate if available
+    const bitRate = parseInt(video.probe.format?.bit_rate || 0, 10);
+    if (bitRate > 60000000) {
+      // If bitrate exceeds 60Mbps, set high priority for on-demand transcode
+      return 92;
+    }
+
     // --- Check disk utilization for the volume containing the video file ---
     // If the file path is available, determine the mount point and check usage
     // if (video.path) {
@@ -120,6 +129,11 @@ export default async function upsert_video (video) {
     // If still not found, create a new File instance
     if (!file) {
       file = new File(video);
+    }
+
+    // --- Preserve any existing indexerData before assessing priority ---
+    if (file.indexerData && !video.indexerData) {
+      video.indexerData = file.indexerData;
     }
 
     // --- Priority logic ---
