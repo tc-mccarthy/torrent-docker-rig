@@ -48,8 +48,9 @@ server {
     proxy_pass         http://vpn:8989;   # no trailing slash → upstream sees /sonarr/...
     proxy_http_version 1.1;
 
-    # Don’t forward the client’s Connection header upstream; enable upstream keep-alive
-    proxy_set_header   Connection "";
+    # WebSocket support for Sonarr
+    proxy_set_header   Upgrade $http_upgrade;
+    proxy_set_header   Connection $http_connection;
 
     # Standard forwards
     proxy_set_header   Host               $host;
@@ -67,17 +68,15 @@ server {
     proxy_buffering        on;
     proxy_buffers          16 64k;
     proxy_buffer_size      16k;
-
-    # No WebSocket upgrade for Sonarr API
-    # (remove any Upgrade/Connection: $http_connection directives)
   }
 
   location /radarr/ {
     proxy_pass         http://vpn:7878;   # no trailing slash → upstream sees /radarr/...
     proxy_http_version 1.1;
 
-    # Don’t forward the client’s Connection header upstream; enable upstream keep-alive
-    proxy_set_header   Connection "";
+    # WebSocket support for Radarr
+    proxy_set_header   Upgrade $http_upgrade;
+    proxy_set_header   Connection $http_connection;
 
     # Standard forwards
     proxy_set_header   Host               $host;
@@ -95,9 +94,6 @@ server {
     proxy_buffering        on;
     proxy_buffers          16 64k;
     proxy_buffer_size      16k;
-
-    # No WebSocket upgrade for Radarr API
-    # (remove any Upgrade/Connection: $http_connection directives)
   }
 
 
