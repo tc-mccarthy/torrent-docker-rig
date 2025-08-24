@@ -1,66 +1,11 @@
 /**
- * Generates transcoding instructions based on ffprobe and metadata (TMDb/TVDb) in a mongo document.
- *
- * This function analyzes video, audio, and subtitle streams and determines whether to copy or transcode
- * based on stream characteristics (e.g., codec, size, resolution, HDR metadata). This version includes:
- * - Dynamic GOP size calculation for improved Plex compatibility
- * - Usage of `-avoid_negative_ts make_zero` to fix negative timestamps
- * - SVT-AV1 `usage`, `tier`, and `fast-decode` passed via `-svtav1-params`
- *
- * @param {Object} mongoDoc - The Mongo document containing ffprobe and metadata info.
- * @returns {{
- *   video: {
- *     stream_index: number,
- *     codec: string,
- *     arguments: Object
- *   },
- *   audio: Array<{
- *     stream_index: number,
- *     language: string,
- *     codec: string,
- *     bitrate?: string
- *   }>,
- *   subtitles: Array<{
- *     stream_index: number,
- *     codec: string
- *   }>
- * }} - Transcoding instruction object.
- */
-/**
- * Generates transcoding instructions based on ffprobe and metadata (TMDb/TVDb) in a mongo document.
- *
- * This function analyzes video, audio, and subtitle streams and determines whether to copy or transcode
- * based on stream characteristics (e.g., codec, size, resolution, HDR metadata). This version includes:
- * - Dynamic GOP size calculation for improved Plex compatibility
- * - Usage of `-avoid_negative_ts make_zero` to fix negative timestamps
- * - SVT-AV1 `usage`, `tier`, and `fast-decode` passed via `-svtav1-params`
- *
- * @param {Object} mongoDoc - The Mongo document containing ffprobe and metadata info.
- * @returns {{
- *   video: {
- *     stream_index: number,
- *     codec: string,
- *     arguments: Object
- *   },
- *   audio: Array<{
- *     stream_index: number,
- *     language: string,
- *     codec: string,
- *     bitrate?: string
- *   }>,
- *   subtitles: Array<{
- *     stream_index: number,
- *     codec: string
- *   }>
- * }} - Transcoding instruction object.
- */
-/**
  * Generates transcoding instructions for video, audio, and subtitles based on ffprobe and metadata.
  *
  * This function analyzes the input media file and determines the optimal transcoding strategy for Plex/streaming:
  * - Video: Copies HEVC if small, otherwise transcodes to AV1 with HDR and rate control.
- * - Audio: Copies AAC/AC3/EAC3, otherwise encodes stereo to AAC and multichannel to EAC3.
- * - Subtitles: Copies English/und streams in supported formats.
+ * - Audio: Drops AC3 5.1 compatibility tracks if a higher-channel EAC3/TrueHD/DTS exists for the same language.
+ *   Copies AAC/AC3/EAC3, otherwise encodes stereo to AAC and multichannel to EAC3.
+ * - Subtitles: Copies English/und streams in supported formats (SRT, PGS, ASS).
  *
  * @param {Object} mongoDoc - MongoDB document containing ffprobe and metadata info.
  * @returns {Object} Transcoding instruction object for video, audio, and subtitles.
@@ -84,18 +29,18 @@ export function generateTranscodeInstructions (mongoDoc) {
   // Lowercase all spoken language codes for matching
   const spokenLangs = audio_language.map((lang) => lang.toLowerCase());
 
-  // Prepare the result object
+  // Prepare the result object for transcoding instructions
   const result = {
     video: null,
     audio: [],
     subtitles: []
   };
 
-  // Main video stream is always the first video stream
+  // Main video stream is always the first video stream (assume first is main)
   const mainVideo = videoStreams[0];
   if (!mainVideo) throw new Error('No video stream found'); // Defensive: must have a video stream
 
-  // Gather video stream properties
+  // Gather video stream properties (codec, width, UHD status)
   const videoCodec = mainVideo.codec_name;
   const isHEVC = videoCodec === 'hevc' || videoCodec === 'h265';
   const width = mainVideo.width || 0;
@@ -169,24 +114,55 @@ export function generateTranscodeInstructions (mongoDoc) {
   }
 
   // Filter audio streams to only those matching spoken languages (from TMDb/TVDb)
-  const filteredAudio = audioStreams.filter((s) => {
-    // Only include streams with a language in the spokenLangs list
-    const lang = (s.tags?.language || 'und').toLowerCase();
-    return spokenLangs.includes(lang);
-  });
+  /**
+   * Filter and map audio streams to encoding instructions.
+   * - Only include streams with a language in the spokenLangs list.
+   * - Drop AC3 5.1 compatibility tracks if a higher channel EAC3/TrueHD/DTS exists for the same language.
+   * - Map each stream to its encoding parameters.
+   */
+  result.audio = audioStreams
+    .filter((s) => {
+      // Only include streams with a language in the spokenLangs list
+      const lang = (s.tags?.language || 'und').toLowerCase();
+      return spokenLangs.includes(lang);
+    })
+    .filter((stream, idx, arr) => {
+      // Drop AC3 5.1 compatibility tracks if a higher channel EAC3/TrueHD/DTS exists for the same language
+      const lang = (stream.tags?.language || 'und').toLowerCase();
+      const codec = (stream.codec_name || '').toLowerCase();
+      const channels = parseInt(stream.channels || 2, 10);
+      // If this is an AC3 5.1 track, check if a higher channel EAC3/TrueHD/DTS exists for same language
+      if (codec === 'ac3' && channels === 6) {
+        return !arr.some((other) => {
+          if (other === stream) return false;
+          const otherLang = (other.tags?.language || 'und').toLowerCase();
+          const otherCodec = (other.codec_name || '').toLowerCase();
+          const otherChannels = parseInt(other.channels || 2, 10);
+          // Accept if same language and higher channel count and is EAC3/TrueHD/DTS
+          return (
+            otherLang === lang &&
+            otherChannels > channels &&
+            (/eac3|truehd|dts/i.test(otherCodec))
+          );
+        });
+      }
+      return true;
+    })
+    .map((stream) => {
+      // Map filtered audio streams to encoding instructions
+      const lang = (stream.tags?.language || 'und').toLowerCase();
+      // Determine codec and encoding parameters for each audio stream
+      return {
+        stream_index: stream.index,
+        language: lang,
+        ...determineAudioCodec(stream)
+      };
+    });
 
-  // Map filtered audio streams to encoding instructions
-  result.audio = filteredAudio.map((stream) => {
-    const lang = (stream.tags?.language || 'und').toLowerCase();
-    // Determine codec and encoding parameters for each audio stream
-    return {
-      stream_index: stream.index,
-      language: lang,
-      ...determineAudioCodec(stream)
-    };
-  });
-
-  // Only include English/und subtitle streams in supported formats (SRT, PGS, ASS)
+  /**
+   * Filter and map subtitle streams to supported formats.
+   * - Only include English/und subtitle streams in supported formats (SRT, PGS, ASS).
+   */
   result.subtitles = subtitleStreams
     .filter((stream) => {
       const lang = (stream.tags?.language || 'und').toLowerCase();
