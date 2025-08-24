@@ -60,7 +60,8 @@ export async function importIndexerData () {
         imdbId: movie.imdbId,
         folderName: movie.folderName.replace(process.env.TRANSCODE_STORAGE, '/source_media'),
         tags: (movie.tags || []).map((id) => radarrTagMap[id] || id),
-        poster: movie.images?.find((img) => img.coverType === 'poster')?.remoteUrl || ''
+        poster: movie.images?.find((img) => img.coverType === 'poster')?.remoteUrl || '',
+        indexerId: movie.id,
       };
       const escapedFolderName = indexerData.folderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       logger.debug(`BulkWrite: Updating indexer data for movie: ${movie.title} (${movie.tmdbId})`, { indexerData, path: { $regex: `^${escapedFolderName}`, $options: 'i' } });
@@ -109,7 +110,8 @@ export async function importIndexerData () {
         imdbId: series.imdbId,
         folderName: series.path.replace(process.env.TRANSCODE_STORAGE, '/source_media'),
         tags: (series.tags || []).map((id) => sonarrTagMap[id] || id),
-        poster: series.images?.find((img) => img.coverType === 'poster')?.remoteUrl || ''
+        poster: series.images?.find((img) => img.coverType === 'poster')?.remoteUrl || '',
+        indexerId: series.id,
       };
       const escapedSeriesFolderName = indexerData.folderName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       logger.debug(`BulkWrite: Updating indexer data for series: ${series.title} (${series.tvdbId})`, { indexerData });
