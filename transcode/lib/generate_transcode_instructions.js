@@ -121,6 +121,7 @@ export function generateTranscodeInstructions (mongoDoc) {
      * Includes scene-cut detection, film grain synthesis, AQ, and quant matrices.
      */
     const svtParams = [
+      'fast-decode=1', // Enable fast decode for better compatibility
       'scd=1',
       'usage=0',
       'tier=0',
@@ -135,7 +136,6 @@ export function generateTranscodeInstructions (mongoDoc) {
       stream_index: mainVideo.index,
       codec: 'libsvtav1',
       arguments: {
-        'fast-decode': 1, // Enable fast decode for better compatibility
         pix_fmt: 'yuv420p10le', // 10-bit for best quality
         max_muxing_queue_size: 9999, // Avoid muxing errors
         'svtav1-params': svtParams, // SVT-AV1 encoder params
