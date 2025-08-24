@@ -115,6 +115,7 @@ export function generateTranscodeInstructions (mongoDoc) {
 
     // Calculate GOP size for Plex compatibility (2s interval)
     const gop = calculateGOP(mainVideo);
+    const { crf, fgs } = pickCrfAndFgs(mongoDoc);
 
     /**
      * SVT-AV1 encoder parameters for perceptual quality and compatibility.
@@ -125,7 +126,7 @@ export function generateTranscodeInstructions (mongoDoc) {
       'scd=1',
       'usage=0',
       'tier=0',
-      'film-grain=8',
+      `film-grain=${fgs}`,
       'film-grain-denoise=0',
       'aq-mode=1',
       'enable-qm=1'
@@ -145,7 +146,7 @@ export function generateTranscodeInstructions (mongoDoc) {
         g: gop, // GOP size
         keyint_min: gop / 2, // Minimum keyframe interval
         preset: determinePreset(isUHD, fileSizeGB), // Encoder preset
-        crf: getCrfForResolution(width), // Quality target
+        crf, // Quality target
         // ...getRateControl(width), // Bitrate and bufsize (optional)
         ...hdrProps // HDR metadata if present
       }
@@ -231,17 +232,43 @@ export function generateTranscodeInstructions (mongoDoc) {
 }
 
 /**
- * Returns the CRF (Constant Rate Factor) value for a given video width.
- * Lower CRF means higher quality. Adjusts for UHD, 1080p, 720p, and SD.
+ * Pick CRF and FGS values based on resolution + genres.
  *
- * @param {number} width - Video width in pixels.
- * @returns {number} CRF value for ffmpeg.
+ * @param {Object} mongoDoc - ffprobe + indexerData doc
+ * @returns {{crf:number, fgs:number}}
  */
-function getCrfForResolution (width) {
-  if (width >= 3840) return 27; // 4K UHD: 26–28 recommended
-  if (width >= 1920) return 26; // 1080p: 24–26 sweet spot for action
-  if (width >= 1280) return 28; // 720p
-  return 30; // SD
+export function pickCrfAndFgs (mongoDoc) {
+  const width = Number(mongoDoc?.streams?.find((s) => s.codec_type === 'video')?.width || 0);
+  const genres = (mongoDoc?.indexerData?.genres || []).map((g) => g.toLowerCase());
+
+  const isAnimation = genres.includes('animation');
+  const isAction = genres.includes('action');
+
+  /**
+   * Rule map: first match wins.
+   * width = minimum width threshold
+   */
+  const rules = [
+    { width: 3840, isAnimation: false, isAction: false, crf: 30, fgs: 8 }, // UHD general
+    { width: 3840, isAnimation: true, isAction: false, crf: 28, fgs: 4 }, // UHD animation
+    { width: 3840, isAnimation: false, isAction: true, crf: 29, fgs: 9 }, // UHD action
+
+    { width: 1920, isAnimation: false, isAction: false, crf: 30, fgs: 8 }, // 1080p general
+    { width: 1920, isAnimation: true, isAction: false, crf: 28, fgs: 3 }, // 1080p animation
+    { width: 1920, isAnimation: false, isAction: true, crf: 29, fgs: 9 }, // 1080p action
+
+    { width: 1280, isAnimation: false, isAction: false, crf: 29, fgs: 7 }, // 720p general
+    { width: 1280, isAnimation: true, isAction: false, crf: 27, fgs: 2 } // 720p animation
+  ];
+
+  // First rule that fits resolution + genres
+  const match = rules.find((r) =>
+    width >= r.width &&
+    r.isAnimation === isAnimation &&
+    r.isAction === isAction);
+
+  // Default fallback if nothing matches
+  return match ? { crf: match.crf, fgs: match.fgs } : { crf: 30, fgs: 8 };
 }
 
 /**
