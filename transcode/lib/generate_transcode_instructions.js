@@ -405,7 +405,7 @@ function calculateGOP (stream) {
   // Use avg_frame_rate if available, else r_frame_rate
   const fpsStr = stream.avg_frame_rate || stream.r_frame_rate;
   const [num, den] = fpsStr.split('/').map((n) => parseInt(n, 10));
-  if (!den || Number.isNaN(num)) return 240; // fallback default (24fps * 2s)
+  if (!den || Number.isNaN(num)) return 120; // fallback default (24fps * 2s)
   // Calculate GOP as 2 seconds worth of frames
-  return Math.round((num / den) * 10);
+  return Math.round((num / den) * 5);
 }
