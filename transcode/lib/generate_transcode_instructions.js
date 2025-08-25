@@ -147,7 +147,7 @@ export function generateTranscodeInstructions (mongoDoc) {
         keyint_min: gop / 2, // Minimum keyframe interval
         preset: determinePreset(isUHD, fileSizeGB), // Encoder preset
         crf, // Quality target
-        // ...getRateControl(width), // Bitrate and bufsize (optional)
+        ...getRateControl(width), // Bitrate and bufsize (optional)
         ...hdrProps // HDR metadata if present
       }
     };
@@ -278,29 +278,29 @@ export function pickCrfAndFgs (mongoDoc) {
  * @param {number} width - Video width in pixels.
    * @returns {{maxrate: string, bufsize: string}} Rate control parameters.
  */
-// function getRateControl (width) {
-//   let maxrate;
+function getRateControl (width) {
+  let maxrate;
 
-//   if (width >= 3840) {
-//     // 4K UHD — try to stay under 20M to allow 1–2 concurrent streams
-//     maxrate = '16M';
-//   } else if (width >= 1920) {
-//     // 1080p — visually solid AV1 at ~8 Mbps
-//     maxrate = '8M';
-//   } else if (width >= 1280) {
-//     // 720p — good at 4M, preserves detail
-//     maxrate = '4M';
-//   } else {
-//     // SD — very low bitrate needed
-//     maxrate = '2M';
-//   }
+  if (width >= 3840) {
+    // 4K UHD — try to stay under 20M to allow 1–2 concurrent streams
+    maxrate = '16M';
+  } else if (width >= 1920) {
+    // 1080p — visually solid AV1 at ~8 Mbps
+    maxrate = '8M';
+  } else if (width >= 1280) {
+    // 720p — good at 4M, preserves detail
+    maxrate = '4M';
+  } else {
+    // SD — very low bitrate needed
+    maxrate = '2M';
+  }
 
-//   // Buffer size is 2x maxrate for more stable streaming
-//   const numericRate = parseInt(maxrate, 10);
-//   const bufsize = `${numericRate * 2}M`;
+  // Buffer size is 2x maxrate for more stable streaming
+  const numericRate = parseInt(maxrate, 10);
+  const bufsize = `${numericRate * 2}M`;
 
-//   return { maxrate, bufsize };
-// }
+  return { maxrate, bufsize };
+}
 
 /**
  * Selects the encoder preset for SVT-AV1 based on resolution and file size.
