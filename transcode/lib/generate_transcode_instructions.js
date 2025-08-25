@@ -146,6 +146,7 @@ export function generateTranscodeInstructions (mongoDoc) {
         avoid_negative_ts: 'make_zero', // Fix negative timestamps
         vsync: 'vfr',
         video_track_timescale: 90000,
+        threads: 0, // Auto threads
         g: gop, // GOP size
         keyint_min: gop / 2, // Minimum keyframe interval
         preset: determinePreset(isUHD, fileSizeGB), // Encoder preset
@@ -300,7 +301,7 @@ function getRateControl (width) {
 
   if (width >= 3840) {
     // 4K UHD — try to stay under 20M to allow 1–2 concurrent streams
-    maxrate = '16M';
+    maxrate = '24M';
   } else if (width >= 1920) {
     // 1080p — visually solid AV1 at ~8 Mbps
     maxrate = '8M';
@@ -406,7 +407,7 @@ function calculateGOP (stream) {
   // Use avg_frame_rate if available, else r_frame_rate
   const fpsStr = stream.avg_frame_rate || stream.r_frame_rate;
   const [num, den] = fpsStr.split('/').map((n) => parseInt(n, 10));
-  if (!den || Number.isNaN(num)) return 48; // fallback default (24fps * 2s)
+  if (!den || Number.isNaN(num)) return 240; // fallback default (24fps * 2s)
   // Calculate GOP as 2 seconds worth of frames
-  return Math.round((num / den) * 2);
+  return Math.round((num / den) * 10);
 }
