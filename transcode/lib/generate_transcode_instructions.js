@@ -146,7 +146,7 @@ export function generateTranscodeInstructions (mongoDoc) {
         vsync: 'vfr',
         video_track_timescale: 90000,
         g: gop, // GOP size
-        keyint_min: gop / 2, // Minimum keyframe interval
+        keyint_min: gop / 4, // Minimum keyframe interval
         preset: determinePreset(isUHD, fileSizeGB), // Encoder preset
         crf, // Quality target
         ...getRateControl(width), // Bitrate and bufsize (optional)
