@@ -27,8 +27,8 @@ export function generateTranscodeInstructions (mongoDoc) {
    * File size in kilobytes, then convert to gigabytes for logic.
    * @type {number}
    */
-  const fileSizeKB = parseInt(format.size || 0, 10);
-  const fileSizeGB = fileSizeKB / 1024 ** 2;
+  const fileSizeBytes = parseInt(format.size || 0, 10);
+  const fileSizeGiB = fileSizeBytes / 1024 ** 3;
 
   /**
    * Split streams by type for easier processing.
@@ -73,14 +73,14 @@ export function generateTranscodeInstructions (mongoDoc) {
 
   // Log the video stream being processed for debugging and traceability
   console.log(
-    `Processing video stream: ${videoCodec}, width: ${width}, size: ${fileSizeGB.toFixed(2)} GB`
+    `Processing video stream: ${videoCodec}, width: ${width}, size: ${fileSizeGiB.toFixed(2)} GiB`
   );
 
   /**
    * If the file is small and already HEVC, just copy the video stream (saves time/resources).
    * No need to transcode, just copy the stream.
    */
-  if (fileSizeGB <= 1 && isHEVC) {
+  if (fileSizeGiB <= 1 && isHEVC) {
     result.video = {
       stream_index: mainVideo.index,
       codec: 'copy',
@@ -88,8 +88,9 @@ export function generateTranscodeInstructions (mongoDoc) {
     };
   } else {
     /**
-     * Build AV1 transcode instruction, including HDR metadata and SVT-AV1 params.
-     * If HDR (PQ/2084), extract and preserve HDR mastering and content light level metadata for Plex compatibility.
+     * Otherwise, build a full transcode instruction for AV1.
+     * If HDR (PQ/2084), preserve HDR metadata for Plex/quality.
+     * Extract HDR mastering and content light level metadata if present.
      */
     const hdrProps = {};
     if (mainVideo.color_transfer?.includes('2084')) {
@@ -97,7 +98,6 @@ export function generateTranscodeInstructions (mongoDoc) {
       hdrProps.color_trc = mainVideo.color_transfer;
       hdrProps.colorspace = mainVideo.color_space;
 
-      // Extract HDR mastering and content light level metadata if present
       const sideData = mainVideo.side_data_list || [];
       const masteringDisplay = sideData.find(
         (d) => d.side_data_type === 'Mastering display metadata'
@@ -105,6 +105,7 @@ export function generateTranscodeInstructions (mongoDoc) {
       const contentLightLevel = sideData.find(
         (d) => d.side_data_type === 'Content light level metadata'
       );
+
       if (masteringDisplay?.mastering_display_metadata) {
         hdrProps.master_display = masteringDisplay.mastering_display_metadata;
       }
@@ -113,41 +114,46 @@ export function generateTranscodeInstructions (mongoDoc) {
       }
     }
 
-    // Calculate GOP size for Plex compatibility (2s interval)
+    /**
+     * Calculate GOP size for Plex compatibility (2s interval).
+     * @type {number}
+     */
     const gop = calculateGOP(mainVideo);
-    const { crf, fgs } = pickCrfAndFgs(mongoDoc);
 
     /**
-     * SVT-AV1 encoder parameters for perceptual quality and compatibility.
-     * Includes scene-cut detection, film grain synthesis, AQ, and quant matrices.
+     * Build SVT-AV1 specific encoder parameters into a single string.
+     * Enable film grain synthesis for improved perceptual quality.
+     * @type {string}
      */
     const svtParams = [
-      'fast-decode=1', // Enable fast decode for better compatibility
+      'fast-decode=1',
       'scd=1',
       'usage=0',
       'tier=0',
-      `film-grain=${fgs}`,
+      'film-grain=8',
       'film-grain-denoise=0',
-      'aq-mode=1',
-      'enable-qm=1'
+      `tile-columns=${pickTiles(width).cols}`,
+      `tile-rows=${pickTiles(width).rows}`,
+      'lp=0'
     ].join(':');
 
-    // Build the video transcode instruction for AV1
+    /**
+     * Build the video transcode instruction for AV1.
+     * Includes HDR metadata, rate control, and SVT-AV1 params.
+     */
     result.video = {
       stream_index: mainVideo.index,
       codec: 'libsvtav1',
       arguments: {
         pix_fmt: 'yuv420p10le', // 10-bit for best quality
         max_muxing_queue_size: 9999, // Avoid muxing errors
-        'svtav1-params': svtParams, // SVT-AV1 encoder params
+        'svtav1-params': svtParams, // Pass SVT-AV1 params
         avoid_negative_ts: 'make_zero', // Fix negative timestamps
-        vsync: 'vfr',
-        video_track_timescale: 90000,
         g: gop, // GOP size
         keyint_min: gop / 2, // Minimum keyframe interval
-        preset: determinePreset(isUHD, fileSizeGB), // Encoder preset
-        crf, // Quality target
-        ...getRateControl(width), // Bitrate and bufsize (optional)
+        preset: determinePreset(isUHD, fileSizeGiB), // Encoder preset
+        crf: getCrfForResolution(width), // Quality target
+        ...getRateControl(width), // Bitrate and bufsize
         ...hdrProps // HDR metadata if present
       }
     };
@@ -232,43 +238,17 @@ export function generateTranscodeInstructions (mongoDoc) {
 }
 
 /**
- * Pick CRF and FGS values based on resolution + genres.
+ * Returns the CRF (Constant Rate Factor) value for a given video width.
+ * Lower CRF means higher quality. Adjusts for UHD, 1080p, 720p, and SD.
  *
- * @param {Object} mongoDoc - ffprobe + indexerData doc
- * @returns {{crf:number, fgs:number}}
+ * @param {number} width - Video width in pixels.
+ * @returns {number} CRF value for ffmpeg.
  */
-export function pickCrfAndFgs (mongoDoc) {
-  const width = Number(mongoDoc?.streams?.find((s) => s.codec_type === 'video')?.width || 0);
-  const genres = (mongoDoc?.indexerData?.genres || []).map((g) => g.toLowerCase());
-
-  const isAnimation = genres.includes('animation');
-  const isAction = genres.includes('action');
-
-  /**
-   * Rule map: first match wins.
-   * width = minimum width threshold
-   */
-  const rules = [
-    { width: 3840, isAnimation: false, isAction: false, crf: 30, fgs: 8 }, // UHD general
-    { width: 3840, isAnimation: true, isAction: false, crf: 28, fgs: 4 }, // UHD animation
-    { width: 3840, isAnimation: false, isAction: true, crf: 29, fgs: 9 }, // UHD action
-
-    { width: 1920, isAnimation: false, isAction: false, crf: 30, fgs: 8 }, // 1080p general
-    { width: 1920, isAnimation: true, isAction: false, crf: 28, fgs: 3 }, // 1080p animation
-    { width: 1920, isAnimation: false, isAction: true, crf: 29, fgs: 9 }, // 1080p action
-
-    { width: 1280, isAnimation: false, isAction: false, crf: 29, fgs: 7 }, // 720p general
-    { width: 1280, isAnimation: true, isAction: false, crf: 27, fgs: 2 } // 720p animation
-  ];
-
-  // First rule that fits resolution + genres
-  const match = rules.find((r) =>
-    width >= r.width &&
-    r.isAnimation === isAnimation &&
-    r.isAction === isAction);
-
-  // Default fallback if nothing matches
-  return match ? { crf: match.crf, fgs: match.fgs } : { crf: 30, fgs: 8 };
+function getCrfForResolution (width) {
+  if (width >= 3840) return 27; // 4K UHD: 26–28 recommended
+  if (width >= 1920) return 26; // 1080p: 24–26 sweet spot for action
+  if (width >= 1280) return 28; // 720p
+  return 30; // SD
 }
 
 /**
@@ -278,12 +258,27 @@ export function pickCrfAndFgs (mongoDoc) {
  * @param {number} width - Video width in pixels.
    * @returns {{maxrate: string, bufsize: string}} Rate control parameters.
  */
+
+/**
+ * Choose tile layout to increase parallelism with minimal quality impact.
+ *  - ≥3840 width: 2x2 tiles
+ *  - ≥1920 width: 2x1 tiles
+ *  - else: 1x1
+ * @param {number} w
+ * @returns {{cols:number, rows:number}}
+ */
+function pickTiles (w) {
+  if (w >= 3840) return { cols: 2, rows: 2 };
+  if (w >= 1920) return { cols: 2, rows: 1 };
+  return { cols: 1, rows: 1 };
+}
+
 function getRateControl (width) {
   let maxrate;
 
   if (width >= 3840) {
     // 4K UHD — try to stay under 20M to allow 1–2 concurrent streams
-    maxrate = '16M';
+    maxrate = '20M';
   } else if (width >= 1920) {
     // 1080p — visually solid AV1 at ~8 Mbps
     maxrate = '8M';
@@ -310,12 +305,12 @@ function getRateControl (width) {
  * - All others use preset 6 (default balance)
  *
  * @param {boolean} isUHD - True if the video is UHD/4K.
- * @param {number} fileSizeGB - File size in gigabytes.
+ * @param {number} fileSizeGiB - File size in gigabytes.
  * @returns {number} SVT-AV1 preset value (6, 7, or 8)
  */
-function determinePreset (isUHD, fileSizeGB) {
+function determinePreset (isUHD, fileSizeGiB) {
   if (isUHD) return 8;
-  if (fileSizeGB > 10) return 7;
+  if (fileSizeGiB > 10) return 7;
   return 6;
 }
 
