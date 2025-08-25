@@ -27,8 +27,8 @@ export function generateTranscodeInstructions (mongoDoc) {
    * File size in kilobytes, then convert to gigabytes for logic.
    * @type {number}
    */
-  const fileSizeBytes = parseInt(format.size || 0, 10);
-  const fileSizeGiB = fileSizeBytes / 1024 ** 3;
+  const fileSizeKB = parseInt(format.size || 0, 10);
+  const fileSizeGB = fileSizeKB / 1024 ** 2;
 
   /**
    * Split streams by type for easier processing.
@@ -73,14 +73,14 @@ export function generateTranscodeInstructions (mongoDoc) {
 
   // Log the video stream being processed for debugging and traceability
   console.log(
-    `Processing video stream: ${videoCodec}, width: ${width}, size: ${fileSizeGiB.toFixed(2)} GiB`
+    `Processing video stream: ${videoCodec}, width: ${width}, size: ${fileSizeGB.toFixed(2)} GiB`
   );
 
   /**
    * If the file is small and already HEVC, just copy the video stream (saves time/resources).
    * No need to transcode, just copy the stream.
    */
-  if (fileSizeGiB <= 1 && isHEVC) {
+  if (fileSizeGB <= 1 && isHEVC) {
     result.video = {
       stream_index: mainVideo.index,
       codec: 'copy',
@@ -151,7 +151,7 @@ export function generateTranscodeInstructions (mongoDoc) {
         avoid_negative_ts: 'make_zero', // Fix negative timestamps
         g: gop, // GOP size
         keyint_min: gop / 2, // Minimum keyframe interval
-        preset: determinePreset(isUHD, fileSizeGiB), // Encoder preset
+        preset: determinePreset(isUHD, fileSizeGB), // Encoder preset
         crf: getCrfForResolution(width), // Quality target
         ...getRateControl(width), // Bitrate and bufsize
         ...hdrProps // HDR metadata if present
@@ -305,12 +305,12 @@ function getRateControl (width) {
  * - All others use preset 6 (default balance)
  *
  * @param {boolean} isUHD - True if the video is UHD/4K.
- * @param {number} fileSizeGiB - File size in gigabytes.
+ * @param {number} fileSizeGB - File size in gigabytes.
  * @returns {number} SVT-AV1 preset value (6, 7, or 8)
  */
-function determinePreset (isUHD, fileSizeGiB) {
+function determinePreset (isUHD, fileSizeGB) {
   if (isUHD) return 8;
-  if (fileSizeGiB > 10) return 7;
+  if (fileSizeGB > 10) return 7;
   return 6;
 }
 
