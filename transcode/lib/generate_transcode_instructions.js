@@ -332,7 +332,7 @@ function getRateControl (width) {
  * @returns {number} SVT-AV1 preset value (6, 7, or 8)
  */
 function determinePreset (isUHD, fileSizeGB) {
-  if (isUHD) return 8;
+  if (isUHD) return 9;
   if (fileSizeGB > 10) return 7;
   return 6;
 }

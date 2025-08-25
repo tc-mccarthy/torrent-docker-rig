@@ -212,7 +212,8 @@ export default function transcode (file) {
       }
 
       // Hardware acceleration and codec info
-      const hwaccel = video_record.permitHWDecode ? 'auto' : 'none';
+      // const hwaccel = video_record.permitHWDecode ? 'auto' : 'none';
+      const hwaccel = 'none';
       const source_video_codec = ffprobe_data.streams.find((s) => s.codec_type === 'video')?.codec_name;
       const source_audio_codec = ffprobe_data.streams.find((s) => s.codec_type === 'audio')?.codec_name;
       const { audio_language } = video_record;
