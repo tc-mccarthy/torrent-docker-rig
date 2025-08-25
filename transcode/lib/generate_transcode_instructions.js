@@ -73,7 +73,9 @@ export function generateTranscodeInstructions (mongoDoc) {
 
   // Log the video stream being processed for debugging and traceability
   console.log(
-    `Processing video stream: ${videoCodec}, width: ${width}, size: ${fileSizeGB.toFixed(2)} GB`
+    `Processing video stream: ${videoCodec}, width: ${width}, size: ${fileSizeGB.toFixed(
+      2
+    )} GB`
   );
 
   /**
@@ -187,7 +189,7 @@ export function generateTranscodeInstructions (mongoDoc) {
           return (
             otherLang === lang &&
             otherChannels > channels &&
-            (/eac3|truehd|dts/i.test(otherCodec))
+            /eac3|truehd|dts/i.test(otherCodec)
           );
         });
       }
@@ -240,8 +242,11 @@ export function generateTranscodeInstructions (mongoDoc) {
  * @returns {{crf:number, fgs:number}}
  */
 export function pickCrfAndFgs (mongoDoc) {
-  const width = Number(mongoDoc?.probe?.streams?.find((s) => s.codec_type === 'video')?.width || 0);
-  const genres = (mongoDoc?.indexerData?.genres || []).map((g) => g.toLowerCase());
+  const width = Number(
+    mongoDoc?.probe?.streams?.find((s) => s.codec_type === 'video')?.width || 0
+  );
+  const genres = (mongoDoc?.indexerData?.genres || []).map((g) =>
+    g.toLowerCase());
 
   const isAnimation = genres.includes('animation');
   const isAction = genres.includes('action');
@@ -251,23 +256,28 @@ export function pickCrfAndFgs (mongoDoc) {
    * width = minimum width threshold
    */
   const rules = [
-    { width: 3840, isAnimation: false, isAction: false, crf: 30, fgs: 8 }, // UHD general
-    { width: 3840, isAnimation: true, isAction: false, crf: 28, fgs: 4 }, // UHD animation
-    { width: 3840, isAnimation: false, isAction: true, crf: 29, fgs: 9 }, // UHD action
+    // --- UHD (3840x2160) ---
+    { width: 3840, isAnimation: false, isAction: false, crf: 30, fgs: 2 }, // General: reduce grain overhead
+    { width: 3840, isAnimation: true, isAction: false, crf: 28, fgs: 0 }, // Animation: typically clean, skip grain
+    { width: 3840, isAnimation: false, isAction: true, crf: 29, fgs: 4 }, // Action: moderate grain, not excessive
 
-    { width: 1920, isAnimation: false, isAction: false, crf: 30, fgs: 8 }, // 1080p general
-    { width: 1920, isAnimation: true, isAction: false, crf: 28, fgs: 3 }, // 1080p animation
-    { width: 1920, isAnimation: false, isAction: true, crf: 29, fgs: 9 }, // 1080p action
+    // --- 1080p (1920x1080) ---
+    { width: 1920, isAnimation: false, isAction: false, crf: 30, fgs: 2 }, // Lower grain to reduce artifacts/smearing
+    { width: 1920, isAnimation: true, isAction: false, crf: 28, fgs: 0 }, // Animation: no synthetic grain
+    { width: 1920, isAnimation: false, isAction: true, crf: 29, fgs: 3 }, // Action: subtle grain retained
 
-    { width: 1280, isAnimation: false, isAction: false, crf: 29, fgs: 7 }, // 720p general
-    { width: 1280, isAnimation: true, isAction: false, crf: 27, fgs: 2 } // 720p animation
+    // --- 720p (1280x720) ---
+    { width: 1280, isAnimation: false, isAction: false, crf: 29, fgs: 2 }, // Reduce for efficiency at low res
+    { width: 1280, isAnimation: true, isAction: false, crf: 27, fgs: 0 } // No grain at all
   ];
 
   // First rule that fits resolution + genres
-  const match = rules.find((r) =>
-    width >= r.width &&
-    r.isAnimation === isAnimation &&
-    r.isAction === isAction);
+  const match = rules.find(
+    (r) =>
+      width >= r.width &&
+      r.isAnimation === isAnimation &&
+      r.isAction === isAction
+  );
 
   // Default fallback if nothing matches
   return match ? { crf: match.crf, fgs: match.fgs } : { crf: 30, fgs: 8 };
@@ -292,7 +302,7 @@ function pickTiles (w) {
  * Ensures reasonable streaming bitrates for different resolutions.
  *
  * @param {number} width - Video width in pixels.
-   * @returns {{maxrate: string, bufsize: string}} Rate control parameters.
+ * @returns {{maxrate: string, bufsize: string}} Rate control parameters.
  */
 function getRateControl (width) {
   let maxrate;
