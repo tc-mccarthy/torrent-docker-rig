@@ -117,7 +117,7 @@ export function generateTranscodeInstructions (mongoDoc) {
 
     // Calculate GOP size for Plex compatibility (2s interval)
     const gop = calculateGOP(mainVideo);
-    const { crf, fgs } = pickCrfAndFgs(mongoDoc);
+    const { crf } = pickCrfAndFgs(mongoDoc);
 
     /**
      * SVT-AV1 encoder parameters for perceptual quality and compatibility.
@@ -126,14 +126,14 @@ export function generateTranscodeInstructions (mongoDoc) {
     const svtParams = [
       'fast-decode=1', // Enable fast decode for better compatibility
       'scd=1',
-      'usage=0',
+      'usage=1',
       'tier=0',
-      `film-grain=${fgs}`,
+      // `film-grain=${fgs}`,
       'film-grain-denoise=0',
       'aq-mode=1',
-      'enable-qm=1',
-      `tile-columns=${pickTiles(width).cols}`,
-      `tile-rows=${pickTiles(width).rows}`
+      'enable-qm=1'
+      // `tile-columns=${pickTiles(width).cols}`,
+      // `tile-rows=${pickTiles(width).rows}`
     ].join(':');
 
     // Build the video transcode instruction for AV1
@@ -291,11 +291,11 @@ export function pickCrfAndFgs (mongoDoc) {
  * @param {number} w
  * @returns {{cols:number, rows:number}}
  */
-function pickTiles (w) {
-  if (w >= 3840) return { cols: 2, rows: 2 };
-  if (w >= 1920) return { cols: 2, rows: 1 };
-  return { cols: 1, rows: 1 };
-}
+// function pickTiles (w) {
+//   if (w >= 3840) return { cols: 2, rows: 2 };
+//   if (w >= 1920) return { cols: 2, rows: 1 };
+//   return { cols: 1, rows: 1 };
+// }
 
 /**
  * Returns the maxrate and bufsize for ffmpeg rate control based on video width.
