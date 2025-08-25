@@ -126,7 +126,7 @@ export function generateTranscodeInstructions (mongoDoc) {
     const svtParams = [
       'fast-decode=1', // Enable fast decode for better compatibility
       'scd=1',
-      'usage=1',
+      'usage=0',
       'tier=0',
       // `film-grain=${fgs}`,
       'film-grain-denoise=0',
