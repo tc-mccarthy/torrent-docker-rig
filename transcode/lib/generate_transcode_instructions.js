@@ -132,8 +132,6 @@ export function generateTranscodeInstructions (mongoDoc) {
       'film-grain-denoise=0',
       'aq-mode=1',
       'enable-qm=1'
-      // `tile-columns=${pickTiles(width).cols}`,
-      // `tile-rows=${pickTiles(width).rows}`
     ].join(':');
 
     // Build the video transcode instruction for AV1
@@ -256,19 +254,19 @@ export function pickCrfAndFgs (mongoDoc) {
    * width = minimum width threshold
    */
   const rules = [
-    // --- UHD (3840x2160) ---
-    { width: 3840, isAnimation: false, isAction: false, crf: 30, fgs: 2 }, // General: reduce grain overhead
-    { width: 3840, isAnimation: true, isAction: false, crf: 28, fgs: 0 }, // Animation: typically clean, skip grain
-    { width: 3840, isAnimation: false, isAction: true, crf: 29, fgs: 4 }, // Action: moderate grain, not excessive
+  // --- UHD (3840x2160) ---
+    { width: 3840, isAnimation: false, isAction: false, crf: 27, fgs: 2 }, // General: retain detail, modest grain
+    { width: 3840, isAnimation: true, isAction: false, crf: 26, fgs: 0 }, // Animation: clean visuals, no grain
+    { width: 3840, isAnimation: false, isAction: true, crf: 27, fgs: 3 }, // Action: balance texture and bitrate
 
     // --- 1080p (1920x1080) ---
-    { width: 1920, isAnimation: false, isAction: false, crf: 30, fgs: 2 }, // Lower grain to reduce artifacts/smearing
-    { width: 1920, isAnimation: true, isAction: false, crf: 28, fgs: 0 }, // Animation: no synthetic grain
-    { width: 1920, isAnimation: false, isAction: true, crf: 29, fgs: 3 }, // Action: subtle grain retained
+    { width: 1920, isAnimation: false, isAction: false, crf: 27, fgs: 2 }, // General: avoid artifacting, maintain texture
+    { width: 1920, isAnimation: true, isAction: false, crf: 26, fgs: 0 }, // Animation: crisp, clean
+    { width: 1920, isAnimation: false, isAction: true, crf: 27, fgs: 2 }, // Action: fgs=2 enough for depth without blur
 
     // --- 720p (1280x720) ---
-    { width: 1280, isAnimation: false, isAction: false, crf: 29, fgs: 2 }, // Reduce for efficiency at low res
-    { width: 1280, isAnimation: true, isAction: false, crf: 27, fgs: 0 } // No grain at all
+    { width: 1280, isAnimation: false, isAction: false, crf: 27, fgs: 1 }, // Lower res, low grain to preserve clarity
+    { width: 1280, isAnimation: true, isAction: false, crf: 26, fgs: 0 } // Animation at 720p: skip grain, maintain sharpness
   ];
 
   // First rule that fits resolution + genres
@@ -282,20 +280,6 @@ export function pickCrfAndFgs (mongoDoc) {
   // Default fallback if nothing matches
   return match ? { crf: match.crf, fgs: match.fgs } : { crf: 30, fgs: 8 };
 }
-
-/**
- * Choose tile layout to increase parallelism with minimal quality impact.
- *  - ≥3840 width: 2x2 tiles
- *  - ≥1920 width: 2x1 tiles
- *  - else: 1x1
- * @param {number} w
- * @returns {{cols:number, rows:number}}
- */
-// function pickTiles (w) {
-//   if (w >= 3840) return { cols: 2, rows: 2 };
-//   if (w >= 1920) return { cols: 2, rows: 1 };
-//   return { cols: 1, rows: 1 };
-// }
 
 /**
  * Returns the maxrate and bufsize for ffmpeg rate control based on video width.
@@ -340,7 +324,7 @@ function getRateControl (width) {
  * @returns {number} SVT-AV1 preset value (6, 7, or 8)
  */
 function determinePreset (isUHD, fileSizeGB) {
-  if (isUHD) return 9;
+  if (isUHD) return 8;
   if (fileSizeGB > 10) return 7;
   return 6;
 }
