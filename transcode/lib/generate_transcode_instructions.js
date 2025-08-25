@@ -69,7 +69,6 @@ export function generateTranscodeInstructions (mongoDoc) {
   const videoCodec = mainVideo.codec_name;
   const isHEVC = videoCodec === 'hevc' || videoCodec === 'h265';
   const width = mainVideo.width || 0;
-  const isUHD = width >= 3840;
 
   // Log the video stream being processed for debugging and traceability
   console.log(
@@ -117,7 +116,7 @@ export function generateTranscodeInstructions (mongoDoc) {
 
     // Calculate GOP size for Plex compatibility (2s interval)
     const gop = calculateGOP(mainVideo);
-    const { crf } = pickCrfAndFgs(mongoDoc);
+    const { crf, preset } = pickCrfPresetAndFgs(mongoDoc);
 
     /**
      * SVT-AV1 encoder parameters for perceptual quality and compatibility.
@@ -147,7 +146,7 @@ export function generateTranscodeInstructions (mongoDoc) {
         video_track_timescale: 90000,
         g: gop, // GOP size
         keyint_min: gop / 4, // Minimum keyframe interval
-        preset: determinePreset(isUHD, fileSizeGB), // Encoder preset
+        preset, // Encoder preset
         crf, // Quality target
         ...getRateControl(width), // Bitrate and bufsize (optional)
         ...hdrProps // HDR metadata if present
@@ -239,15 +238,15 @@ export function generateTranscodeInstructions (mongoDoc) {
  * @param {Object} mongoDoc - ffprobe + indexerData doc
  * @returns {{crf:number, fgs:number}}
  */
-export function pickCrfAndFgs (mongoDoc) {
+export function pickCrfPresetAndFgs (mongoDoc) {
   const width = Number(
     mongoDoc?.probe?.streams?.find((s) => s.codec_type === 'video')?.width || 0
   );
   const genres = (mongoDoc?.indexerData?.genres || []).map((g) =>
     g.toLowerCase());
 
-  const isAnimation = genres.includes('animation');
-  const isAction = genres.includes('action');
+  const isAnimation = genres.some((g) => /anim/.test(g));
+  const isAction = genres.some((g) => /action|adventure|war|sci[- ]?fi/.test(g));
 
   /**
    * Rule map: first match wins.
@@ -255,38 +254,43 @@ export function pickCrfAndFgs (mongoDoc) {
    */
   const rules = [
   // --- UHD (3840x2160) ---
-    { width: 3840, isAnimation: false, isAction: false, crf: 27, fgs: 2 }, // General: retain detail, modest grain
-    { width: 3840, isAnimation: true, isAction: false, crf: 26, fgs: 0 }, // Animation: clean visuals, no grain
-    { width: 3840, isAnimation: false, isAction: true, crf: 27, fgs: 3 }, // Action: balance texture and bitrate
+    { width: 3840, isAnimation: false, isAction: false, crf: 27, fgs: 2, preset: 8 }, // General: retain detail, modest grain
+    { width: 3840, isAnimation: true, isAction: false, crf: 26, fgs: 0, preset: 9 }, // Animation: clean visuals, no grain
+    { width: 3840, isAnimation: false, isAction: true, crf: 27, fgs: 3, preset: 8 }, // Action: balance texture and bitrate
 
     // --- 1080p (1920x1080) ---
-    { width: 1920, isAnimation: false, isAction: false, crf: 27, fgs: 2 }, // General: avoid artifacting, maintain texture
-    { width: 1920, isAnimation: true, isAction: false, crf: 26, fgs: 0 }, // Animation: crisp, clean
-    { width: 1920, isAnimation: false, isAction: true, crf: 27, fgs: 2 }, // Action: fgs=2 enough for depth without blur
+    { width: 1920, isAnimation: false, isAction: false, crf: 27, fgs: 2, preset: 8 }, // General: avoid artifacting, maintain texture
+    { width: 1920, isAnimation: true, isAction: false, crf: 26, fgs: 0, preset: 9 }, // Animation: crisp, clean
+    { width: 1920, isAnimation: false, isAction: true, crf: 27, fgs: 2, preset: 8 }, // Action: fgs=2 enough for depth without blur
 
     // --- 720p (1280x720) ---
-    { width: 1280, isAnimation: false, isAction: false, crf: 27, fgs: 1 }, // Lower res, low grain to preserve clarity
-    { width: 1280, isAnimation: true, isAction: false, crf: 26, fgs: 0 } // Animation at 720p: skip grain, maintain sharpness
+    { width: 1280, isAnimation: false, isAction: false, crf: 27, fgs: 1, preset: 8 }, // Lower res, low grain to preserve clarity
+    { width: 1280, isAnimation: true, isAction: false, crf: 26, fgs: 0, preset: 9 } // Animation at 720p: skip grain, maintain sharpness
   ];
 
   // First rule that fits resolution + genres
-  const match = rules.find(
+  let match = rules.find(
     (r) =>
       width >= r.width &&
       r.isAnimation === isAnimation &&
       r.isAction === isAction
   );
 
+  // if there's no match, use defaults
+  if (!match) {
+    match = { width: 0, isAnimation: false, isAction: false, crf: 27, fgs: 2, preset: 8 };
+  }
+
   // Default fallback if nothing matches
-  return match ? { crf: match.crf, fgs: match.fgs } : { crf: 30, fgs: 8 };
+  return match;
 }
 
 /**
- * Returns the maxrate and bufsize for ffmpeg rate control based on video width.
- * Ensures reasonable streaming bitrates for different resolutions.
+ * Returns maxrate and bufsize for ffmpeg rate control based on video width.
+ * Used to ensure reasonable streaming bitrates for different resolutions.
  *
- * @param {number} width - Video width in pixels.
- * @returns {{maxrate: string, bufsize: string}} Rate control parameters.
+ * @param {number} width - Video width in pixels
+ * @returns {{maxrate: string, bufsize: string}} - Rate control parameters
  */
 function getRateControl (width) {
   let maxrate;
@@ -313,27 +317,10 @@ function getRateControl (width) {
 }
 
 /**
- * Selects the encoder preset for SVT-AV1 based on resolution and file size.
+ * Maps a channel count to a valid ffmpeg channel layout string for audio encoding.
  *
- * - UHD (4K) always uses preset 8 (slowest, highest quality)
- * - Non-UHD files larger than 10GB use preset 7 (slower, higher quality)
- * - All others use preset 6 (default balance)
- *
- * @param {boolean} isUHD - True if the video is UHD/4K.
- * @param {number} fileSizeGB - File size in gigabytes.
- * @returns {number} SVT-AV1 preset value (6, 7, or 8)
- */
-function determinePreset (isUHD, fileSizeGB) {
-  if (isUHD) return 8;
-  if (fileSizeGB > 10) return 7;
-  return 6;
-}
-
-/**
- * Maps a channel count to a valid channel layout string for audio encoding.
- *
- * @param {number} channels - Number of audio channels.
- * @returns {string} Channel layout name.
+ * @param {number} channels - Number of audio channels
+ * @returns {string} - Channel layout name
  */
 function mapChannelLayout (channels) {
   // Mapping of channel count to ffmpeg channel layout names
@@ -351,13 +338,12 @@ function mapChannelLayout (channels) {
 
 /**
  * Determines the audio codec and encoding parameters for a given stream.
- *
- * - If the input is already AAC, AC3, or EAC3, copy the stream.
- * - For stereo or mono, use libfdk_aac at 96k per channel.
+ * - If input is AAC, AC3, or EAC3, copy the stream.
+ * - For stereo/mono, use libfdk_aac at 96k per channel.
  * - For multichannel, use EAC3 at 128k per channel (max 768k).
  *
- * @param {Object} stream - ffprobe audio stream object.
- * @returns {Object} Audio encoding parameters for ffmpeg.
+ * @param {Object} stream - ffprobe audio stream object
+ * @returns {Object} - Audio encoding parameters for ffmpeg
  */
 function determineAudioCodec (stream) {
   const codec = stream.codec_name.toLowerCase();
@@ -389,17 +375,17 @@ function determineAudioCodec (stream) {
 }
 
 /**
- * Dynamically calculates GOP size (group of pictures interval).
- * Target is 2 seconds worth of frames for optimal Plex compatibility.
+ * Calculates GOP size (group of pictures interval) for Plex compatibility.
+ * Target is 2 seconds worth of frames, or fallback to 120 frames if unknown.
  *
- * @param {Object} stream - The video stream.
- * @returns {number} GOP size in frames.
+ * @param {Object} stream - Video stream object
+ * @returns {number} - GOP size in frames
  */
 function calculateGOP (stream) {
   // Use avg_frame_rate if available, else r_frame_rate
   const fpsStr = stream.avg_frame_rate || stream.r_frame_rate;
   const [num, den] = fpsStr.split('/').map((n) => parseInt(n, 10));
-  if (!den || Number.isNaN(num)) return 120; // fallback default (24fps * 2s)
-  // Calculate GOP as 2 seconds worth of frames
+  if (!den || Number.isNaN(num)) return 120; // fallback default (24fps * 5s)
+  // Calculate GOP as 5 seconds worth of frames (for longer keyframe interval)
   return Math.round((num / den) * 5);
 }
