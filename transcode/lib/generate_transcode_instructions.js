@@ -130,7 +130,6 @@ export function generateTranscodeInstructions (mongoDoc) {
       'film-grain-denoise=0',
       'aq-mode=1',
       'enable-qm=1',
-      'lp=0',
       `tile-columns=${pickTiles(width).cols}`,
       `tile-rows=${pickTiles(width).rows}`
     ].join(':');
@@ -141,12 +140,11 @@ export function generateTranscodeInstructions (mongoDoc) {
       codec: 'libsvtav1',
       arguments: {
         pix_fmt: 'yuv420p10le', // 10-bit for best quality
-        max_muxing_queue_size: 9999, // Avoid muxing errors
+        max_muxing_queue_size: 99999, // Avoid muxing errors
         'svtav1-params': svtParams, // SVT-AV1 encoder params
         avoid_negative_ts: 'make_zero', // Fix negative timestamps
         vsync: 'vfr',
         video_track_timescale: 90000,
-        threads: 0, // Auto threads
         g: gop, // GOP size
         keyint_min: gop / 2, // Minimum keyframe interval
         preset: determinePreset(isUHD, fileSizeGB), // Encoder preset
