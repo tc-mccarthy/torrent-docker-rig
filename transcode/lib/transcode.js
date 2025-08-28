@@ -167,7 +167,7 @@ export default function transcode (file) {
               }, 1000);
             }
             // Use OS-level cp for fast copy
-            await exec_promise(`cp "${file}" "${stage_file}"`);
+            await exec_promise(`cp --reflink=never --sparse=never --preserve=timestamps "${file}" "${stage_file}"`);
             if (interval) clearInterval(interval);
             // After copy, report 100% progress
             const percent = 100;
