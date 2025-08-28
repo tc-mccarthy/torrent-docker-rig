@@ -128,9 +128,9 @@ export function generateTranscodeInstructions (mongoDoc) {
       'usage=0',
       'tier=0',
       // `film-grain=${fgs}`,
-      'film-grain-denoise=0',
-      'aq-mode=1',
-      'enable-qm=1'
+      'film-grain-denoise=0'
+      // 'aq-mode=1',
+      // 'enable-qm=1'
     ].join(':');
 
     // Build the video transcode instruction for AV1
