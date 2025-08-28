@@ -246,7 +246,7 @@ export default function transcode (file) {
             `-c:a:${idx} ${audio.codec}`,
             audio.bitrate && `-b:a:${idx} ${audio.bitrate}`,
             audio.channels && `-ac:${idx} ${audio.channels}`,
-            audio.filter && `-filter:a:${idx} ${audio.filter}`,
+            audio.filter && `-filter:a:${idx} "${audio.filter}"`,
             `-map_metadata:s:a:${idx} 0:s:a:${idx}`
           ].filter(Boolean)))
         .outputOptions(transcode_instructions.subtitles
@@ -461,7 +461,7 @@ export default function transcode (file) {
 
         .on('error', async (err, stdout, stderr) => {
           // FFmpeg error event: log, cleanup, update error status
-          let retry = true;
+          const retry = true;
           logger.error(err, { label: 'Cannot process video', stdout, stderr });
           fs.appendFileSync('/usr/app/logs/ffmpeg.log', JSON.stringify({ error: err.message, stdout, stderr, ffmpeg_cmd, trace: err.stack }, null, 4));
 
