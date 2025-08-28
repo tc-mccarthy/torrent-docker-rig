@@ -235,7 +235,7 @@ export default function transcode (file) {
 
       // Build FFmpeg command with all input/output options
       let cmd = ffmpeg(file)
-        .inputOptions(['-v debug', '-stats', `-hwaccel ${hwaccel}`].filter(Boolean))
+        .inputOptions(['-v fatal', '-stats', `-hwaccel ${hwaccel}`].filter(Boolean))
         .outputOptions(input_maps)
         .outputOptions([
           `-c:v ${transcode_instructions.video.codec}`,
@@ -461,6 +461,7 @@ export default function transcode (file) {
 
         .on('error', async (err, stdout, stderr) => {
           // FFmpeg error event: log, cleanup, update error status
+          let retry = true;
           logger.error(err, { label: 'Cannot process video', stdout, stderr });
           fs.appendFileSync('/usr/app/logs/ffmpeg.log', JSON.stringify({ error: err.message, stdout, stderr, ffmpeg_cmd, trace: err.stack }, null, 4));
 
@@ -471,9 +472,14 @@ export default function transcode (file) {
             video_record.permitHWDecode = false;
           }
 
+          if (/234/i.test(err.message)) {
+            retry = false;
+            await trash(file);
+          }
+
           await trash(scratch_file, false);
           // Delete stage_file if it exists
-          if (stage_file && fs.existsSync(stage_file)) {
+          if (!retry && stage_file && fs.existsSync(stage_file)) {
             try {
               await fs.promises.unlink(stage_file);
               logger.debug(`Deleted stage_file after error: ${stage_file}`);
