@@ -235,7 +235,7 @@ export default function transcode (file) {
 
       // Build FFmpeg command with all input/output options
       let cmd = ffmpeg(file)
-        .inputOptions(['-v fatal', '-stats', `-hwaccel ${hwaccel}`].filter(Boolean))
+        .inputOptions(['-v debug', '-stats', `-hwaccel ${hwaccel}`].filter(Boolean))
         .outputOptions(input_maps)
         .outputOptions([
           `-c:v ${transcode_instructions.video.codec}`,
