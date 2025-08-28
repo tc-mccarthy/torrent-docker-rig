@@ -246,7 +246,7 @@ export default function transcode (file) {
             `-c:a:${idx} ${audio.codec}`,
             audio.bitrate && `-b:a:${idx} ${audio.bitrate}`,
             audio.channels && `-ac:${idx} ${audio.channels}`,
-            audio.channel_layout && `-filter:a:${idx} channelmap=channel_layout=${audio.channel_layout}`,
+            audio.filter && `-filter:a:${idx} ${audio.filter}`,
             `-map_metadata:s:a:${idx} 0:s:a:${idx}`
           ].filter(Boolean)))
         .outputOptions(transcode_instructions.subtitles
@@ -470,11 +470,6 @@ export default function transcode (file) {
           if (/251/i.test(err.message)) {
             logger.warn('FFmpeg error 251 detected. Disabling hardware acceleration for this video.');
             video_record.permitHWDecode = false;
-          }
-
-          if (/234/i.test(err.message)) {
-            retry = false;
-            await trash(file);
           }
 
           await trash(scratch_file, false);

@@ -213,10 +213,15 @@ export function generateTranscodeInstructions (mongoDoc) {
       const lang = (stream.tags?.language || 'und').toLowerCase();
       const codec = stream.codec_name?.toLowerCase();
       // Only keep English/und and supported subtitle codecs
-      return (
-        ['en', 'eng', 'und'].includes(lang) &&
-        /subrip|hdmv_pgs_subtitle|substation/i.test(codec)
-      );
+      if (!['en', 'eng', 'und'].includes(lang)) return false;
+      if (/subrip|substation/i.test(codec)) return true;
+      if (codec === 'hdmv_pgs_subtitle') {
+        // Require valid width and height > 0 for PGS
+        const w = Number(stream.width || 0);
+        const h = Number(stream.height || 0);
+        return w > 0 && h > 0;
+      }
+      return false;
     })
     .map((stream) => ({
       stream_index: stream.index,
@@ -320,15 +325,15 @@ function getRateControl (width) {
  * @param {number} channels - Number of audio channels
  * @returns {string} - Channel layout name
  */
-function mapChannelLayout (channels) {
+function mapAudioFilter (channels) {
   // Mapping of channel count to ffmpeg channel layout names
   const map = {
-    1: 'mono', // OK for both
-    2: 'stereo', // OK for both
-    3: 'stereo', // Fallback (2.1 isn't valid)
-    4: 'quad', // Supported by EAC3; rarely used in AAC
-    5: '5.0',
-    6: '5.1'
+    1: 'pan=stereo|c0=0|c1=0', // OK for both
+    2: 'channelmap=channel_layout=stereo', // OK for both
+    3: 'channelmap=channel_layout=stereo', // Fallback (2.1 isn't valid)
+    4: 'channelmap=channel_layout=quad', // Supported by EAC3; rarely used in AAC
+    5: 'channelmap=channel_layout=5.0',
+    6: 'channelmap=channel_layout=5.1'
   };
 
   return map[channels] || 'stereo';
@@ -359,7 +364,7 @@ function determineAudioCodec (stream) {
       codec: 'libfdk_aac', // always use libfdk_aac for mono/stereo
       bitrate: `${(96000 * channels) / 1000}k`, // 96k per channel
       channels: 2, // always mix to stereo -- mono gets mixed to stereo
-      channel_layout: mapChannelLayout(2) // always stereo layout
+      filter: mapAudioFilter(channels)
     };
   }
 
@@ -368,7 +373,7 @@ function determineAudioCodec (stream) {
     codec: 'eac3',
     bitrate: `${Math.min(128000 * channels, 768000) / 1000}k`,
     channels,
-    channel_layout: mapChannelLayout(channels)
+    filter: mapAudioFilter(channels)
   };
 }
 
