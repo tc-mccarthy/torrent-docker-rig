@@ -336,7 +336,7 @@ function mapAudioFilter (channels) {
     6: 'channelmap=channel_layout=5.1'
   };
 
-  return map[channels] || 'stereo';
+  return map[channels];
 }
 
 /**
