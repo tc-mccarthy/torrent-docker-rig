@@ -464,6 +464,13 @@ export default function transcode (file) {
           logger.error(err, { label: 'Cannot process video', stdout, stderr });
           fs.appendFileSync('/usr/app/logs/ffmpeg.log', JSON.stringify({ error: err.message, stdout, stderr, ffmpeg_cmd, trace: err.stack }, null, 4));
 
+          // FFmpeg error 251 typically means a hardware decoder failed to initialize (e.g., unsupported GPU or corrupted driver).
+          // Disabling hardware decode ensures fallback to software on retry.
+          if (/251/i.test(err.message)) {
+            logger.warn('FFmpeg error 251 detected. Disabling hardware acceleration for this video.');
+            video_record.permitHWDecode = false;
+          }
+
           await trash(scratch_file, false);
           // Delete stage_file if it exists
           if (stage_file && fs.existsSync(stage_file)) {
@@ -473,13 +480,6 @@ export default function transcode (file) {
             } catch (stageDelErr) {
               logger.warn(`Failed to delete stage_file: ${stage_file}`, stageDelErr);
             }
-          }
-
-          // FFmpeg error 234 or 251 typically means a hardware decoder failed to initialize (e.g., unsupported GPU or corrupted driver).
-          // Disabling hardware decode ensures fallback to software on retry.
-          if (/251|234/i.test(err.message)) {
-            logger.warn('FFmpeg error 251 or 234 detected. Disabling hardware acceleration for this video.');
-            video_record.permitHWDecode = false;
           }
 
           Object.assign(video_record, {

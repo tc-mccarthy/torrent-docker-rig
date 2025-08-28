@@ -142,8 +142,6 @@ export function generateTranscodeInstructions (mongoDoc) {
         max_muxing_queue_size: 99999, // Avoid muxing errors
         'svtav1-params': svtParams, // SVT-AV1 encoder params
         avoid_negative_ts: 'make_zero', // Fix negative timestamps
-        vsync: 'vfr',
-        video_track_timescale: 90000,
         g: gop, // GOP size
         keyint_min: gop / 4, // Minimum keyframe interval
         preset, // Encoder preset
