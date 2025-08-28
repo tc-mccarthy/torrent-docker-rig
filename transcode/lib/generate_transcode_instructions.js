@@ -213,10 +213,15 @@ export function generateTranscodeInstructions (mongoDoc) {
       const lang = (stream.tags?.language || 'und').toLowerCase();
       const codec = stream.codec_name?.toLowerCase();
       // Only keep English/und and supported subtitle codecs
-      return (
-        ['en', 'eng', 'und'].includes(lang) &&
-        /subrip|hdmv_pgs_subtitle|substation/i.test(codec)
-      );
+      if (!['en', 'eng', 'und'].includes(lang)) return false;
+      if (/subrip|substation/i.test(codec)) return true;
+      if (codec === 'hdmv_pgs_subtitle') {
+        // Require valid width and height > 0 for PGS
+        const w = Number(stream.width || 0);
+        const h = Number(stream.height || 0);
+        return w > 0 && h > 0;
+      }
+      return false;
     })
     .map((stream) => ({
       stream_index: stream.index,
