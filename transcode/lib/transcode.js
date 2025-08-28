@@ -475,10 +475,10 @@ export default function transcode (file) {
             }
           }
 
-          // FFmpeg error 251 typically means a hardware decoder failed to initialize (e.g., unsupported GPU or corrupted driver).
+          // FFmpeg error 234 or 251 typically means a hardware decoder failed to initialize (e.g., unsupported GPU or corrupted driver).
           // Disabling hardware decode ensures fallback to software on retry.
-          if (/251/i.test(err.message)) {
-            logger.warn('FFmpeg error 251 detected. Disabling hardware acceleration for this video.');
+          if (/251|234/i.test(err.message)) {
+            logger.warn('FFmpeg error 251 or 234 detected. Disabling hardware acceleration for this video.');
             video_record.permitHWDecode = false;
           }
 
