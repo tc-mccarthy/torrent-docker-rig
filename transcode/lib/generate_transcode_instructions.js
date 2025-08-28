@@ -328,7 +328,7 @@ function getRateControl (width) {
 function mapAudioFilter (channels) {
   // Mapping of channel count to ffmpeg channel layout names
   const map = {
-    1: 'pan=stereo|c0=0|c1=0', // OK for both
+    1: 'pan=stereo|c0=c0|c1=c0', // OK for both
     2: '', // OK for both
     3: 'channelmap=channel_layout=stereo', // Fallback (2.1 isn't valid)
     4: 'channelmap=channel_layout=quad', // Supported by EAC3; rarely used in AAC
