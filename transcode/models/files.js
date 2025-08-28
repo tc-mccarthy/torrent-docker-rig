@@ -246,5 +246,18 @@ schema.index({ integrityCheck: 1, status: 1 });
  */
 schema.index({ 'sortFields.priority': 1, status: 1 });
 
+/**
+ * Compound index for generating the file list
+ * 
+ */
+schema.index({
+  status: 1,
+  integrityCheck: 1,
+  encode_version: 1,
+  'sortFields.priority': 1,
+  'sortFields.size': -1,
+  'sortFields.width': -1
+});
+
 // create a model object that uses the above schema
 export default model(model_name, schema);
