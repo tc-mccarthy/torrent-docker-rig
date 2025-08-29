@@ -588,6 +588,14 @@ services:
     volumes:
       - ./tautulli/config:/config
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8181/ | grep -qi tautulli"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    labels:
+      - "autoheal=true"
     logging: 
       driver: "json-file"
       options: 
