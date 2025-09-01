@@ -68,16 +68,6 @@ export async function default_priority (video) {
       return 91;
     }
 
-    // --- Priority: Excessive bitrate triggers on-demand transcode for Plex ---
-    // 60Mbps = 60,000,000 bits/sec; ffprobe reports bitrate in bits/sec
-    // Defensive: use video.effectiveBitrate (computed from probe)
-    const bitRate = video.effectiveBitrate;
-    if (bitRate > 60 * 1024 * 1024) {
-      // If bitrate exceeds 60Mbps, set high priority for on-demand transcode
-      return 92;
-    }
-    // }
-
     // --- Default case: normal priority ---
     return 100; // No special conditions met, normal priority
   } catch (e) {
