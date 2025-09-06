@@ -368,6 +368,27 @@ services:
         max-file: "10"
 
   # --------------------------------------------------------------------------
+  # MyMedia (ALEXA playback)
+  # --------------------------------------------------------------------------  
+  mymedia:
+    image: bizmodeller/mymediaforalexa:latest
+    container_name: mymedia
+    ports:
+      - "52051:52051"   # Web UI
+      - "52050:52050"   # Alexa communication
+    environment:
+      - TZ
+    volumes:
+      - ${TRANSCODE_STORAGE}:/media
+      - ./mymedia/config:/config
+    restart: unless-stopped
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
+
+  # --------------------------------------------------------------------------
   # MONGO (local)
   # --------------------------------------------------------------------------
   mongo:
