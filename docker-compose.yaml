@@ -379,8 +379,8 @@ services:
     environment:
       - TZ
     volumes:
-      - ${TRANSCODE_STORAGE}:/media
-      - ./mymedia/config:/config
+      - ${TRANSCODE_STORAGE}:/medialibrary
+      - ./mymedia/config:/datadir
     restart: unless-stopped
     logging: 
       driver: "json-file"
