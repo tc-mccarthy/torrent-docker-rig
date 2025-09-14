@@ -248,7 +248,7 @@ schema.index({ 'sortFields.priority': 1, status: 1 });
 
 /**
  * Compound index for generating the file list
- * 
+ *
  */
 schema.index({
   status: 1,
