@@ -25,7 +25,7 @@ export default async function generate_filelist ({ limit = 1, writeToFile = fals
     .limit(limit);
 
   if (writeToFile) {
-    const data = filelist.slice(1, 1001).map((f) => ({
+    const data = filelist.map((f) => ({
       path: f.path.split(/\//).pop(),
       volume: f.path.split(/\//)[2],
       size: f.sortFields.size,
