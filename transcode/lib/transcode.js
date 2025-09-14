@@ -343,9 +343,19 @@ export default function transcode (file) {
             action: 'transcoding'
           };
 
-          // Find the job in the transcodeQueue and update its status
+          // Find the job in the transcodeQueue
           const runningJobIndex = global.transcodeQueue.runningJobs.findIndex((j) => j._id.toString() === video_record._id.toString());
-          Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], { ffmpeg_cmd, audio_language, file, ...output });
+
+          // only update the job if it is found and runningJob.index.timemark !== output.timemark
+          if (runningJobIndex !== -1 && global.transcodeQueue.runningJobs[runningJobIndex].timemark !== output.timemark) {
+            Object.assign(global.transcodeQueue.runningJobs[runningJobIndex], { ffmpeg_cmd, audio_language, file, ...output });
+          }
+
+          // if global.transcodeQueue.runningJobs[runningJobIndex].refreshed is greater than 8 hours old, the job has stalled and we should remove it from the active jobs list
+          if (global.transcodeQueue.runningJobs[runningJobIndex].refreshed < Date.now() - 8 * 60 * 60 * 1000) {
+            logger.warn(`Removing stalled job ${video_record._id}`);
+            global.transcodeQueue.runningJobs.splice(runningJobIndex, 1);
+          }
         })
         .on('end', async () => {
           // FFmpeg end event: finalize output, cleanup, update status

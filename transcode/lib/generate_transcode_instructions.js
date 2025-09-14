@@ -2,85 +2,71 @@
  * Generates transcoding instructions for video, audio, and subtitles based on ffprobe and metadata.
  *
  * This function analyzes the input media file and determines the optimal transcoding strategy for Plex/streaming:
- * - Video: Copies HEVC if small, otherwise transcodes to AV1 with HDR and rate control.
- * - Audio: Drops AC3 5.1 compatibility tracks if a higher-channel EAC3/TrueHD/DTS exists for the same language.
- *   Copies AAC/AC3/EAC3, otherwise encodes stereo to AAC and multichannel to EAC3.
- * - Subtitles: Copies English/und streams in supported formats (SRT, PGS, ASS).
  *
- * @param {Object} mongoDoc - MongoDB document containing ffprobe and metadata info.
+ * Video:
+ *   - If the file is small (<= 1GB) and already HEVC, the video stream is copied directly to save time and resources.
+ *   - Otherwise, the video is transcoded to AV1 using SVT-AV1, with HDR metadata preserved if present, and rate control parameters set for Plex compatibility.
+ *
+ * Audio:
+ *   - Only includes streams matching the spoken languages (from TMDb/TVDb metadata).
+ *   - Drops AC3 5.1 compatibility tracks if a higher-channel EAC3/TrueHD/DTS exists for the same language.
+ *   - Copies AAC/AC3/EAC3 streams; otherwise, encodes stereo/mono to AAC and multichannel to EAC3.
+ *
+ * Subtitles:
+ *   - Only includes English/undetermined streams in supported formats (SRT, PGS, ASS).
+ *   - For PGS subtitles, requires valid width and height properties.
+ *
+ * @param {Object} mongoDoc MongoDB document containing ffprobe and metadata info.
+ * @param {Object} mongoDoc.probe ffprobe output containing streams and format.
+ * @param {Array<string>} [mongoDoc.audio_language] List of spoken language codes (lowercase).
  * @returns {Object} Transcoding instruction object for video, audio, and subtitles.
+ * @returns {Object} return.video Video transcode instruction or null if not needed.
+ * @returns {Array<Object>} return.audio List of audio transcode instructions.
+ * @returns {Array<Object>} return.subtitles List of subtitle copy instructions.
  */
 export function generateTranscodeInstructions (mongoDoc) {
-  /**
-   * Extract ffprobe and language info from the MongoDB document.
-   * @type {Object}
-   */
+  // Extract ffprobe and language info from the MongoDB document
   const { probe: ffprobe, audio_language = [] } = mongoDoc;
 
-  /**
-   * Defensive: ensure streams and format are always objects.
-   * @type {Array}
-   */
+  // Defensive: ensure streams and format are always objects
   const streams = ffprobe.streams || [];
   const format = ffprobe.format || {};
-  /**
-   * File size in kilobytes, then convert to gigabytes for logic.
-   * @type {number}
-   */
+  // File size in kilobytes, then convert to gigabytes for logic
   const fileSizeKB = parseInt(format.size || 0, 10);
   const fileSizeGB = fileSizeKB / 1024 ** 2;
 
-  /**
-   * Split streams by type for easier processing.
-   * @type {Array}
-   */
+  // Split streams by type for easier processing
   const videoStreams = streams.filter((s) => s.codec_type === 'video');
   const audioStreams = streams.filter((s) => s.codec_type === 'audio');
   const subtitleStreams = streams.filter((s) => s.codec_type === 'subtitle');
 
-  /**
-   * Lowercase all spoken language codes for matching.
-   * @type {Array}
-   */
+  // Lowercase all spoken language codes for matching
   const spokenLangs = audio_language.map((lang) => lang.toLowerCase());
 
-  /**
-   * Prepare the result object for transcoding instructions.
-   * @type {Object}
-   */
+  // Prepare the result object for transcoding instructions
   const result = {
     video: null,
     audio: [],
     subtitles: []
   };
 
-  /**
-   * Main video stream is always the first video stream (assume first is main).
-   * Defensive: must have a video stream.
-   * @type {Object}
-   */
+  // Main video stream is always the first video stream (assume first is main)
+  // Defensive: must have a video stream
   const mainVideo = videoStreams[0];
   if (!mainVideo) throw new Error('No video stream found');
 
-  /**
-   * Gather video stream properties (codec, width, UHD status).
-   * @type {string}
-   */
+  // Gather video stream properties (codec, width, UHD status)
   const videoCodec = mainVideo.codec_name;
   const isHEVC = videoCodec === 'hevc' || videoCodec === 'h265';
   const width = mainVideo.width || 0;
 
   // Log the video stream being processed for debugging and traceability
   console.log(
-    `Processing video stream: ${videoCodec}, width: ${width}, size: ${fileSizeGB.toFixed(
-      2
-    )} GB`
+    `Processing video stream: ${videoCodec}, width: ${width}, size: ${fileSizeGB.toFixed(2)} GB`
   );
 
-  /**
-   * If the file is small and already HEVC, just copy the video stream (saves time/resources).
-   * No need to transcode, just copy the stream.
-   */
+  // If the file is small and already HEVC, just copy the video stream (saves time/resources)
+  // No need to transcode, just copy the stream
   if (fileSizeGB <= 1 && isHEVC) {
     result.video = {
       stream_index: mainVideo.index,
@@ -88,10 +74,8 @@ export function generateTranscodeInstructions (mongoDoc) {
       arguments: {}
     };
   } else {
-    /**
-     * Build AV1 transcode instruction, including HDR metadata and SVT-AV1 params.
-     * If HDR (PQ/2084), extract and preserve HDR mastering and content light level metadata for Plex compatibility.
-     */
+    // Build AV1 transcode instruction, including HDR metadata and SVT-AV1 params
+    // If HDR (PQ/2084), extract and preserve HDR mastering and content light level metadata for Plex compatibility
     const hdrProps = {};
     if (mainVideo.color_transfer?.includes('2084')) {
       hdrProps.color_primaries = mainVideo.color_primaries;
@@ -114,23 +98,21 @@ export function generateTranscodeInstructions (mongoDoc) {
       }
     }
 
-    // Calculate GOP size for Plex compatibility (2s interval)
+    // Calculate GOP size for Plex compatibility (5s interval)
     const gop = calculateGOP(mainVideo);
     const { crf, preset } = pickCrfPresetAndFgs(mongoDoc);
 
-    /**
-     * SVT-AV1 encoder parameters for perceptual quality and compatibility.
-     * Includes scene-cut detection, film grain synthesis, AQ, and quant matrices.
-     */
+    // SVT-AV1 encoder parameters for perceptual quality and compatibility
+    // Includes scene-cut detection, film grain synthesis, AQ, and quant matrices
     const svtParams = [
       'fast-decode=1', // Enable fast decode for better compatibility
-      'scd=1',
-      'usage=0',
-      'tier=0',
-      // `film-grain=${fgs}`,
-      'film-grain-denoise=0',
-      'aq-mode=1',
-      'enable-qm=1'
+      'scd=1', // Scene cut detection
+      'usage=0', // VOD mode
+      'tier=0', // Main tier
+      // 'film-grain=${fgs}', // Film grain synthesis (currently not used)
+      'film-grain-denoise=0', // No denoise
+      'aq-mode=1', // Adaptive quantization
+      'enable-qm=1' // Enable quantization matrices
     ].join(':');
 
     // Build the video transcode instruction for AV1
@@ -142,7 +124,7 @@ export function generateTranscodeInstructions (mongoDoc) {
         max_muxing_queue_size: 99999, // Avoid muxing errors
         'svtav1-params': svtParams, // SVT-AV1 encoder params
         avoid_negative_ts: 'make_zero', // Fix negative timestamps
-        g: gop, // GOP size
+        g: gop, // GOP size (keyframe interval)
         keyint_min: gop / 4, // Minimum keyframe interval
         preset, // Encoder preset
         crf, // Quality target
@@ -152,16 +134,10 @@ export function generateTranscodeInstructions (mongoDoc) {
     };
   }
 
-  // Filter audio streams to only those matching spoken languages (from TMDb/TVDb)
-  /**
-   * Filter and map audio streams to encoding instructions.
-   *
-   * - Only include streams with a language in the spokenLangs list.
-   * - Drop AC3 5.1 compatibility tracks if a higher channel EAC3/TrueHD/DTS exists for the same language.
-   * - Map each stream to its encoding parameters.
-   *
-   * @type {Array}
-   */
+  // Filter and map audio streams to encoding instructions
+  // - Only include streams with a language in the spokenLangs list
+  // - Drop AC3 5.1 compatibility tracks if a higher channel EAC3/TrueHD/DTS exists for the same language
+  // - Map each stream to its encoding parameters
   result.audio = audioStreams
     .filter((s) => {
       // Only include streams with a language in the spokenLangs list
@@ -169,7 +145,7 @@ export function generateTranscodeInstructions (mongoDoc) {
       return spokenLangs.includes(lang);
     })
     .filter((stream, idx, arr) => {
-      // Drop AC3 5.1 compatibility tracks if a higher channel EAC3/TrueHD/DTS exists for the same language
+      // Drop AC3 5.1 compatibility tracks if a higher channel EAC3/TrueHD/DTS exists for same language
       const lang = (stream.tags?.language || 'und').toLowerCase();
       const codec = (stream.codec_name || '').toLowerCase();
       const channels = parseInt(stream.channels || 2, 10);
@@ -201,13 +177,9 @@ export function generateTranscodeInstructions (mongoDoc) {
       };
     });
 
-  /**
-   * Filter and map subtitle streams to supported formats.
-   *
-   * - Only include English/und subtitle streams in supported formats (SRT, PGS, ASS).
-   *
-   * @type {Array}
-   */
+  // Filter and map subtitle streams to supported formats
+  // - Only include English/und subtitle streams in supported formats (SRT, PGS, ASS)
+  // - For PGS, require width and height > 0
   result.subtitles = subtitleStreams
     .filter((stream) => {
       const lang = (stream.tags?.language || 'und').toLowerCase();
@@ -228,18 +200,21 @@ export function generateTranscodeInstructions (mongoDoc) {
       codec: 'copy'
     }));
 
-  /**
-   * Return the full transcoding instruction object.
-   * @type {Object}
-   */
+  // Return the full transcoding instruction object
   return result;
 }
 
 /**
- * Pick CRF and FGS values based on resolution + genres.
+ * Picks CRF (Constant Rate Factor), FGS (Film Grain Synthesis), and encoder preset values
+ * based on video resolution and genres.
  *
- * @param {Object} mongoDoc - ffprobe + indexerData doc
- * @returns {{crf:number, fgs:number}}
+ * This function uses a rule map to select encoding parameters for AV1 based on the width of the video
+ * and whether the content is animation or action. The first matching rule is used.
+ *
+ * @param {Object} mongoDoc ffprobe + indexerData doc
+ * @param {Object} mongoDoc.probe ffprobe output
+ * @param {Object} [mongoDoc.indexerData] Indexer metadata (genres)
+ * @returns {{crf:number, fgs:number, preset:number}} Encoding parameters for AV1
  */
 export function pickCrfPresetAndFgs (mongoDoc) {
   const width = Number(
@@ -292,8 +267,8 @@ export function pickCrfPresetAndFgs (mongoDoc) {
  * Returns maxrate and bufsize for ffmpeg rate control based on video width.
  * Used to ensure reasonable streaming bitrates for different resolutions.
  *
- * @param {number} width - Video width in pixels
- * @returns {{maxrate: string, bufsize: string}} - Rate control parameters
+ * @param {number} width Video width in pixels
+ * @returns {{maxrate: string, bufsize: string}} Rate control parameters for ffmpeg
  */
 function getRateControl (width) {
   let maxrate;
@@ -322,8 +297,8 @@ function getRateControl (width) {
 /**
  * Maps a channel count to a valid ffmpeg channel layout string for audio encoding.
  *
- * @param {number} channels - Number of audio channels
- * @returns {string} - Channel layout name
+ * @param {number} channels Number of audio channels
+ * @returns {string} Channel layout name for ffmpeg filter
  */
 function mapAudioFilter (channels) {
   // Mapping of channel count to ffmpeg channel layout names
@@ -341,12 +316,13 @@ function mapAudioFilter (channels) {
 
 /**
  * Determines the audio codec and encoding parameters for a given stream.
- * - If input is AAC, AC3, or EAC3, copy the stream.
- * - For stereo/mono, use libfdk_aac at 96k per channel.
- * - For multichannel, use EAC3 at 128k per channel (max 768k).
  *
- * @param {Object} stream - ffprobe audio stream object
- * @returns {Object} - Audio encoding parameters for ffmpeg
+ * - If input is AAC, AC3, or EAC3, copies the stream.
+ * - For stereo/mono, uses AAC at 96k per channel (mixed to stereo).
+ * - For multichannel, uses EAC3 at 128k per channel (max 768k).
+ *
+ * @param {Object} stream ffprobe audio stream object
+ * @returns {Object} Audio encoding parameters for ffmpeg
  */
 function determineAudioCodec (stream) {
   const codec = stream.codec_name.toLowerCase();
@@ -358,10 +334,10 @@ function determineAudioCodec (stream) {
     return { codec: 'copy' };
   }
 
-  // Use libfdk_aac for mono/stereo (best quality for Plex)
+  // Use aac for mono/stereo (best quality for Plex)
   if (channels <= 2) {
     return {
-      codec: 'libfdk_aac', // always use libfdk_aac for mono/stereo
+      codec: 'aac', // always use aac for mono/stereo
       bitrate: `${(96000 * channels) / 1000}k`, // 96k per channel
       channels: 2, // always mix to stereo -- mono gets mixed to stereo
       filter: mapAudioFilter(channels)
@@ -379,10 +355,11 @@ function determineAudioCodec (stream) {
 
 /**
  * Calculates GOP size (group of pictures interval) for Plex compatibility.
- * Target is 2 seconds worth of frames, or fallback to 120 frames if unknown.
  *
- * @param {Object} stream - Video stream object
- * @returns {number} - GOP size in frames
+ * Target is 5 seconds worth of frames, or fallback to 120 frames if unknown.
+ *
+ * @param {Object} stream Video stream object
+ * @returns {number} GOP size in frames
  */
 function calculateGOP (stream) {
   // Use avg_frame_rate if available, else r_frame_rate
