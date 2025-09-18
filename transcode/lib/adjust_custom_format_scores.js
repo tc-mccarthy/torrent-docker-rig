@@ -39,6 +39,13 @@ export async function downgradeAudio () {
     asyncify(async (file) => {
       // Construct the new file name by appending '_fdk_surround' before the extension
       const newFileName = file.path.replace(/\.mkv$/, '_fdk_surround.mkv');
+      const fileExists = await fs.exists(file.path);
+
+      // confirm the file exists before renaming
+      if (!fileExists) {
+        return true;
+      }
+
       // Rename the file on disk
       await fs.rename(file.path, newFileName);
       // Optionally, update the File document in MongoDB here if needed
