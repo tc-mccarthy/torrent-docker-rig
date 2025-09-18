@@ -26,6 +26,7 @@ import IntegrityQueue from './lib/integrityQueue';
 import TranscodeQueue from './lib/transcodeQueue';
 import update_status from './lib/update_status';
 import refresh_indexer_data from './lib/refresh_indexer_data';
+import { downgradeAudio } from './lib/adjust_custom_format_scores';
 
 const {
   max_memory_score, max_cpu_score,
@@ -72,7 +73,7 @@ async function run () {
 
     // Update the transcode queue and status, and generate the initial filelist
     update_status();
-    update_queue().then(() => { refresh_indexer_data(); });
+    update_queue().then(() => { refresh_indexer_data(); downgradeAudio(); });
     generate_filelist({ limit: 1000, writeToFile: true });
 
     // Start the main transcode queue (handles video jobs)
@@ -96,7 +97,9 @@ async function run () {
 
     // Schedule queue update every day at midnight
     cron.schedule('0 0 * * *', () => {
-      update_queue().then(() => { refresh_indexer_data(); });
+      update_queue().then(() => {
+        refresh_indexer_data();
+      });
     });
 
     // update indexer data every hour
