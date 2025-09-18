@@ -20,6 +20,7 @@ export async function downgradeAudio () {
   // - ENCODER tag matching 'libfdk_aac' (case-insensitive, with optional _ or -)
   // - More than two channels (surround audio)
   const filelist = await File.find({
+    path: { $not: /fdk_surround/ }, // Exclude files already marked as fdk_surround
     'probe.streams': {
       $elemMatch: {
         codec_type: 'audio',
