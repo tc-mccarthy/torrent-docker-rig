@@ -1,7 +1,9 @@
 
 import { eachLimit, asyncify } from 'async';
-import fs from 'fs/promises';
+import { rename, access } from 'fs/promises';
+import { constants } from 'fs';
 import File from '../models/files';
+import logger from './logger';
 
 /**
  * Finds all files in the File model that have audio tracks encoded with libfdk_aac and more than two channels.
@@ -37,19 +39,18 @@ export async function downgradeAudio () {
     filelist,
     2,
     asyncify(async (file) => {
-      // Construct the new file name by appending '_fdk_surround' before the extension
-      const newFileName = file.path.replace(/\.mkv$/, '_fdk_surround.mkv');
-      const fileExists = await fs.exists(file.path);
+      try {
+        // Construct the new file name by appending '_fdk_surround' before the extension
+        const newFileName = file.path.replace(/\.mkv$/, '_fdk_surround.mkv');
+        await access(file.path, constants.F_OK);
 
-      // confirm the file exists before renaming
-      if (!fileExists) {
+        // Rename the file on disk
+        await rename(file.path, newFileName);
+      } catch (err) {
+        logger.error(`Error processing file ${file.path}: ${err.message}`);
+      } finally {
         return true;
       }
-
-      // Rename the file on disk
-      await fs.rename(file.path, newFileName);
-      // Optionally, update the File document in MongoDB here if needed
-      return true;
     })
   );
 }
