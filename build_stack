@@ -23,6 +23,9 @@ if [[ -f ./.env ]]; then
     source ./.env
 fi
 
+# Stop the transcoder as its the most resource intensive service. It will make this process much faster
+docker compose stop transcode
+
 # Prebuild all containers with no cache to ensure fresh images
 echo "Prebuilding all containers with --no-cache..."
 docker compose build
