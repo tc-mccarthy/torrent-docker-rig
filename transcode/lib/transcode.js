@@ -352,7 +352,7 @@ export default function transcode (file) {
           }
 
           // if global.transcodeQueue.runningJobs[runningJobIndex].refreshed is greater than 8 hours old, the job has stalled and we should remove it from the active jobs list
-          if (global.transcodeQueue.runningJobs[runningJobIndex].refreshed < Date.now() - 8 * 60 * 60 * 1000) {
+          if ((global.transcodeQueue.runningJobs[runningJobIndex]?.refreshed || 0) < Date.now() - 8 * 60 * 60 * 1000) {
             logger.warn(`Removing stalled job ${video_record._id}`);
             global.transcodeQueue.runningJobs.splice(runningJobIndex, 1);
           }
