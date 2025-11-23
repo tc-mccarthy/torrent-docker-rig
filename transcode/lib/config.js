@@ -75,6 +75,16 @@ const transcode_config = {
       path: '/source_media/Romanoff/TV Shows',
       scratch: '/source_media/transcode_scratch',
       stage_path: '/source_media/transcode_scratch'
+    },
+    {
+      path: '/source_media/Rhodes/TV Shows',
+      scratch: '/source_media/transcode_scratch',
+      stage_path: '/source_media/transcode_scratch'
+    },
+    {
+      path: '/source_media/Barnes/Movies',
+      scratch: '/source_media/transcode_scratch',
+      stage_path: '/source_media/transcode_scratch'
     }
   ]
 };
