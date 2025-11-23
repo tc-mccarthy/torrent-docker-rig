@@ -92,7 +92,10 @@ export async function trash (file, record = true) {
 
   // Remove the file from disk if it exists
   if (fs.existsSync(file)) {
+    console.log(`Deleting file: ${file}`);
     await fs.promises.unlink(file);
+  } else {
+    console.log(`File not found on disk, skipping delete: ${file}`);
   }
 
   // Optionally delete the file record from the DB
