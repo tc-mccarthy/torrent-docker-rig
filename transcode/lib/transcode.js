@@ -413,8 +413,8 @@ export default function transcode (file) {
             await moveFile(scratch_file, dest_file);
 
             // if the file and dest_file are not the same, delete the original file
-            if (dest_file !== file) {
-              await trash(file, true);
+            if (dest_file !== video_record.path) {
+              await trash(video_record.path, true);
             }
 
             if (moveInterval) clearInterval(moveInterval);
