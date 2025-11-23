@@ -411,6 +411,12 @@ export default function transcode (file) {
               }, 1000);
             }
             await moveFile(scratch_file, dest_file);
+
+            // if the file and dest_file are not the same, delete the original file
+            if (dest_file !== file) {
+              await trash(file, true);
+            }
+
             if (moveInterval) clearInterval(moveInterval);
             // After move, report 100% progress
             const percent = 100;

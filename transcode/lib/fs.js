@@ -37,23 +37,25 @@ export function generate_file_paths (file) {
   // Extract the filename from the path
   const filename = file.match(/([^/]+)$/)[1];
 
+
   // Capture the filename and extension in separate variables
   const match = filename.match(/(.+)[.]([A-Za-z0-9]+)$/);
   if (!match) {
     throw new Error(`Invalid filename format: ${filename}`);
   }
   const name = match[1];
+  const ext = match[2];
 
   // Build the normalized base name
   const normalized = name.replace(/[^A-Za-z0-9]+/g, '-').toLowerCase();
 
-  // Build the scratch file path with _scratch suffix
+  // Build the scratch file path with _scratch suffix (always .mkv)
   const scratch_file = `${scratch_path}/${normalized}_scratch.mkv`;
 
-  // Build the stage file path with _stage suffix, or false if stage_path is falsey
+  // Build the stage file path with _stage suffix, preserving the original extension
   let stage_file = false;
   if (stage_path) {
-    stage_file = `${stage_path}/${normalized}_stage.mkv`;
+    stage_file = `${stage_path}/${normalized}_stage.${ext}`;
   }
 
   // Build the destination file path by replacing the extension with .mkv
