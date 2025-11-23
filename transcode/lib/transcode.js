@@ -69,6 +69,8 @@ export default function transcode (file) {
       // Accepts either a MongoDB File record or a file path object
       const video_record = file;
       file = file.path;
+      const original_file = file;
+
       // Validate input and presence of Mongo record
       if (!video_record || !video_record?._id) {
         throw new Error(`Video record not found for file: ${file}`);
@@ -413,8 +415,9 @@ export default function transcode (file) {
             await moveFile(scratch_file, dest_file);
 
             // if the file and dest_file are not the same, delete the original file
-            if (dest_file !== video_record.path) {
-              await trash(video_record.path, true);
+            if (dest_file !== original_file) {
+              console.log(`Deleting original file after transcode: ${original_file}`);
+              await trash(original_file, true);
             }
 
             if (moveInterval) clearInterval(moveInterval);
