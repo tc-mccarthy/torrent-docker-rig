@@ -20,6 +20,6 @@ server {
   proxy_set_header X-Forwarded-Ssl on;
 
   location / {
-    proxy_pass http://vpn:5055;
+    proxy_pass http://overseerr:5055;
   }
 }
