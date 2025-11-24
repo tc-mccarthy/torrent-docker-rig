@@ -2,25 +2,22 @@
 # docker-compose.yml
 #
 # Purpose:
-#   Media/torrent stack with all VPN-routed services bound to a NordLynx
-#   container ("nordlynx"). When the VPN restarts, any service labeled
-#   `restart-with=nordlynx` is also restarted immediately to refresh sockets,
-#   trackers, and long-lived connections. Autoheal + healthchecks provide
-#   self-healing for transient tunnel blips.
+#   Media/torrent stack using a NordLynx VPN gateway container ("nordlynx")
+#   for torrent and Usenet traffic, with other services talking directly to
+#   the internet on the LAN. Autoheal + healthchecks provide self-healing
+#   for transient tunnel blips and service failures.
 #
 # Key patterns:
-#   - VPN gateway container: services route via `network_mode: service:vpn`.
+#   - VPN gateway container: specific clients (qBittorrent, SABnzbd) route via
+#     `network_mode: service:vpn`.
 #   - Autoheal: label `autoheal=true` + a meaningful healthcheck.
-#   - Immediate restart on VPN restart: label `restart-with=nordlynx`.
-#   - Event watcher: `vpn-restarter` listens to docker events for `nordlynx`
-#     and restarts all containers with `restart-with=nordlynx`.
 #
 # Extend:
 #   If you move any other service behind the VPN, add:
 #     network_mode: service:vpn
 #     labels:
 #       - "autoheal=true"
-#       - "restart-with=nordlynx"
+#   and (ideally) a healthcheck that fails when the VPN is down.
 #   and (ideally) a healthcheck that fails when the VPN is down.
 # ------------------------------------------------------------------------------
 
@@ -49,22 +46,13 @@ services:
     ports:
       # Ports exposed *on the VPN container* for services running inside it.
       # These map the inner apps' ports to the host.
+    ports:
+      # Ports exposed *on the VPN container* for services running inside it.
+      # These map the inner apps' ports to the host.
       - 8088:8088   # qbittorrent web ui
       - 6881:6881   # qbittorrent tcp
       - 6881:6881/udp
-      - 7878:7878   # radarr
-      - 8989:8989   # sonarr
-      - 9696:9696   # prowlarr
-      - 4000:4000   # tinyMediaManager VNC (if enabled)
-      - 9443:9443   # portainer behind VPN
-      - 6767:6767   # bazarr
       - 8090:8080   # sabnzbd (usenet)
-      - 5055:5055   # overseerr
-      - 8181:8181   # tautulli
-      - 9705:9705   # huntarr
-    sysctls:
-      - net.ipv6.conf.all.disable_ipv6=1 # Prefer IPv4-only to avoid leak/route confusion
-      - net.ipv4.conf.all.rp_filter=2    # Loose reverse path filtering for policy routing
     volumes:
       - ./scripts:/scripts # healthcheck and utility scripts
     restart: unless-stopped
@@ -88,7 +76,7 @@ services:
   # --------------------------------------------------------------------------
   # TORRENT CLIENT (qBittorrent)
   # Runs inside the VPN namespace. Healthcheck should fail on tunnel loss.
-  # Labeled for autoheal and restart-with-vpn for instant reconnection.
+  # Labeled for autoheal; healthcheck fails if the tunnel or qBittorrent goes down.
   # --------------------------------------------------------------------------
   torrent:
     image: linuxserver/qbittorrent
@@ -97,8 +85,8 @@ services:
     environment:
       - WEBUI_PORT=${QBIT_WEB_UI_PORT}
       - PUID=1000
-      - GUID=1000
-      - Umask=022
+      - PGID=1000
+      - UMASK=022
       - TZ
     volumes:
       - ${TORRENT_STORAGE}:${TORRENT_STORAGE} # downloads storage
@@ -407,13 +395,15 @@ services:
         max-file: "10"
 
   # --------------------------------------------------------------------------
-  # SONARR (VPN-routed)
+  # SONARR (direct, not VPN-routed)
   # Waits for VPN, Prowlarr, Torrent; labeled for autoheal + instant restart.
   # --------------------------------------------------------------------------
   sonarr:
     container_name: sonarr
+    ports:
+      - 8989:8989   # sonarr
     image: lscr.io/linuxserver/sonarr:latest
-    network_mode: service:vpn
+    # network_mode: service:vpn  # (was VPN-routed; now uses default network)
     environment:
       - TZ
       - PUID=1000
@@ -444,12 +434,14 @@ services:
         max-file: "10"
 
   # --------------------------------------------------------------------------
-  # RADARR (VPN-routed)
+  # RADARR (direct, not VPN-routed)
   # --------------------------------------------------------------------------
   radarr:
     container_name: radarr
+    ports:
+      - 7878:7878   # radarr
     image: lscr.io/linuxserver/radarr:latest
-    network_mode: service:vpn
+    # network_mode: service:vpn  # (was VPN-routed; now uses default network)
     environment:
       - TZ
       - PUID=1000
@@ -480,12 +472,14 @@ services:
         max-file: "10"
 
   # --------------------------------------------------------------------------
-  # BAZARR (VPN-routed)
+  # BAZARR (direct, not VPN-routed)
   # --------------------------------------------------------------------------
   bazarr:
     container_name: bazarr
+    ports:
+      - 6767:6767   # bazarr
     image: lscr.io/linuxserver/bazarr:latest
-    network_mode: service:vpn
+    # network_mode: service:vpn  # (was VPN-routed; now uses default network)
     environment:
       - TZ
       - PUID=1000
@@ -507,8 +501,6 @@ services:
     labels:
       - "autoheal=true"
     depends_on:
-      vpn:
-        condition: service_healthy
       # radarr:
       #   condition: service_healthy
       # sonarr:
@@ -520,12 +512,14 @@ services:
         max-file: "10"
 
   # --------------------------------------------------------------------------
-  # OVERSEERR (VPN-routed)
+  # OVERSEERR (direct, not VPN-routed)
   # --------------------------------------------------------------------------
   overseerr:
     container_name: overseerr
+    ports:
+      - 5055:5055   # overseerr
     image: lscr.io/linuxserver/overseerr:latest
-    network_mode: service:vpn
+    # network_mode: service:vpn  # (was VPN-routed; now uses default network)
     environment:
       - TZ
       - PUID=1000
@@ -546,8 +540,6 @@ services:
     labels:
       - "autoheal=true"
     depends_on:
-      vpn:
-        condition: service_healthy
       # radarr:
       #   condition: service_healthy
       # sonarr:
@@ -559,12 +551,14 @@ services:
         max-file: "10"
 
   # --------------------------------------------------------------------------
-  # PROWLARR (VPN-routed)
+  # PROWLARR (direct, not VPN-routed)
   # --------------------------------------------------------------------------
   prowlarr:
     container_name: prowlarr
+    ports:
+      - 9696:9696   # prowlarr
     image: lscr.io/linuxserver/prowlarr:latest
-    network_mode: service:vpn
+    # network_mode: service:vpn  # (was VPN-routed; now uses default network)
     environment:
       - TZ
       - PUID=1000
@@ -586,8 +580,6 @@ services:
       - "autoheal=true" 
     restart: unless-stopped
     depends_on:
-      vpn:
-        condition: service_healthy
       torrent:
         condition: service_healthy
     logging: 
@@ -601,6 +593,8 @@ services:
   # --------------------------------------------------------------------------
   tautulli:
     container_name: tautulli
+    ports:
+      - 8181:8181   # tautulli
     image: lscr.io/linuxserver/tautulli:latest
     environment:
       - TZ
@@ -626,12 +620,14 @@ services:
   # --------------------------------------------------------------------------
   # HUNTARR (VPN-routed)
   # Typically exits on network loss -> Docker restarts quickly.
-  # Still labeled to follow VPN restarts immediately.
+  # Uses autoheal so it recovers quickly from failures (no special VPN restart logic).
   # --------------------------------------------------------------------------
   huntarr:
     container_name: huntarr
+    ports:
+      - 9705:9705   # huntarr
     image: huntarr/huntarr:latest
-    network_mode: service:vpn
+    # network_mode: service:vpn  # (was VPN-routed; now uses default network)
     environment:
       - TZ
       - PUID=1000
@@ -642,8 +638,6 @@ services:
     labels:
       - "autoheal=true"
     depends_on:
-      vpn:
-        condition: service_healthy
       # sonarr:
       #   condition: service_healthy
       # radarr:
@@ -659,12 +653,14 @@ services:
         max-file: "10"
 
   # --------------------------------------------------------------------------
-  # TINYMEDIA MANAGER (VPN-routed)
+  # TINYMEDIA MANAGER (direct, not VPN-routed)
   # --------------------------------------------------------------------------
   tmm:
     container_name: tinymediamanager
+    ports:
+      - 4000:4000   # tinyMediaManager VNC (if enabled)
     image: tinymediamanager/tinymediamanager:latest
-    network_mode: service:vpn
+    # network_mode: service:vpn  # (was VPN-routed; now uses default network)
     environment:
       - TZ
       - USER_ID=1000
@@ -685,8 +681,6 @@ services:
     labels:
       - "autoheal=true"
     depends_on:
-      vpn:
-        condition: service_healthy
     logging: 
       driver: "json-file"
       options: 
@@ -694,19 +688,19 @@ services:
         max-file: "10"
 
   # --------------------------------------------------------------------------
-  # PORTAINER (VPN-routed UI)
-  # Labeled to follow VPN restarts so its session reconnects promptly.
+  # PORTAINER (UI on LAN, not VPN-routed)
+  # Runs on the LAN for direct access; autoheal helps recover from failures.
   # --------------------------------------------------------------------------
   portainer:
     container_name: portainer
+    ports:
+      - 9443:9443   # portainer
     image: portainer/portainer-ce:latest
-    network_mode: service:vpn
+    # network_mode: service:vpn  # (was VPN-routed; now uses default network)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_db:/data
     depends_on:
-      vpn:
-        condition: service_healthy
     restart: unless-stopped
     labels:
       - "autoheal=true"
@@ -766,8 +760,8 @@ services:
     network_mode: service:vpn
     environment:
       - PUID=1000
-      - GUID=1000
-      - Umask=022
+      - PGID=1000
+      - UMASK=022
       - TZ
     volumes:
       - ${USENET_STORAGE}:${USENET_STORAGE}
