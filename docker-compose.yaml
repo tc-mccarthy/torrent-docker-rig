@@ -46,9 +46,6 @@ services:
     ports:
       # Ports exposed *on the VPN container* for services running inside it.
       # These map the inner apps' ports to the host.
-    ports:
-      # Ports exposed *on the VPN container* for services running inside it.
-      # These map the inner apps' ports to the host.
       - 8088:8088   # qbittorrent web ui
       - 6881:6881   # qbittorrent tcp
       - 6881:6881/udp
@@ -501,10 +498,10 @@ services:
     labels:
       - "autoheal=true"
     depends_on:
-      # radarr:
-      #   condition: service_healthy
-      # sonarr:
-      #   condition: service_healthy
+      radarr:
+        condition: service_healthy
+      sonarr:
+        condition: service_healthy
     logging: 
       driver: "json-file"
       options: 
@@ -540,10 +537,10 @@ services:
     labels:
       - "autoheal=true"
     depends_on:
-      # radarr:
-      #   condition: service_healthy
-      # sonarr:
-      #   condition: service_healthy
+      radarr:
+        condition: service_healthy
+      sonarr:
+        condition: service_healthy
     logging: 
       driver: "json-file"
       options: 
@@ -680,7 +677,6 @@ services:
       start_period: 60s
     labels:
       - "autoheal=true"
-    depends_on:
     logging: 
       driver: "json-file"
       options: 
@@ -700,7 +696,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_db:/data
-    depends_on:
     restart: unless-stopped
     labels:
       - "autoheal=true"
