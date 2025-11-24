@@ -39,6 +39,10 @@ docker compose build
 echo "Shutting down running stack and pruning orphans..."
 docker compose down --remove-orphans
 
+# Create external networks if they do not exist
+echo "Ensuring external networks exist..."
+docker network create torrent-rig -d bridge || echo "Network torrent-rig already exists"
+
 # Bring up new stack in detached mode (blue-green replacement)
 echo "Starting new stack..."
 docker compose up -d --remove-orphans
