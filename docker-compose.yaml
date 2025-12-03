@@ -612,7 +612,7 @@ services:
     networks:
       - default
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8181/ | grep -qi tautulli"]
+      test: ["CMD-SHELL", "curl -fsS --max-time 5 http://127.0.0.1:8181/home 2>/dev/null | grep -qi '<title>tautulli' || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5
