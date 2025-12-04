@@ -36,27 +36,26 @@ if [[ "$LOCK" != "0" ]]; then
 fi
 
 
-# If an API key is provided, refresh download clients and indexers
-if [[ "$API_KEY" != "" ]]; then
-    log_msg "INFO" "API KEY DETECTED. Refreshing ${SERVICE_NAME} download clients."
-    curl "http://localhost:${SERVICE_PORT}/${SERVICE_NAME}/api/v3/downloadclient/testall" \
-        -X 'POST' \
-        -H 'Accept: application/json, text/javascript, */*; q=0.01' \
-        -H 'Accept-Language: en-US,en;q=0.9' \
-        -H 'Content-Length: 0' \
-        -H 'Content-Type: application/json' \
-        -H "X-Api-Key: ${API_KEY}" \
-        --compressed
+## Generic health check: query the /api/v3/ping endpoint (no API key required)
+HEALTH_URL="http://localhost:${SERVICE_PORT}/${SERVICE_NAME}/api/v3/ping"
+RESPONSE=$(curl -s -w "%{http_code}" "$HEALTH_URL")
 
-    log_msg "INFO" "API KEY DETECTED. Refreshing ${SERVICE_NAME} indexers."
-    curl "http://localhost:${SERVICE_PORT}/${SERVICE_NAME}/api/v3/indexer/testall" \
-        -X 'POST' \
-        -H 'Accept: application/json, text/javascript, */*; q=0.01' \
-        -H 'Accept-Language: en-US,en;q=0.9' \
-        -H 'Content-Length: 0' \
-        -H 'Content-Type: application/json' \
-        -H "X-Api-Key: ${API_KEY}" \
-        --compressed
+# Extract HTTP status code (last 3 chars)
+HTTP_CODE="${RESPONSE: -3}"
+# Extract body (everything except last 3 chars)
+BODY="${RESPONSE::-3}"
+
+if [[ "$HTTP_CODE" != "200" ]]; then
+    log_msg "ERROR" "Health check failed: $HEALTH_URL returned HTTP $HTTP_CODE"
+    exit 1
+fi
+
+# Extract the 'status' property from the JSON response
+STATUS=$(echo "$BODY" | grep -o '"status"[ ]*:[ ]*"[^"]*"' | head -n1 | sed 's/.*:[ ]*"\([^"]*\)"/\1/')
+
+if [[ "$STATUS" != "OK" ]]; then
+    log_msg "ERROR" "Health check failed: status='$STATUS' from $HEALTH_URL"
+    exit 1
 fi
 log_msg "INFO" "All systems go for $SERVICE_NAME."
 touch "$DIR/$SERVICE_NAME-health-check.lock"
