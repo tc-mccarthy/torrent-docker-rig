@@ -37,7 +37,7 @@ fi
 
 
 ## Generic health check: query the /api/v3/ping endpoint (no API key required)
-HEALTH_URL="http://localhost:${SERVICE_PORT}/${SERVICE_NAME}/api/v3/ping"
+HEALTH_URL="http://localhost:${SERVICE_PORT}/${SERVICE_NAME}/ping"
 RESPONSE=$(curl -s -w "%{http_code}" "$HEALTH_URL")
 
 # Extract HTTP status code (last 3 chars)
