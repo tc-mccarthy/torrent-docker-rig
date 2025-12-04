@@ -581,7 +581,7 @@ services:
       interval: 10s
       retries: 3
       timeout: 5s
-      start_period: 10s
+      start_period: 60s
     labels:
       - "autoheal=true" 
     restart: unless-stopped
