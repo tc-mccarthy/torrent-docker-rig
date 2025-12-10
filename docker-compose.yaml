@@ -21,7 +21,7 @@
 #   and (ideally) a healthcheck that fails when the VPN is down.
 # ------------------------------------------------------------------------------
 
-version: "3.7"
+version: "3.8"
 
 services:
   # --------------------------------------------------------------------------
@@ -327,8 +327,6 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      memcached:
-        condition: service_healthy
     mem_limit: 56g
     memswap_limit: 64g
     networks:
@@ -338,8 +336,6 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
-    labels:
-      - "autoheal=true"
 
   # --------------------------------------------------------------------------
   # PLEX (host network for DLNA/UPnP discovery)
@@ -364,8 +360,6 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
-    labels:
-      - "autoheal=true"
 
   # --------------------------------------------------------------------------
   # MyMedia (ALEXA playback)
@@ -387,8 +381,6 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
-    labels:
-      - "autoheal=true"
 
   # --------------------------------------------------------------------------
   # MONGO (local)
@@ -402,19 +394,20 @@ services:
     volumes:
       - mongo_db_8:/data/db
     restart: always
+    labels:
+      - "autoheal=true"
+    healthcheck:
+      test: mongosh --eval "db.adminCommand('ping').ok" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     logging: 
       driver: "json-file"
       options: 
         max-size: "200k"
         max-file: "10"
-    labels:
-      - "autoheal=true"
-    healthcheck:
-      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+
   # --------------------------------------------------------------------------
   # SONARR (direct, not VPN-routed)
   # Waits for VPN, Prowlarr, Torrent; labeled for autoheal + instant restart.
@@ -752,11 +745,6 @@ services:
       - redis_data:/data
     restart: always
     entrypoint: redis-server --appendonly yes
-    logging: 
-      driver: "json-file"
-      options: 
-        max-size: "200k"
-        max-file: "10"
     labels:
       - "autoheal=true"
     healthcheck:
@@ -765,6 +753,12 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
+    
   # --------------------------------------------------------------------------
   # SAMBA (host network for LAN file shares)
   # --------------------------------------------------------------------------
@@ -786,13 +780,6 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
-
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
 
   # --------------------------------------------------------------------------
   # SABNZBD / USENET (VPN-routed)
@@ -857,11 +844,6 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq/mnesia/
     restart: always
-    logging: 
-      driver: "json-file"
-      options: 
-        max-size: "200k"
-        max-file: "10"
     labels:
       - "autoheal=true"
     healthcheck:
@@ -870,13 +852,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-
-    healthcheck:
-      test: ["CMD", "sh", "-c", "echo stats | nc 127.0.0.1 11211 | grep -q 'STAT pid'"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
   
   # --------------------------------------------------------------------------
   # MEMCACHED
@@ -887,19 +867,19 @@ services:
     ports:
       - "11211:11211"
     restart: always
+    labels:
+      - "autoheal=true"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo stats | nc 127.0.0.1 11211 | grep -q 'STAT' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     logging: 
       driver: "json-file"
       options: 
         max-size: "200k"
         max-file: "10"
-    labels:
-      - "autoheal=true"
-    healthcheck:
-      test: ["CMD", "sh", "-c", "echo stats | nc 127.0.0.1 11211 | grep -q 'STAT pid'"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
 
 # ------------------------------------------------------------------------------
 # VOLUMES
