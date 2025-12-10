@@ -116,8 +116,10 @@ services:
     build: ./torrent-monitor
     container_name: torrent-monitor
     depends_on:
-      - torrent
-      - redis
+      torrent:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - QB_API_URL=https://${TORRENT_SSL_HOST}/qbt
       - QB_USERNAME                 # supply at runtime
