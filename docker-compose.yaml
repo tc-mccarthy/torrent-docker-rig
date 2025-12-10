@@ -415,16 +415,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    labels:
-      - "autoheal=true"
-
-    healthcheck:
-      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
   # --------------------------------------------------------------------------
   # SONARR (direct, not VPN-routed)
   # Waits for VPN, Prowlarr, Torrent; labeled for autoheal + instant restart.
@@ -775,14 +765,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    
   # --------------------------------------------------------------------------
   # SAMBA (host network for LAN file shares)
   # --------------------------------------------------------------------------
