@@ -319,9 +319,14 @@ services:
       - /usr/app/bin
     restart: unless-stopped
     depends_on:
-      - redis
-      - mongo
-      - rabbitmq
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      memcached:
+        condition: service_healthy
     mem_limit: 56g
     memswap_limit: 64g
     networks:
@@ -331,6 +336,8 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
+    labels:
+      - "autoheal=true"
 
   # --------------------------------------------------------------------------
   # PLEX (host network for DLNA/UPnP discovery)
@@ -355,6 +362,8 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
+    labels:
+      - "autoheal=true"
 
   # --------------------------------------------------------------------------
   # MyMedia (ALEXA playback)
@@ -376,6 +385,8 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
+    labels:
+      - "autoheal=true"
 
   # --------------------------------------------------------------------------
   # MONGO (local)
@@ -394,6 +405,15 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
+    labels:
+      - "autoheal=true"
+
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # --------------------------------------------------------------------------
   # SONARR (direct, not VPN-routed)
@@ -737,6 +757,13 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     
   # --------------------------------------------------------------------------
   # SAMBA (host network for LAN file shares)
@@ -759,6 +786,13 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
+
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # --------------------------------------------------------------------------
   # SABNZBD / USENET (VPN-routed)
@@ -828,6 +862,13 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
+
+    healthcheck:
+      test: ["CMD", "sh", "-c", "echo stats | nc 127.0.0.1 11211 | grep -q 'STAT pid'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
   
   # --------------------------------------------------------------------------
   # MEMCACHED
