@@ -409,6 +409,14 @@ services:
         max-file: "10"
     labels:
       - "autoheal=true"
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "autoheal=true"
 
     healthcheck:
       test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
@@ -759,6 +767,14 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
+    labels:
+      - "autoheal=true"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -864,6 +880,14 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
+    labels:
+      - "autoheal=true"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
     healthcheck:
       test: ["CMD", "sh", "-c", "echo stats | nc 127.0.0.1 11211 | grep -q 'STAT pid'"]
@@ -886,6 +910,14 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
+    labels:
+      - "autoheal=true"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "echo stats | nc 127.0.0.1 11211 | grep -q 'STAT pid'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 # ------------------------------------------------------------------------------
 # VOLUMES
