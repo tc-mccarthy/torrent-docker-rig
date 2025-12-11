@@ -1,6 +1,6 @@
 import chokidar from 'chokidar';
 import config from './config';
-import rabbit_connect from './rabbitmq';
+import redisClient from './redis';
 import logger from './logger';
 import probe_and_upsert from './probe_and_upsert';
 
@@ -10,8 +10,31 @@ const { get_paths } = config;
 
 const PATHS = get_paths(config);
 
-// connect to rabbit
-const { send, receive } = await rabbit_connect();
+const STREAM_KEY = 'transcode_file_events';
+
+async function sendToStream(msg) {
+  await redisClient.xAdd(STREAM_KEY, '*', { ...msg });
+}
+
+async function receiveFromStream(callback) {
+  let lastId = '0-0';
+  while (true) {
+    const response = await redisClient.xRead(
+      [{ key: STREAM_KEY, id: lastId }],
+      { BLOCK: 0, COUNT: 1 }
+    );
+    if (response && response.length > 0) {
+      const [stream] = response;
+      const ids = stream.messages.map((message) => {
+        callback(message.id, message.message);
+        return message.id;
+      });
+      if (ids.length > 0) {
+        lastId = ids[ids.length - 1];
+      }
+    }
+  }
+}
 
 export default function fs_watch () {
   const watcher = chokidar.watch(PATHS, {
@@ -41,29 +64,27 @@ export default function fs_watch () {
     .on('add', (path) => {
       if (file_ext.some((ext) => new RegExp(`.${ext}$`, 'i').test(path))) {
         logger.debug('>> NEW FILE DETECTED >>', path);
-        send({ path });
+        sendToStream({ path });
       }
     })
     .on('change', (path) => {
       if (file_ext.some((ext) => new RegExp(`.${ext}$`, 'i').test(path))) {
         logger.debug('>> FILE CHANGE DETECTED >>', path);
-        send({ path });
+        sendToStream({ path });
       }
     })
     .on('unlink', (path) => {
       if (file_ext.some((ext) => new RegExp(`.${ext}$`, 'i').test(path))) {
         logger.debug('>> FILE DELETE DETECTED >>', path);
-        send({ path });
+        sendToStream({ path });
       }
     });
 
-  receive(async (msg, message_content, channel) => {
+  receiveFromStream(async (id, message_content) => {
     try {
-      channel.ack(msg);
       await probe_and_upsert(message_content.path);
     } catch (e) {
-      logger.error(e, { label: 'RABBITMQ ERROR' });
-      channel.ack(msg);
+      logger.error(e, { label: 'REDIS STREAM ERROR' });
     }
   });
 

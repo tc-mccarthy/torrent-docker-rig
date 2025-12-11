@@ -831,34 +831,6 @@ services:
         max-size: "200k"
         max-file: "10"
   
-  # --------------------------------------------------------------------------
-  # RABBITMQ (management + AMQP)
-  # --------------------------------------------------------------------------
-  rabbitmq:
-    hostname: rabbitmq
-    container_name: rabbitmq
-    image: rabbitmq:4.0.9-management-alpine
-    ports:
-      - "15672:15672" # mgmt UI
-      - "5672:5672"   # amqp
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq/mnesia/
-    restart: always
-    labels:
-      - "autoheal=true"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    logging: 
-      driver: "json-file"
-      options: 
-        max-size: "200k"
-        max-file: "10"
-  
-
 # ------------------------------------------------------------------------------
 # VOLUMES
 # ------------------------------------------------------------------------------
