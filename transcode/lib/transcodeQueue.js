@@ -1,159 +1,264 @@
+/**
+ * TranscodeQueue
+ * A smart queue for transcoding video jobs using a unified compute score
+ * across independent CPU and memory compute pools. Supports system resource
+ * penalties, job prioritization, and starvation protection.
+ */
+
 import { setTimeout as delay } from 'timers/promises';
-import si from 'systeminformation'; // For system resource monitoring
+import fs from 'fs/promises';
+import si from 'systeminformation';
 import transcode from './transcode';
 import logger from './logger';
 import generate_filelist from './generate_filelist';
-import update_active from './update_active';
+import { getCpuLoadPercentage } from './getCpuLoadPercentage';
 
 export default class TranscodeQueue {
-  constructor ({ maxScore = 4, pollDelay = 2000 }) {
-    // start the transcode loops
-    logger.info(`Initiating transcode queue for a max compute of ${maxScore}...`);
-    this.maxScore = maxScore; // Max compute units allowed simultaneously
-    this.computePenalty = 0; // Current compute penalty based on system resource utilization
-    this.pollDelay = pollDelay; // Delay between scheduling attempts (ms)
-    this.runningJobs = []; // In-memory list of currently active jobs
-    this._isRunning = false; // Flag for controlling the loop
+  /**
+   * @param {Object} options
+   * @param {number} options.maxMemoryComputeScore - Maximum allowed memory compute score
+   * @param {number} options.maxCpuComputeScore - Maximum allowed CPU compute score
+   * @param {number} options.pollDelay - Time between scheduling loops in ms
+   */
+  constructor ({ maxMemoryComputeScore = 4, maxCpuComputeScore = 2, pollDelay = 2000 }) {
+    logger.debug(`Initiating transcode queue with max compute (Memory: ${maxMemoryComputeScore}, CPU: ${maxCpuComputeScore})`);
+    this.maxMemoryComputeScore = maxMemoryComputeScore;
+    this.maxCpuComputeScore = maxCpuComputeScore;
+    this.memoryPenalty = 0;
+    this.cpuPenalty = 0;
+    this.pollDelay = pollDelay;
+    this.runningJobs = [];
+    this._isRunning = false;
 
-    // Stores the last 10 minutes of memory usage samples
-    this.memoryPollIntervalMs = 5000; // Interval for memory pressure checks (ms)
+    // Shared sampling window for CPU and memory pressure (10 min @ 5s/sample)
+    this.resourcePollIntervalMs = 5000;
+    this.maxResourceSamples = 10 * 60 * 1000 / this.resourcePollIntervalMs;
+
+    // Rolling sample buffers
     this.memoryUsageSamples = [];
-    this.maxMemorySamples = 10 * 60 * 1000 / this.memoryPollIntervalMs; // 10 min @ 5s/sample
+    this.cpuUsageSamples = [];
+
+    // Periodic flush of job state to disk
+    this.flushIntervalMs = 10000;
+    this.flushPath = '/usr/app/output/active.json';
+
+    // Starvation detection
+    this.starvationCounter = 0;
+    this.lastBlockedJobId = null;
   }
 
-  // Starts the recursive scheduling loop
+  /** Starts the queue loop and resource monitors */
   async start () {
     if (this._isRunning) return;
     this._isRunning = true;
-    logger.info('Transcode queue started.');
-    update_active();
-    this.startMemoryPressureMonitor(); // Start monitoring system resources
+    logger.debug('Transcode queue started.');
+    this.startResourceMonitors();
+    this.startFlushLoop();
     await this.loop();
   }
 
-  // Stops the queue
+  /** Stops the scheduling loop */
   stop () {
     this._isRunning = false;
     console.log('Transcode queue stopped.');
   }
 
-  // Returns total compute in use
-  getUsedCompute () {
-    return this.runningJobs.reduce((sum, job) => sum + job.computeScore, 0);
+  /** @returns {number} Total memory compute in use */
+  getUsedMemoryCompute () {
+    return this.runningJobs.reduce((sum, job) => sum + (job.computeScore || 1), 0);
   }
 
-  // Returns available compute capacity
+  /** @returns {number} Available memory compute after penalties */
+  getAvailableMemoryCompute () {
+    return this.maxMemoryComputeScore - this.memoryPenalty - this.getUsedMemoryCompute();
+  }
+
+  /** @returns {number} Total CPU compute in use */
+  getUsedCpuCompute () {
+    return this.runningJobs.reduce((sum, job) => sum + (job.computeScore || 1), 0);
+  }
+
+  /** @returns {number} Available CPU compute after penalties */
+  getAvailableCpuCompute () {
+    return this.maxCpuComputeScore - this.cpuPenalty - this.getUsedCpuCompute();
+  }
+
+  /**
+   * @returns {number} Minimum available compute across memory and CPU.
+   * Used to determine whether a new job can be scheduled.
+   */
   getAvailableCompute () {
-    return this.maxScore - this.computePenalty - this.getUsedCompute();
+    return Math.min(this.getAvailableMemoryCompute(), this.getAvailableCpuCompute());
   }
 
-  // Main loop: tries to schedule jobs and waits before the next run
+  /** Main loop: repeatedly attempts to schedule jobs */
   async loop () {
     while (this._isRunning) {
       await this.scheduleJobs();
-      await delay(this.pollDelay); // Wait before checking again
+      await delay(this.pollDelay);
     }
   }
 
+  /** Starts both memory and CPU resource monitoring loops */
+  startResourceMonitors () {
+    this.startMemoryPressureMonitor();
+    this.startCpuPressureMonitor();
+  }
+
   /**
-   * Monitors system memory usage.
-   * Applies half of maxScore as a penalty when 10-minute avg memory > 85%.
-   * Applies full maxScore penalty when 10-minute avg memory > 90%.
-   */
-  /**
-   * Starts monitoring memory usage over a rolling 10-minute window.
-   * Applies penalties based on average memory usage / total memory.
+   * Monitors memory usage and applies penalty when average usage exceeds thresholds.
+   * Penalizes compute when memory usage exceeds 85% and again at 90%.
    */
   async startMemoryPressureMonitor () {
     while (true) {
       try {
         const mem = await si.mem();
-
         this.memoryUsageSamples.push(mem.available);
-
-        if (this.memoryUsageSamples.length > this.maxMemorySamples) {
-          this.memoryUsageSamples.shift(); // Maintain a rolling buffer of samples
+        if (this.memoryUsageSamples.length > this.maxResourceSamples) {
+          this.memoryUsageSamples.shift();
         }
 
-        const memoryAvailableAverage = this.memoryUsageSamples.reduce((sum, val) => sum + val, 0) / this.memoryUsageSamples.length;
-        const memoryUsagePercent = 100 - (memoryAvailableAverage / mem.total * 100);
+        const avgAvailable = this.memoryUsageSamples.reduce((a, b) => a + b, 0) / this.memoryUsageSamples.length;
+        const memUsedPercent = 100 - (avgAvailable / mem.total * 100);
 
-        // Apply penalties
         let penalty = 0;
-        if (memoryUsagePercent > 85) penalty += this.maxScore / 2;
-        if (memoryUsagePercent > 90) penalty += this.maxScore / 2;
+        if (memUsedPercent > 85) penalty += this.maxMemoryComputeScore / 2;
+        if (memUsedPercent > 90) penalty += this.maxMemoryComputeScore / 2;
 
-        this.computePenalty = penalty;
-
-        console.log(
-          `[ResourceMonitor] Penalty: ${penalty.toFixed(2)} | 10-min Avg Mem: ${memoryUsagePercent.toFixed(1)}%`
-        );
+        this.memoryPenalty = penalty;
+        logger.debug(`[ResourceMonitor] Memory Penalty: ${penalty.toFixed(2)} | Avg Mem Used: ${memUsedPercent.toFixed(1)}%`);
       } catch (err) {
-        console.error('[ResourceMonitor] Error:', err);
+        console.error('[ResourceMonitor] Memory Error:', err);
       }
-
-      await delay(this.memoryPollIntervalMs);
+      await delay(this.resourcePollIntervalMs);
     }
   }
 
-  // Attempts to find and run a job that fits within available compute
-  async scheduleJobs () {
-    const availableCompute = this.getAvailableCompute();
-    logger.info(`Available transcode compute: ${availableCompute}.`);
+  /**
+   * Monitors CPU load and applies penalty based on a rolling 10-minute average.
+   * Uses load-to-core ratio to adapt thresholds across systems with different core counts.
+   */
+  async startCpuPressureMonitor () {
+    while (true) {
+      try {
+        const { loadPercent, loadRatio } = await getCpuLoadPercentage();
 
+        logger.debug({ loadPercent, loadRatio }, { label: `[ResourceMonitor] CPU Load Ratio` });
+
+        this.cpuUsageSamples.push(loadRatio);
+        if (this.cpuUsageSamples.length > this.maxResourceSamples) {
+          this.cpuUsageSamples.shift();
+        }
+
+        const avgCpuRatio = this.cpuUsageSamples.reduce((a, b) => a + b, 0) / this.cpuUsageSamples.length;
+
+        let penalty = 0;
+        if (avgCpuRatio > 4.0) penalty += this.maxCpuComputeScore / 2;
+        if (avgCpuRatio > 6.0) penalty += this.maxCpuComputeScore / 2;
+
+        this.cpuPenalty = penalty;
+        logger.debug(`[ResourceMonitor] CPU Penalty: ${penalty} | Avg Load Ratio (10 min): ${avgCpuRatio.toFixed(2)}x per core`);
+      } catch (err) {
+        console.error('[ResourceMonitor] CPU Error:', err);
+      }
+      await delay(this.resourcePollIntervalMs);
+    }
+  }
+
+  /**
+   * Attempts to find and start a job that fits within both memory and CPU compute limits.
+   * Honors priority order and introduces starvation detection for blocked jobs.
+   */
+  async scheduleJobs () {
+    // Block scheduling if any job is in 'staging' or 'finalizing' action
+    const blockingJob = this.runningJobs.find((j) => j.action === 'staging' || j.action === 'finalizing');
+    if (blockingJob) {
+      logger.debug(`[QUEUE] Blocking new jobs: job ${blockingJob._id} is in '${blockingJob.action}' stage.`);
+      return;
+    }
+
+    const availableMemory = this.getAvailableMemoryCompute();
+    const availableCpu = this.getAvailableCpuCompute();
+    const availableCompute = this.getAvailableCompute();
+
+    logger.debug(`Available compute (Memory: ${availableMemory}, CPU: ${availableCpu}, Unified: ${availableCompute})`);
     if (availableCompute <= 0) return;
 
-    logger.info('Checking for new jobs to run...');
-    const jobs = await generate_filelist({ limit: 50 });
+    const jobs = await generate_filelist({ limit: 1000 });
 
-    // Are there any jobs being blocked due to lack of compute?
-    const blockedHighPriorityJob = jobs.find((job) => {
+    // Find the first job in the queue that cannot run due to lack of compute
+    const blockedEntry = jobs.find((job) => {
       const alreadyRunning = this.runningJobs.some((j) => j._id.toString() === job._id.toString());
       return !alreadyRunning && job.computeScore > availableCompute;
     });
 
-    if (blockedHighPriorityJob) {
-      logger.debug(blockedHighPriorityJob.path, { label: 'High Priority Job Blocked due to lack of compute' });
+    if (blockedEntry) {
+      this.starvationCounter = this.lastBlockedJobId?.toString() === blockedEntry._id.toString()
+        ? this.starvationCounter += 1
+        : 1;
+      this.lastBlockedJobId = blockedEntry._id;
+      logger.debug(`[QUEUE] Blocked job ${blockedEntry.path} | Compute ${blockedEntry.computeScore} | Starvation ${this.starvationCounter}`);
+    } else {
+      this.starvationCounter = 0;
+      this.lastBlockedJobId = null;
     }
 
-    // Now let's find the next job that will fit within available compute
+    // Select the next job that fits within the compute and respects priority/starvation rules
     const nextJob = jobs.find((job) => {
-      const alreadyRunning = this.runningJobs.some((j) => j._id.toString() === job._id.toString()); // skip any already running jobs
-      if (alreadyRunning || job.computeScore > availableCompute) return false; // discount any jobs that are already running or exceed available compute
+      const alreadyRunning = this.runningJobs.some((j) => j._id.toString() === job._id.toString());
+      if (alreadyRunning) return false;
 
-      // If a higher-priority job is blocked, don't schedule lower-priority jobs
-      if (blockedHighPriorityJob && job.sortFields.priority > blockedHighPriorityJob.sortFields.priority) {
-        logger.debug(`Skipping file ${job.path} because ${blockedHighPriorityJob.path} has a higher priority and is awaiting available compute.`);
-        return false; // if a higher-priority job is blocked, don't schedule lower-priority jobs, let the queue open up to process the higher-priority job
-      }
+      if (job.computeScore > availableCompute) return false;
 
-      if (blockedHighPriorityJob) {
-        logger.debug(`Scheduling file ${job.path} because ${blockedHighPriorityJob.path} does not have a higher priority than this job.`, { blockedPriority: blockedHighPriorityJob.sortFields.priority, jobPriority: job.sortFields.priority, note: 'Lower numbers indicate higher importance' });
-      }
+      if (blockedEntry && job.sortFields.priority > blockedEntry.sortFields.priority) return false;
 
-      // If we reach here, the job is eligible to run
+      if (blockedEntry && job.sortFields.priority === blockedEntry.sortFields.priority && this.starvationCounter >= 5) return false;
+
       return true;
     });
 
-    if (nextJob) {
-      this.runJob(nextJob);
+    if (nextJob) this.runJob(nextJob);
+  }
+
+  /**
+   * Starts the transcode process for a given job and removes it from memory when done.
+   * @param {Object} job - Job document with ._id, .computeScore, and .path
+   */
+  async runJob (job) {
+    try {
+      this.runningJobs.push({ ...job.toObject(), file: job.path });
+      await transcode(job);
+    } catch (err) {
+      console.error(`Transcoding failed for ${job.path}: ${err.message}`);
+    } finally {
+      this.runningJobs = this.runningJobs.filter((j) => j._id.toString() !== job._id.toString());
+      generate_filelist({ limit: 1000, writeToFile: true });
     }
   }
 
-  // Handles job execution and cleanup
-  async runJob (job) {
-    try {
-      this.runningJobs.push(job);
-      await transcode(job); // Await external ffmpeg logic
-    } catch (err) {
-      console.error(`Transcoding failed for ${job.inputPath}: ${err.message}`);
-    } finally {
-      // Always clean up the memory queue
-      this.runningJobs = this.runningJobs.filter(
-        (j) => j._id.toString() !== job._id.toString()
-      );
+  /** Starts a loop that periodically writes the job queue state to disk */
+  async startFlushLoop () {
+    while (this._isRunning) {
+      await this.flushActiveJobs();
+      await delay(this.flushIntervalMs);
+    }
+  }
 
-      generate_filelist({ limit: 1000, writeToFile: true }); // Regenerate file list after job completion
+  /** Flushes the current job state and available compute scores to disk */
+  async flushActiveJobs () {
+    try {
+      const flushObj = {
+        active: this.runningJobs,
+        availableMemoryCompute: this.getAvailableMemoryCompute(),
+        availableCpuCompute: this.getAvailableCpuCompute(),
+        availableCompute: this.getAvailableCompute(),
+        memoryPenalty: this.memoryPenalty,
+        cpuPenalty: this.cpuPenalty,
+        refreshed: Date.now()
+      };
+      await fs.writeFile(this.flushPath, JSON.stringify(flushObj, null, 2));
+    } catch (err) {
+      logger.error('Failed to flush active jobs:', err);
     }
   }
 }

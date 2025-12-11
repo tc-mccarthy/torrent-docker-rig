@@ -1,28 +1,45 @@
 #!/bin/bash
+#
+# vpn-health-check: Health check script for NordLynx VPN container
+# ---------------------------------------------------------------
+# This script verifies that the container is connected to the internet via NordLynx VPN.
+# It logs the check, prevents rapid repeated checks with a lock file, and marks the container
+# as unhealthy if VPN protection is not detected. Intended for use as a Docker healthcheck.
+#
+# - Logs all output to /scripts/vpn-health-check.log
+# - Uses a lock file to avoid redundant checks
+# - Checks VPN status via NordVPN's public API
+# - Exits 0 if VPN is up, 1 if not
+# ---------------------------------------------------------------
+
+# Log the current timestamp for traceability
 TIMESTAMP=$(date)
 echo "$TIMESTAMP" > /scripts/vpn-health-check.log
 
-$LOCK=$(find /scripts -iname "vpn-health-check.lock" -mmin +10 | wc -l)
+# Lock file logic: Only skip health check if a lock file exists and is 10 minutes old or younger.
+LOCK=$(find /scripts -iname "vpn-health-check.lock" -mmin -10 | wc -l)
 
 if [[ "$LOCK" != "0" ]]; then
-    echo ">> LOCK DETECTED. SKIPPING HEALTHCHECK >>" >> /scripts/vpn-health-check.log
+    echo ">> LOCK file is less than or equal to 10 minutes old. SKIPPING HEALTHCHECK >>" >> /scripts/vpn-health-check.log
     exit 0;
 fi
 
-## URL TO THE VPN STATUS CHECK TO CONFIRM THIS CONTAINER IS GOING OUT TO THE INTERNET PROTECTED
-VPN_STATUS_URL="https://nordvpn.com/wp-admin/admin-ajax.php?action=get_user_info_data"
+# URL to NordVPN's status endpoint to confirm VPN protection
+VPN_STATUS_URL="https://web-api.nordvpn.com/v1/ips/info"
 
-## CAPTURE STATUSES
-VPN_STATUS=$(curl "$VPN_STATUS_URL");
+# Query the VPN status API
+VPN_STATUS=$(curl "$VPN_STATUS_URL")
 
+# Log the full VPN status JSON for debugging
 echo "VPN STATUS" >> /scripts/vpn-health-check.log
 echo "$VPN_STATUS" | jq . >> /scripts/vpn-health-check.log
 
-VPN_STATUS=$(echo "$VPN_STATUS" | jq .status)
+# Extract the 'status' field (should be true if protected)
+VPN_STATUS=$(echo "$VPN_STATUS" | jq .protected)
 
-## IF WE'RE NOT VPN PROTECTED, FAIL
-if [[ "$VPN_STATUS" == "false" ]]; then
-    echo "Not connected to NordLynx. Marking unhealthy" >> /scripts/vpn-health-check.log
+# If not VPN protected (anything except true), mark container as unhealthy
+if [[ $VPN_STATUS != true ]]; then
+    echo "Not connected to NordLynx or unable to verify VPN status. Marking unhealthy" >> /scripts/vpn-health-check.log
     exit 1;
 else
     echo "VPN connected" >> /scripts/vpn-health-check.log

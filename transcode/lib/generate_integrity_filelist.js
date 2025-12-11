@@ -2,7 +2,7 @@ import logger from './logger';
 import File from '../models/files';
 
 export default async function generate_integrity_filelist (limit = 1000) {
-  logger.info('GENERATING INTEGRITY FILE LIST');
+  logger.debug('GENERATING INTEGRITY FILE LIST');
   // query for any files that have an encode version that doesn't match the current encode version
   // do not hydrate results into models
   // sort by priority, then size, then width

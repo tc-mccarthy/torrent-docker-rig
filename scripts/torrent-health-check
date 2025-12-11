@@ -1,45 +1,75 @@
 #!/bin/bash
-TIMESTAMP=$(date)
+#
+# torrent-health-check: Health check script for qBittorent container
+# -------------------------------------------------------------------------------
+# This script verifies that the container is connected to the internet via VPN (NordLynx),
+# and optionally refreshes download clients if an API key is provided. It uses a lock file
+# to prevent redundant checks and logs all output for debugging. VPN status is determined
+# by sourcing vpn_utils.sh and calling check_vpn_protection().
+#
+# - Logs all output to /scripts/$SERVICE_NAME-health-check.log
+# - Uses a lock file to avoid redundant checks
+# - Checks VPN status using a shared utility function
+# - Exits 0 if VPN is up, 1 if not
+# -------------------------------------------------------------------------------
 
-$LOCK=$(find /scripts -iname "torrent-health-check.lock" -mmin +10 | wc -l)
+# Determine the directory where this script is located
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "$TIMESTAMP" > /scripts/torrent-health-check.log
+# Change to the script directory to ensure relative paths work
+cd "$DIR"
+
+# Source VPN utility functions
+source ./vpn_utils.sh
+source ./log_utils.sh
+
+LOG_FILE="$DIR/torrent-health-check.log"
+
+# Log the current timestamp for traceability
+log_msg "INFO" "Health check started for $SERVICE_NAME"
+
+# Lock file logic: Only skip health check if a lock file exists and is 10 minutes old or younger.
+LOCK=$(find "$DIR" -iname "$SERVICE_NAME-health-check.lock" -mmin -10 | wc -l)
 
 if [[ "$LOCK" != "0" ]]; then
-    echo ">> LOCK DETECTED. SKIPPING HEALTHCHECK >>" >> /scripts/torrent-health-check.log
+    log_msg "WARN" "Lock file is less than or equal to 10 minutes old. Skipping health check for $SERVICE_NAME."
     exit 0;
 fi
 
-## URL TO THE VPN STATUS CHECK TO CONFIRM THIS CONTAINER IS GOING OUT TO THE INTERNET PROTECTED
-VPN_STATUS_URL="https://nordvpn.com/wp-admin/admin-ajax.php?action=get_user_info_data"
+# Use the shared function to check VPN protection status
+VPN_STATUS=$(check_vpn_protection)
+
+# Log the VPN status (raw output and parsed)
+log_msg "DEBUG" "VPN STATUS: $VPN_STATUS"
 
 ## URL TO THE QBITTORRENT STATUS CHECK TO CONFIRM WE ARE CONNECTED, NOT FIREWALLED OR SOMETHING ELSE
 TORRENT_STATUS_URL="http://localhost:$WEBUI_PORT/api/v2/transfer/info"
-
-## CAPTURE STATUSES
-VPN_STATUS=$(curl "$VPN_STATUS_URL");
 TORRENT_STATUS=$(curl "$TORRENT_STATUS_URL")
 
-echo "VPN STATUS" >> /scripts/torrent-health-check.log
-echo "$VPN_STATUS" | jq . >> /scripts/torrent-health-check.log
+# Log the TORRENT status (raw output and parsed)
+log_msg "DEBUG" "TORRENT STATUS: $TORRENT_STATUS"
 
-echo "TORRENT STATUS" >> /scripts/torrent-health-check.log
-echo "$TORRENT_STATUS" | jq . >> /scripts/torrent-health-check.log
-
-VPN_STATUS=$(echo "$VPN_STATUS" | jq .status)
-TORRENT_STATUS=$(echo "$TORRENT_STATUS" | jq .connection_status)
-
-## IF WE'RE NOT VPN PROTECTED, FAIL
-if [[ "$VPN_STATUS" == "false" ]]; then
-    echo "Not connected to NordLynx. Marking unhealthy" >> /scripts/torrent-health-check.log
+# If not VPN protected, mark container as unhealthy
+if [[ $VPN_STATUS != true ]]; then
+    log_msg "ERROR" "Not connected to NordLynx. Marking unhealthy"
     exit 1;
-
-## IF QBITTORRENT ISN'T SEEING ITSELF AS CONNECTED, FAIL
-elif [[ "$TORRENT_STATUS" != '"connected"' ]]; then
-    echo "qBittorrent not open to internet. Current Status: $TORRENT_STATUS. Marking unhealthy" >> /scripts/torrent-health-check.log
+elif [[ $(echo "$TORRENT_STATUS" | jq -r .connection_status) != "connected" && $(echo "$TORRENT_STATUS" | jq -r .connection_status) != "firewalled" ]]; then
+    log_msg "ERROR" "qBittorrent not open to internet. Current Status: $(echo "$TORRENT_STATUS" | jq -r .connection_status). Marking unhealthy"
     exit 1;
 else
-    echo "All systems go" >> /scripts/torrent-health-check.log
-    touch "/scripts/torrent-health-check.lock"
+    # If an API key is provided, refresh download clients
+    if [[ "$API_KEY" != "" ]]; then
+        log_msg "INFO" "API KEY DETECTED. REFRESHING ${SERVICE_NAME} DOWNLOAD CLIENTS"
+        curl "http://localhost:${SERVICE_PORT}/${SERVICE_NAME}/api/v3/downloadclient/testall" \
+            -X 'POST' \
+            -H 'Accept: application/json, text/javascript, */*; q=0.01' \
+            -H 'Accept-Language: en-US,en;q=0.9' \
+            -H 'Content-Length: 0' \
+            -H 'Content-Type: application/json' \
+            -H "X-Api-Key: ${API_KEY}" \
+            --compressed
+    fi
+    echo "All systems go" >> "$DIR/torrent-health-check.log"
+    touch "$DIR/torrent-health-check.lock"
     exit 0;
 fi

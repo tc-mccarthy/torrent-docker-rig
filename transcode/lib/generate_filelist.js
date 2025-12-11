@@ -7,24 +7,25 @@ import dayjs from './dayjs';
 const { encode_version } = config;
 
 export default async function generate_filelist ({ limit = 1, writeToFile = false }) {
-  logger.info('GENERATING PRIMARY FILE LIST');
+  logger.debug('GENERATING PRIMARY FILE LIST');
   // query for any files that have an encode version that doesn't match the current encode version
   // do not hydrate results into models
   // sort by priority, then size, then width
   const filelist = await File.find({
     encode_version: { $ne: encode_version },
     status: 'pending',
-    _id: { $not: { $in: global.transcodeQueue?.runningJobs?.map((f) => f._id.toString()) || [] } }
+    _id: { $not: { $in: global.transcodeQueue?.runningJobs?.map((f) => f._id.toString()) || [] } },
+    integrityCheck: true // only include files that have passed integrity check
   })
     .sort({
       'sortFields.priority': 1,
       'sortFields.size': -1,
       'sortFields.width': -1
     })
-    .limit(limit + config.concurrent_transcodes);
+    .limit(limit);
 
   if (writeToFile) {
-    const data = filelist.slice(1, 1001).map((f) => ({
+    const data = filelist.map((f) => ({
       path: f.path.split(/\//).pop(),
       volume: f.path.split(/\//)[2],
       size: f.sortFields.size,

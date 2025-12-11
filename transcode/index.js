@@ -1,3 +1,16 @@
+/**
+ * Entrypoint for the transcode service.
+ *
+ * This script initializes all core services, schedules background jobs, and starts the main transcode and integrity queues.
+ *
+ * - Connects to MongoDB and Redis
+ * - Ensures scratch disks exist
+ * - Starts system resource monitoring
+ * - Starts file system monitor
+ * - Schedules periodic filelist generation, queue updates, and cleanup
+ * - Starts the transcode and integrity queues
+ */
+
 import cron from 'node-cron';
 import mongo_connect from './lib/mongo_connection';
 import update_queue from './lib/update_queue';
@@ -12,13 +25,23 @@ import generate_filelist from './lib/generate_filelist';
 import IntegrityQueue from './lib/integrityQueue';
 import TranscodeQueue from './lib/transcodeQueue';
 import update_status from './lib/update_status';
+import refresh_indexer_data from './lib/refresh_indexer_data';
+import { downgradeAudio } from './lib/adjust_custom_format_scores';
 
 const {
-  concurrent_transcodes,
+  max_memory_score, max_cpu_score,
   concurrent_integrity_checks,
   application_version
 } = config;
 
+/**
+ * Main startup routine for the transcode service.
+ *
+ * Connects to all required services, starts background jobs, and launches the main queues.
+ * All errors are logged and do not crash the process.
+ *
+ * @returns {Promise<void>}
+ */
 async function run () {
   try {
     logger.debug('Starting transcode service...', {
@@ -26,61 +49,69 @@ async function run () {
       application_version
     });
     logger.debug('Connecting to MongoDB');
-    // connect to mongo
+    // Connect to MongoDB
     await mongo_connect();
 
     logger.debug('Connecting to Redis');
-    // connect to redis
+    // Connect to Redis
     await redisClient.connect();
 
-    // create scratch disks
+    // Create scratch disks for all sources
     logger.debug('Creating scratch space');
     await create_scratch_disks();
 
-    // getting system utilization values
+    // Start system utilization monitoring (CPU/memory)
     logger.debug('Getting system utilization values');
     get_utilization();
 
-    // getting disk space
+    // Start disk space monitoring
     logger.debug('Getting disk space');
     get_disk_space();
 
-    // start the file monitor
+    // Start the file system monitor (watches for new/changed files)
     fs_monitor();
 
-    // update the transcode queue
+    // Update the transcode queue and status, and generate the initial filelist
     update_status();
-    update_queue();
+    update_queue().then(() => { refresh_indexer_data(); downgradeAudio(); });
     generate_filelist({ limit: 1000, writeToFile: true });
 
-    const transcodeQueue = new TranscodeQueue({ maxScore: concurrent_transcodes, pollDelay: 30000 });
+    // Start the main transcode queue (handles video jobs)
+    const transcodeQueue = new TranscodeQueue({ maxMemoryComputeScore: max_memory_score, maxCpuComputeScore: max_cpu_score, pollDelay: 10000 });
     transcodeQueue.start();
-
     global.transcodeQueue = transcodeQueue; // Make the queue globally accessible
 
+    // Start the integrity queue (handles file integrity checks)
     const integrityQueue = new IntegrityQueue({ maxScore: concurrent_integrity_checks });
-
     integrityQueue.start();
 
-    // generate the filelist every 5 minutes
+    // Schedule filelist regeneration every 5 minutes
     cron.schedule('*/5 * * * *', () => {
       generate_filelist({ limit: 1000, writeToFile: true });
     });
 
-    // schedule the cleanup tasks
+    // Schedule pre-sanitize cleanup every 3 hours
     cron.schedule('0 */3 * * *', () => {
       pre_sanitize();
     });
 
-    // schedule the queue update
+    // Schedule queue update every day at midnight
     cron.schedule('0 0 * * *', () => {
-      update_queue();
+      update_queue().then(() => {
+        refresh_indexer_data();
+      });
+    });
+
+    // update indexer data every hour
+    cron.schedule('0 1-23 * * *', () => {
+      refresh_indexer_data();
     });
   } catch (e) {
     logger.error(e, { label: 'RUN ERROR', message: e.message });
   }
 }
 
+// Log startup and invoke the main routine
 logger.info('Starting transcode service...', {
   label: 'STARTUP',
   application_version

@@ -59,8 +59,8 @@ export default function fs_watch () {
 
   receive(async (msg, message_content, channel) => {
     try {
-      await probe_and_upsert(message_content.path);
       channel.ack(msg);
+      await probe_and_upsert(message_content.path);
     } catch (e) {
       logger.error(e, { label: 'RABBITMQ ERROR' });
       channel.ack(msg);

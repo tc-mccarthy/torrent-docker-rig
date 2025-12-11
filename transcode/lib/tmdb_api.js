@@ -43,10 +43,10 @@ export default async function tmdb_api (file_path) {
 
       // if the movie details are in redis, return them
       if (redis_data) {
-        logger.info('TMDB data found in redis');
+        logger.debug('TMDB data found in redis');
         return JSON.parse(redis_data);
       }
-      logger.info('Fetching data from TMDB');
+      logger.debug('Fetching data from TMDB');
 
       // fetch the movie details from TMDB
       const url = `https://api.themoviedb.org/3/movie/${tmdb_id}?language=en-US`;
@@ -68,10 +68,10 @@ export default async function tmdb_api (file_path) {
 
       // if the series details are in redis, return them
       if (redis_data) {
-        logger.info('TMDB data found in redis');
+        logger.debug('TMDB data found in redis');
         return JSON.parse(redis_data);
       }
-      logger.info('Fetching data from TMDB');
+      logger.debug('Fetching data from TMDB');
 
       const external_id_url = `https://api.themoviedb.org/3/find/${tvdb_id}?external_source=tvdb_id`;
       const external_id_data = await query_tmdb(external_id_url);

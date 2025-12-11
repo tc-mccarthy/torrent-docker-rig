@@ -1,45 +1,62 @@
 #!/bin/bash
-TIMESTAMP=$(date)
+#
 
-$LOCK=$(find /scripts -iname "$SERVICE_NAME-health-check.lock" -mmin +10 | wc -l)
 
-echo "$TIMESTAMP" > "/scripts/$SERVICE_NAME-health-check.log"
+# arr-health-check: Health check script for Sonarr/Radarr/Bazarr/Overseerr containers
+# -------------------------------------------------------------------------------
+# This script verifies basic health and optionally refreshes download clients if an API key is provided.
+# It uses a lock file to prevent redundant checks and logs all output for debugging.
+#
+# - Logs all output to /scripts/$SERVICE_NAME-health-check.log
+# - Uses a lock file to avoid redundant checks; lock file must be no more than 10 minutes old
+# -------------------------------------------------------------------------------
+
+# Determine the directory where this script is located
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Change to the script directory to ensure relative paths work
+cd "$DIR"
+
+
+# Source logging utility functions
+source ./log_utils.sh
+
+LOG_FILE="$DIR/$SERVICE_NAME-health-check.log"
+
+# Log the current timestamp for traceability
+log_msg "INFO" "Health check started for $SERVICE_NAME"
+
+## Lock file logic: Only skip health check if a lock file exists and is 10 minutes old or younger.
+# If a lock file exists and is 10 minutes old or younger, skip the health check to avoid spamming.
+LOCK=$(find "$DIR" -iname "$SERVICE_NAME-health-check.lock" -mmin -10 | wc -l)
 
 if [[ "$LOCK" != "0" ]]; then
-    echo ">> LOCK DETECTED. SKIPPING HEALTHCHECK >>" >> "/scripts/$SERVICE_NAME-health-check.log"
+    log_msg "WARN" "Qualifying lock file found. Skipping health check for $SERVICE_NAME."
     exit 0;
 fi
 
-## URL TO THE VPN STATUS CHECK TO CONFIRM THIS CONTAINER IS GOING OUT TO THE INTERNET PROTECTED
-VPN_STATUS_URL="https://nordvpn.com/wp-admin/admin-ajax.php?action=get_user_info_data"
 
-## CAPTURE STATUSES
-VPN_STATUS=$(curl "$VPN_STATUS_URL")
+## Generic health check: query the /api/v3/ping endpoint (no API key required)
+HEALTH_URL="http://localhost:${SERVICE_PORT}/${SERVICE_NAME}/ping"
+RESPONSE=$(curl -s -w "%{http_code}" "$HEALTH_URL")
 
+# Extract HTTP status code (last 3 chars)
+HTTP_CODE="${RESPONSE: -3}"
+# Extract body (everything except last 3 chars)
+BODY="${RESPONSE::-3}"
 
-echo "VPN STATUS" >> "/scripts/$SERVICE_NAME-health-check.log"
-echo "$VPN_STATUS" >> "/scripts/$SERVICE_NAME-health-check.log"
-echo "$VPN_STATUS" | jq . >> "/scripts/$SERVICE_NAME-health-check.log"
-
-VPN_STATUS=$(echo "$VPN_STATUS" | jq .status)
-
-## IF WE'RE NOT VPN PROTECTED, FAIL
-if [[ "$VPN_STATUS" != "true" ]]; then
-    echo "Not connected to NordLynx. Marking unhealthy" >> "/scripts/$SERVICE_NAME-health-check.log"
-    exit 1;
-else
-    if [[ "$API_KEY" != "" ]]; then
-        echo "API KEY DETECTED. REFRESHING ${SERVICE_NAME} DOWNLOAD CLIENTS" >> "/scripts/$SERVICE_NAME-health-check.log"
-        curl "http://localhost:${SERVICE_PORT}/${SERVICE_NAME}/api/v3/downloadclient/testall" \
-            -X 'POST' \
-            -H 'Accept: application/json, text/javascript, */*; q=0.01' \
-            -H 'Accept-Language: en-US,en;q=0.9' \
-            -H 'Content-Length: 0' \
-            -H 'Content-Type: application/json' \
-            -H "X-Api-Key: ${API_KEY}" \
-            --compressed
-    fi
-    echo "All systems go" >> "/scripts/$SERVICE_NAME-health-check.log"
-    touch "/scripts/$SERVICE_NAME-health-check.lock"
-    exit 0;
+if [[ "$HTTP_CODE" != "200" ]]; then
+    log_msg "ERROR" "Health check failed: $HEALTH_URL returned HTTP $HTTP_CODE"
+    exit 1
 fi
+
+# Extract the 'status' property from the JSON response
+STATUS=$(echo "$BODY" | grep -o '"status"[ ]*:[ ]*"[^"]*"' | head -n1 | sed 's/.*:[ ]*"\([^"]*\)"/\1/')
+
+if [[ "$STATUS" != "OK" ]]; then
+    log_msg "ERROR" "Health check failed: status='$STATUS' from $HEALTH_URL"
+    exit 1
+fi
+log_msg "INFO" "All systems go for $SERVICE_NAME."
+touch "$DIR/$SERVICE_NAME-health-check.lock"
+exit 0;

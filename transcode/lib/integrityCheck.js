@@ -290,7 +290,7 @@ export default function integrityCheck (file) {
 
           // If this video is corrupted, trash it
           if (is_corrupt) {
-            logger.info(is_corrupt, {
+            logger.error(is_corrupt, {
               label: 'Source video is corrupt. Trashing'
             });
             // don't await the delete in case the problem is a missing file

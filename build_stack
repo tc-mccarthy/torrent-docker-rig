@@ -1,13 +1,55 @@
 #!/bin/bash
-
-## This script builds and rebuilds the stacks
+#
+# build_stack: Build and deploy the Docker stack for the media/torrent rig
+# ------------------------------------------------------------------------
+# This script prebuilds all containers with no cache, then gracefully shuts down
+# any running stack, prunes orphaned containers, and brings up the new stack in
+# blue-green style (new containers replace old ones with minimal downtime).
+#
+# Usage:
+#   ./build_stack
+#
+# Behavior:
+#   - Loads environment variables from .env if present
+#   - Prebuilds all containers with --no-cache to avoid stale layers
+#   - Shuts down the running stack only after build completes
+#   - Removes orphaned containers
+#   - Starts new stack in detached mode (blue-green replacement)
+#   - Follows logs for all containers
+# ------------------------------------------------------------------------
 
 if [[ -f ./.env ]]; then
     echo ".env file detected. Loading variables"
     source ./.env
 fi
 
+# Stop the transcoder as its the most resource intensive service. It will make this process much faster
+echo "Stopping transcoder service to speed up build process..."
+docker compose stop transcode
+
+# Refreshing images before build
+echo "Refreshing Docker images..."
+docker compose pull
+
+# Prebuild all containers with no cache to ensure fresh images
+echo "Prebuilding all containers with --no-cache..."
 docker compose build
-docker compose down
-docker compose up -d
+
+# Gracefully shut down running stack, prune orphans
+echo "Shutting down running stack and pruning orphans..."
+docker compose down --remove-orphans
+
+# Create external networks if they do not exist
+echo "Ensuring external networks exist..."
+docker network create torrent-rig -d bridge || echo "Network torrent-rig already exists"
+
+# Bring up new stack in detached mode (blue-green replacement)
+echo "Starting new stack..."
+docker compose up -d --remove-orphans
+
+# Prune all unused containers, images, networks, and volumes
+echo "Pruning unused containers, images, networks, and volumes..."
+docker system prune -af --volumes
+
+# Follow logs for all containers
 docker compose logs --follow

@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import md5 from 'crypto-js/md5';
 import './Nav.scss';
+import { time_remaining } from '../../time_functions';
 
 export default function Nav ({ data, setDataSelection, dataSelection, availableCompute }) {
   function display_file_name (file) {
@@ -29,19 +30,22 @@ export default function Nav ({ data, setDataSelection, dataSelection, availableC
           {data.map((item, index) => (
             <li key={filename_hash(item.file)}>
               <button type="button" className={dataSelection === index && 'active'} onClick={() => setDataSelection(index)}>
-                {display_file_name(item.file)}
-                {' '}
-                <strong>
-                  (
-                  {Math.round(item.output.percent)}
-                  %)
-                </strong>
+                {item.indexerData?.poster && (<div className="poster"><img src={item.indexerData.poster} alt={item.indexerData.title} /></div>)}
                 <div>
-                  {item.output.time_remaining}
-                  {' '}
-                  {item.name && `- ${item.name}`}
+                  <strong>
+                    {item.indexerData?.title || display_file_name(item.path)}
+                    {' '}
+                    (
+                    {Math.round(item.percent)}
+                    %)
+                  </strong>
+                  <div>
+                    {time_remaining(item.est_completed_timestamp).formatted}
+                    {' '}
+                    {item.name && `- ${item.name}`}
+                  </div>
+                  <div><em>{item.action}</em></div>
                 </div>
-                <div><em>{item.output.action}</em></div>
               </button>
             </li>
           ))}
