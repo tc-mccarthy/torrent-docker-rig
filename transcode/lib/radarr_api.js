@@ -10,7 +10,7 @@
 import { setTimeout as delay } from 'timers/promises';
 import async, { asyncify } from 'async';
 import logger from './logger';
-import memcached from './memcached';
+import redisClient from './redis';
 import streamJsonReq from './stream-json-req';
 
 const RADARR_API_KEY = process.env.RADARR_API_KEY;
@@ -90,7 +90,7 @@ export async function getMovieFiles (movieId) {
 
 /**
  * Lists all movies with a specific tag (cached with lock/wait).
- * Uses memcached for 10-minute cache and lock/wait for concurrency.
+ * Uses Redis for 10-minute cache and lock/wait for concurrency.
  * Returns an array of movie objects with the specified tag.
  * Throws if the tag is not found or API calls fail.
  */
@@ -101,16 +101,16 @@ export async function getMoviesByTag (tagName) {
     const cacheTtl = 600; // 10 minutes
     const lockTtl = 30; // 30 seconds
 
-    const cached = await memcached.get(cacheKey);
+    const cached = await redisClient.get(cacheKey);
     if (cached) return JSON.parse(cached);
 
     // Lock present? Wait for builder
-    const gotLock = await memcached.get(lockKey);
+    const gotLock = await redisClient.get(lockKey);
     if (gotLock) {
       let waited = 0;
       while (waited < lockTtl * 1000) {
         await delay(500);
-        const cached2 = await memcached.get(cacheKey);
+        const cached2 = await redisClient.get(cacheKey);
         if (cached2) return JSON.parse(cached2);
         waited += 500;
       }
@@ -118,12 +118,13 @@ export async function getMoviesByTag (tagName) {
     }
 
     // Acquire lock
-    await memcached.set(lockKey, 'locked', lockTtl);
+    await redisClient.set(lockKey, 'locked', { EX: lockTtl });
 
     // Build cache: fetch all tags, find tag ID, filter movies by tag
     const tags = await getTags();
     const tagObj = tags.find((t) => t.label === tagName);
     if (!tagObj) {
+      await redisClient.del(lockKey);
       throw new Error(`Radarr getMoviesByTag: tag '${tagName}' not found`);
     }
     const tagId = tagObj.id;
@@ -133,7 +134,8 @@ export async function getMoviesByTag (tagName) {
       (m) => Array.isArray(m.tags) && m.tags.includes(tagId)
     );
 
-    await memcached.set(cacheKey, JSON.stringify(result), cacheTtl);
+    await redisClient.set(cacheKey, JSON.stringify(result), { EX: cacheTtl });
+    await redisClient.del(lockKey);
     return result;
   } catch (err) {
     logger.error(
