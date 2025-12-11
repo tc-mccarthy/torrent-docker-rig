@@ -744,9 +744,6 @@ services:
       - redis_data:/data
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
     restart: always
-    volumes:
-      - redis_data:/data
-      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
     entrypoint: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     labels:
       - "autoheal=true"
