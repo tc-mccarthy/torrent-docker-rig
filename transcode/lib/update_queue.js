@@ -15,13 +15,14 @@ const PATHS = get_paths(config);
 
 export default async function update_queue () {
   try {
+    logger.info('update_queue: Starting update queue process');
     // check for a lock in redis
     const lock = await redisClient.get('update_queue_lock');
 
     // short circuit the function if the lock is set
     if (lock) {
       logger.debug('Update queue locked. Exiting...');
-      return;
+      throw new Error('Update queue is currently locked.');
     }
 
     // update the status of any files who have an encode version that matches the current encode version and that haven't been marked as deleted
@@ -75,6 +76,9 @@ export default async function update_queue () {
         total: filelist.length,
         pct: Math.round((file_idx / filelist.length) * 100)
       });
+      if (filelist.length > 0) {
+        logger.info(`update_queue: Processing file ${file_idx + 1} of ${filelist.length} (${Math.round(((file_idx + 1) / filelist.length) * 100)}%)`);
+      }
       // set a 60 second lock with each file so that the lock lives no longer than 60 seconds beyond the final probe
       await redisClient.set('update_queue_lock', 'locked', { EX: 60 });
       try {
@@ -142,5 +146,8 @@ export default async function update_queue () {
   } catch (e) {
     logger.error(e, { label: 'UPDATE QUEUE ERROR' });
     throw e;
+  } finally {
+    // ensure the lock is cleared
+    logger.info('update_queue process complete.');
   }
 }

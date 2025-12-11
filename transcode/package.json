@@ -9,7 +9,6 @@
     "lint:fix": "npx eslint --fix '**/*.js'"
   },
   "dependencies": {
-    "amqplib": "^0.10.5",
     "async": "^3.2.6",
     "axios": "^1.11.0",
     "chokidar": "^4.0.3",
