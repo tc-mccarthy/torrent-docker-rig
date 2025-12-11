@@ -37,7 +37,6 @@ export function generate_file_paths (file) {
   // Extract the filename from the path
   const filename = file.match(/([^/]+)$/)[1];
 
-
   // Capture the filename and extension in separate variables
   const match = filename.match(/(.+)[.]([A-Za-z0-9]+)$/);
   if (!match) {

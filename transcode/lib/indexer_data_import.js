@@ -3,7 +3,7 @@ import { getMovies, getTags as getRadarrTags } from './radarr_api';
 import { getSeries, getTags as getSonarrTags } from './sonarr_api';
 import File from '../models/files';
 import logger from './logger';
-import memcached from './memcached';
+import redisClient from './redis';
 
 /**
  * @fileoverview Imports indexer data from Radarr and Sonarr, mapping tag IDs to names and updating File records in MongoDB.
@@ -24,12 +24,12 @@ export async function importIndexerData () {
   const LOCK_KEY = 'indexer-data-import-lock';
   const LOCK_TTL = 1800; // 30 minutes in seconds
   // Check for lock and short-circuit if found
-  if (await memcached.get(LOCK_KEY)) {
+  if (await redisClient.get(LOCK_KEY)) {
     logger.warn('Indexer data import already in progress (lock found). Aborting.');
     return false;
   }
   // Set lock before starting
-  await memcached.set(LOCK_KEY, 'locked', LOCK_TTL);
+  await redisClient.set(LOCK_KEY, 'locked', { EX: LOCK_TTL });
   try {
     // --- RADARR ---
     logger.info('Importing Radarr indexer data...');
@@ -140,12 +140,12 @@ export async function importIndexerData () {
 
     logger.info(`Sonarr bulkWrite operations completed for ${sonarrBulkOps.length} series.`);
     logger.info('Indexer data import complete.');
-    await memcached.delete(LOCK_KEY);
+    await redisClient.del(LOCK_KEY);
     return true;
   } catch (err) {
     // Log error and stack trace for debugging
     logger.error('Indexer data import failed:', err);
-    await memcached.delete(LOCK_KEY);
+    await redisClient.del(LOCK_KEY);
     throw err;
   }
 }
