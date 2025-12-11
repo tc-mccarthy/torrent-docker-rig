@@ -324,8 +324,6 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
     mem_limit: 56g
     memswap_limit: 64g
     networks:
