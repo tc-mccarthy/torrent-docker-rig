@@ -18,7 +18,6 @@
 #     labels:
 #       - "autoheal=true"
 #   and (ideally) a healthcheck that fails when the VPN is down.
-#   and (ideally) a healthcheck that fails when the VPN is down.
 # ------------------------------------------------------------------------------
 
 version: "3.8"
@@ -838,7 +837,6 @@ volumes:
   mongo_db_8:
   portainer_db:
   redis_data:
-  rabbitmq_data:
 
 # ------------------------------------------------------------------------------
 # NETWORKS
