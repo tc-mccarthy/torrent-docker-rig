@@ -35,17 +35,17 @@ export async function processFSEventQueue () {
 
     if (response && response.length > 0) {
       const [stream] = response;
-      let messages = stream.messages;
-      // Filter out already-processed messages
-      messages = messages.filter((message) => message.message.processed !== 'true' && message.message.processed !== true);
-      logger.info(`xRead returned ${messages.length} unprocessed messages`, { label: 'REDIS STREAM READ RESPONSE' });
-      await async.eachLimit(messages, 1, asyncify(async ({ message, id }) => {
+      const messages = stream.messages;
+      logger.info(`xRead returned ${messages.length} messages`, { label: 'REDIS STREAM READ RESPONSE' });
+      await async.eachLimit(messages, 5, asyncify(async ({ message, id }) => {
         try {
           logger.info({ message, STREAM_KEY, id }, { label: 'REDIS STREAM READ' });
-          await probe_and_upsert(message.path);
-          // Mark message as processed in the stream
-          await redisClient.xAdd(STREAM_KEY, '*', { ...message.message, processed: true });
-          logger.info(`Marked message for path ${message.message.path} as processed`, { label: 'REDIS STREAM PROCESSED' });
+          if (!message.processed) {
+            await probe_and_upsert(message.path);
+            // Mark message as processed in the stream
+            await redisClient.xAdd(STREAM_KEY, '*', { ...message, processed: true });
+            logger.info(`Marked message for path ${message.path} as processed`, { label: 'REDIS STREAM PROCESSED' });
+          }
           const trim_results = await redisClient.xTrim(STREAM_KEY, 'MINID', id);
           logger.info({ trim_results }, { label: 'REDIS STREAM TRIM' });
         } catch (e) {
