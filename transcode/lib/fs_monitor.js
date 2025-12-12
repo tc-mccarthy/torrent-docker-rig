@@ -39,7 +39,7 @@ export async function processFSEventQueue () {
       logger.info(`xRead returned ${messages.length} messages`, { label: 'REDIS STREAM READ RESPONSE' });
       await async.eachSeries(messages, async (message) => {
         try {
-          logger.info(`Processing file system event for file: ${message.message.path}`, { label: 'REDIS STREAM READ', message_content: message.message });
+          logger.info({ message, STREAM_KEY }, { label: 'REDIS STREAM READ' });
           await probe_and_upsert(message.message.path);
           await redisClient.xTrim(STREAM_KEY, { minId: message.id });
         } catch (e) {
