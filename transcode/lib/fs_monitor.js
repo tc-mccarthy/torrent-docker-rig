@@ -29,7 +29,7 @@ export async function processFSEventQueue () {
     logger.info(`About to call xRead for stream '${STREAM_KEY}'`, { label: 'REDIS STREAM RECEIVE' });
     const response = await redisClient.xRead(
       [{ key: STREAM_KEY, id: '0-0' }],
-      { BLOCK: 5000, COUNT: 1 }
+      { BLOCK: 5000, COUNT: 100 }
     );
     logger.info({ response }, { label: 'REDIS STREAM READ RESPONSE' });
 
@@ -41,7 +41,8 @@ export async function processFSEventQueue () {
         try {
           logger.info({ message, STREAM_KEY, id }, { label: 'REDIS STREAM READ' });
           await probe_and_upsert(message.path);
-          await redisClient.xTrim(STREAM_KEY, 'MINID', id);
+          const trim_results = await redisClient.xTrim(STREAM_KEY, 'MINID', id);
+          logger.info({ trim_results }, { label: 'REDIS STREAM TRIM' });
         } catch (e) {
           logger.error(e, { label: 'REDIS STREAM READ LOOP ERROR' });
         } finally {
