@@ -14,7 +14,7 @@
 import cron from 'node-cron';
 import mongo_connect from './lib/mongo_connection';
 import update_queue from './lib/update_queue';
-import fs_monitor from './lib/fs_monitor';
+import fs_monitor, { processFSEventQueue } from './lib/fs_monitor';
 import redisClient from './lib/redis';
 import logger from './lib/logger';
 import { get_utilization, get_disk_space } from './lib/metrics';
@@ -69,6 +69,7 @@ async function run () {
     get_disk_space();
 
     // Start the file system monitor (watches for new/changed files)
+    processFSEventQueue();
     fs_monitor();
 
     // Update the transcode queue and status, and generate the initial filelist
