@@ -23,6 +23,7 @@ async function sendToStream (msg) {
 
 async function receiveFromStream (callback) {
   try {
+    logger.info('Starting Redis stream receiver...', { label: 'REDIS STREAM RECEIVE' });
     let lastId = '0-0';
     while (true) {
       const response = await redisClient.xRead(
@@ -90,6 +91,10 @@ export default function fs_watch () {
       }
     });
 
+  return watcher;
+}
+
+export async function processFSEventQueue () {
   receiveFromStream(async (id, message_content) => {
     try {
       logger.info(`Processing file system event for file: ${message_content.path}`, { label: 'REDIS STREAM READ', message_content });
@@ -98,6 +103,4 @@ export default function fs_watch () {
       logger.error(e, { label: 'REDIS STREAM READ ERROR' });
     }
   });
-
-  return watcher;
 }
