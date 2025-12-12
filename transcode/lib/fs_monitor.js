@@ -43,7 +43,7 @@ export async function processFSEventQueue () {
           await probe_and_upsert(message.path);
           await redisClient.xTrim(STREAM_KEY, 'MINID', id);
         } catch (e) {
-          logger.error(e, { label: 'REDIS STREAM READ ERROR' });
+          logger.error(e, { label: 'REDIS STREAM READ LOOP ERROR' });
         } finally {
           return true;
         }
