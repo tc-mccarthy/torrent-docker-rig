@@ -1,4 +1,5 @@
 import chokidar from 'chokidar';
+import async from 'async';
 import config from './config';
 import redisClient from './redis';
 import logger from './logger';
@@ -21,7 +22,7 @@ async function sendToStream (msg) {
   }
 }
 
-async function receiveFromStream (callback) {
+export async function processFSEventQueue () {
   try {
     logger.info('Starting Redis stream receiver...', { label: 'REDIS STREAM RECEIVE' });
     let lastId = '0-0';
@@ -32,12 +33,17 @@ async function receiveFromStream (callback) {
       );
       if (response && response.length > 0) {
         const [stream] = response;
-        const ids = stream.messages.map((message) => {
-          callback(message.id, message.message);
-          return message.id;
+        const messages = stream.messages;
+        await async.eachSeries(messages, async (message) => {
+          try {
+            logger.info(`Processing file system event for file: ${message.message.path}`, { label: 'REDIS STREAM READ', message_content: message.message });
+            await probe_and_upsert(message.message.path);
+          } catch (e) {
+            logger.error(e, { label: 'REDIS STREAM READ ERROR' });
+          }
         });
-        if (ids.length > 0) {
-          lastId = ids[ids.length - 1];
+        if (messages.length > 0) {
+          lastId = messages[messages.length - 1].id;
         }
       }
     }
@@ -92,15 +98,4 @@ export default function fs_watch () {
     });
 
   return watcher;
-}
-
-export async function processFSEventQueue () {
-  receiveFromStream(async (id, message_content) => {
-    try {
-      logger.info(`Processing file system event for file: ${message_content.path}`, { label: 'REDIS STREAM READ', message_content });
-      await probe_and_upsert(message_content.path);
-    } catch (e) {
-      logger.error(e, { label: 'REDIS STREAM READ ERROR' });
-    }
-  });
 }
