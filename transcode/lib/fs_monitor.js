@@ -24,15 +24,11 @@ async function sendToStream (msg) {
   }
 }
 
-export async function processFSEventQueue (lastId = '0-0') {
-  let nextId = lastId;
+export async function processFSEventQueue () {
   try {
-    if (lastId === '0') {
-      logger.info('Starting Redis stream receiver...', { label: 'REDIS STREAM RECEIVE' });
-    }
-    logger.info(`About to call xRead for stream '${STREAM_KEY}' with lastId: ${lastId}`, { label: 'REDIS STREAM RECEIVE' });
+    logger.info(`About to call xRead for stream '${STREAM_KEY}'`, { label: 'REDIS STREAM RECEIVE' });
     const response = await redisClient.xRead(
-      [{ key: STREAM_KEY, id: lastId }],
+      [{ key: STREAM_KEY, id: '0-0' }],
       { BLOCK: 5000, COUNT: 1 }
     );
     logger.info({ response }, { label: 'REDIS STREAM READ RESPONSE' });
@@ -45,16 +41,11 @@ export async function processFSEventQueue (lastId = '0-0') {
         try {
           logger.info(`Processing file system event for file: ${message.message.path}`, { label: 'REDIS STREAM READ', message_content: message.message });
           await probe_and_upsert(message.message.path);
+          await redisClient.xTrim(STREAM_KEY, { minId: message.id });
         } catch (e) {
           logger.error(e, { label: 'REDIS STREAM READ ERROR' });
         }
       });
-      if (messages.length > 0) {
-        nextId = messages[messages.length - 1].id;
-
-        await redisClient.xTrim(STREAM_KEY, { minId: nextId });
-        logger.info(`Trimmed stream '${STREAM_KEY}' up to ID: ${nextId}`, { label: 'REDIS STREAM TRIM' });
-      }
     } else {
       logger.info('xRead returned no messages (timeout or empty stream)', { label: 'REDIS STREAM READ RESPONSE' });
     }
@@ -64,7 +55,7 @@ export async function processFSEventQueue (lastId = '0-0') {
     // 5-second cool-off before next pass
     await delay(5000);
     // Continue processing from the last ID
-    processFSEventQueue(nextId);
+    processFSEventQueue();
   }
 }
 
@@ -107,6 +98,7 @@ export default function fs_watch () {
   watcher
     .on('ready', () => {
       logger.debug('>> WATCHER IS READY AND WATCHING >>', watcher.getWatched());
+      logger.info('File system monitor is now watching for changes.', { label: 'FS MONITOR READY' });
     })
     .on('error', (error) => logger.error(`Watcher error: ${error}`))
     .on('add', (path) => {
