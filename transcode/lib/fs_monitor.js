@@ -13,7 +13,12 @@ const PATHS = get_paths(config);
 const STREAM_KEY = 'transcode_file_events';
 
 async function sendToStream (msg) {
-  await redisClient.xAdd(STREAM_KEY, '*', { ...msg });
+  try {
+    logger.info(msg, { label: 'REDIS STREAM SEND' });
+    await redisClient.xAdd(STREAM_KEY, '*', { ...msg });
+  } catch (e) {
+    logger.error(e, { label: 'REDIS STREAM SEND ERROR' });
+  }
 }
 
 async function receiveFromStream (callback) {
