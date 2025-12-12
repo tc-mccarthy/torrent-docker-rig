@@ -31,6 +31,7 @@ export async function processFSEventQueue () {
         [{ key: STREAM_KEY, id: lastId }],
         { BLOCK: 0, COUNT: 1 }
       );
+      logger.info(response, { label: 'REDIS STREAM READ RESPONSE' });
       if (response && response.length > 0) {
         const [stream] = response;
         const messages = stream.messages;
