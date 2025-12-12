@@ -5,6 +5,7 @@ import config from './config';
 import redisClient from './redis';
 import logger from './logger';
 import probe_and_upsert from './probe_and_upsert';
+import { send } from 'process';
 
 const { file_ext } = config;
 
@@ -43,7 +44,7 @@ export async function processFSEventQueue () {
           if (!message.processed) {
             await probe_and_upsert(message.path);
             // Mark message as processed in the stream
-            await redisClient.xAdd(STREAM_KEY, '*', { ...message, processed: true });
+            await sendToStream({ ...message, processed: true });
             logger.info(`Marked message for path ${message.path} as processed`, { label: 'REDIS STREAM PROCESSED' });
           }
           const trim_results = await redisClient.xTrim(STREAM_KEY, 'MINID', id);
