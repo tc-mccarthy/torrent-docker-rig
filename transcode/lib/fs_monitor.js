@@ -17,16 +17,17 @@ const STREAM_KEY = 'transcode_file_events';
 async function sendToStream (msg) {
   try {
     logger.info(msg, { label: 'REDIS STREAM SEND' });
-    await redisClient.xAdd(STREAM_KEY, '*', { ...msg });
+    const result = await redisClient.xAdd(STREAM_KEY, '*', { ...msg });
+    logger.info(`Message added to stream with ID: ${result}`, { label: 'REDIS STREAM SEND' });
   } catch (e) {
     logger.error(e, { label: 'REDIS STREAM SEND ERROR' });
   }
 }
 
-export async function processFSEventQueue (lastId = '0') {
+export async function processFSEventQueue (lastId = '0-0') {
   let nextId = lastId;
   try {
-    if (lastId === '0-0') {
+    if (lastId === '0') {
       logger.info('Starting Redis stream receiver...', { label: 'REDIS STREAM RECEIVE' });
     }
     logger.info(`About to call xRead for stream '${STREAM_KEY}' with lastId: ${lastId}`, { label: 'REDIS STREAM RECEIVE' });
