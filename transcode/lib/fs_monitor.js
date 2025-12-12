@@ -1,5 +1,6 @@
 import chokidar from 'chokidar';
 import async from 'async';
+import { setTimeout as delay } from 'timers/promises';
 import config from './config';
 import redisClient from './redis';
 import logger from './logger';
@@ -22,34 +23,40 @@ async function sendToStream (msg) {
   }
 }
 
-export async function processFSEventQueue () {
+export async function processFSEventQueue (lastId = '0-0') {
+  let nextId = lastId;
   try {
-    logger.info('Starting Redis stream receiver...', { label: 'REDIS STREAM RECEIVE' });
-    let lastId = '0-0';
-    while (true) {
-      const response = await redisClient.xRead(
-        [{ key: STREAM_KEY, id: lastId }],
-        { BLOCK: 0, COUNT: 1 }
-      );
-      logger.info(response, { label: 'REDIS STREAM READ RESPONSE' });
-      if (response && response.length > 0) {
-        const [stream] = response;
-        const messages = stream.messages;
-        await async.eachSeries(messages, async (message) => {
-          try {
-            logger.info(`Processing file system event for file: ${message.message.path}`, { label: 'REDIS STREAM READ', message_content: message.message });
-            await probe_and_upsert(message.message.path);
-          } catch (e) {
-            logger.error(e, { label: 'REDIS STREAM READ ERROR' });
-          }
-        });
-        if (messages.length > 0) {
-          lastId = messages[messages.length - 1].id;
+    if (lastId === '0-0') {
+      logger.info('Starting Redis stream receiver...', { label: 'REDIS STREAM RECEIVE' });
+    }
+    const response = await redisClient.xRead(
+      [{ key: STREAM_KEY, id: lastId }],
+      { BLOCK: 0, COUNT: 1 }
+    );
+    logger.info(response, { label: 'REDIS STREAM READ RESPONSE' });
+
+    if (response && response.length > 0) {
+      const [stream] = response;
+      const messages = stream.messages;
+      await async.eachSeries(messages, async (message) => {
+        try {
+          logger.info(`Processing file system event for file: ${message.message.path}`, { label: 'REDIS STREAM READ', message_content: message.message });
+          await probe_and_upsert(message.message.path);
+        } catch (e) {
+          logger.error(e, { label: 'REDIS STREAM READ ERROR' });
         }
+      });
+      if (messages.length > 0) {
+        nextId = messages[messages.length - 1].id;
       }
     }
   } catch (e) {
     logger.error(e, { label: 'REDIS STREAM RECEIVE ERROR' });
+  } finally {
+    // 5-second cool-off before next pass
+    await delay(5000);
+    // Continue processing from the last ID
+    processFSEventQueue(nextId);
   }
 }
 
