@@ -43,7 +43,7 @@ export async function processFSEventQueue () {
           if (!message.processed) {
             await probe_and_upsert(message.path);
             // Mark message as processed in the stream
-            await sendToStream({ path: message.path, processed: true });
+            await sendToStream({ path: message.path, processed: 'true' });
             logger.info(`Marked message for path ${message.path} as processed`, { label: 'REDIS STREAM PROCESSED' });
           }
           const trim_results = await redisClient.xTrim(STREAM_KEY, 'MINID', id);
