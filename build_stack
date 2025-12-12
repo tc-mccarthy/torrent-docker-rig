@@ -48,8 +48,8 @@ echo "Starting new stack..."
 docker compose up -d --remove-orphans
 
 # Prune all unused containers, images, networks, and volumes
-echo "Pruning unused containers, images, networks, and volumes..."
-docker system prune -af --volumes
+# echo "Pruning unused containers, images, networks, and volumes..."
+# docker system prune -af --volumes
 
 # Follow logs for all containers
 docker compose logs --follow

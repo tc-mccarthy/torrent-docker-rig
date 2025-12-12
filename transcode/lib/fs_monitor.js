@@ -63,7 +63,7 @@ export default function fs_watch () {
 
   watcher
     .on('ready', () => {
-      logger.debug('>> WATCHER IS READY AND WATCHING >>', watcher.getWatched());
+      logger.info('>> WATCHER IS READY AND WATCHING >>', watcher.getWatched());
     })
     .on('error', (error) => logger.error(`Watcher error: ${error}`))
     .on('add', (path) => {
