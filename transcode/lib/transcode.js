@@ -362,6 +362,7 @@ export default function transcode (file) {
         .on('end', async () => {
           // FFmpeg end event: finalize output, cleanup, update status
           try {
+            logger.info(`Transcode complete for file: ${file}`);
             await wait(5);
 
             // Ensure scratch file exists before moving
