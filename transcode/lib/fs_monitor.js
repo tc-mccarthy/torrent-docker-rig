@@ -3,6 +3,7 @@ import config from './config';
 import redisClient from './redis';
 import logger from './logger';
 import probe_and_upsert from './probe_and_upsert';
+import { log } from 'async';
 
 const { file_ext } = config;
 
@@ -42,6 +43,7 @@ async function receiveFromStream (callback) {
 }
 
 export default function fs_watch () {
+  logger.info('Starting file system monitor...', { label: 'FS MONITOR' });
   const watcher = chokidar.watch(PATHS, {
     ignored: (file, stats) => {
       // if .deletedByTMM is in the path, ignore
