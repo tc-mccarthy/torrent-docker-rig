@@ -23,21 +23,23 @@ async function sendToStream (msg) {
   }
 }
 
-export async function processFSEventQueue (lastId = '0-0') {
+export async function processFSEventQueue (lastId = '0') {
   let nextId = lastId;
   try {
     if (lastId === '0-0') {
       logger.info('Starting Redis stream receiver...', { label: 'REDIS STREAM RECEIVE' });
     }
+    logger.info(`About to call xRead for stream '${STREAM_KEY}' with lastId: ${lastId}`, { label: 'REDIS STREAM RECEIVE' });
     const response = await redisClient.xRead(
       [{ key: STREAM_KEY, id: lastId }],
-      { BLOCK: 0, COUNT: 1 }
+      { BLOCK: 5000, COUNT: 1 }
     );
-    logger.info(response, { label: 'REDIS STREAM READ RESPONSE' });
+    logger.info({ response }, { label: 'REDIS STREAM READ RESPONSE' });
 
     if (response && response.length > 0) {
       const [stream] = response;
       const messages = stream.messages;
+      logger.info(`xRead returned ${messages.length} messages`, { label: 'REDIS STREAM READ RESPONSE' });
       await async.eachSeries(messages, async (message) => {
         try {
           logger.info(`Processing file system event for file: ${message.message.path}`, { label: 'REDIS STREAM READ', message_content: message.message });
@@ -49,6 +51,8 @@ export async function processFSEventQueue (lastId = '0-0') {
       if (messages.length > 0) {
         nextId = messages[messages.length - 1].id;
       }
+    } else {
+      logger.info('xRead returned no messages (timeout or empty stream)', { label: 'REDIS STREAM READ RESPONSE' });
     }
   } catch (e) {
     logger.error(e, { label: 'REDIS STREAM RECEIVE ERROR' });
@@ -83,7 +87,7 @@ export default function fs_watch () {
 
   watcher
     .on('ready', () => {
-      logger.info('>> WATCHER IS READY AND WATCHING >>', watcher.getWatched());
+      logger.debug('>> WATCHER IS READY AND WATCHING >>', watcher.getWatched());
     })
     .on('error', (error) => logger.error(`Watcher error: ${error}`))
     .on('add', (path) => {
