@@ -5,7 +5,6 @@ import config from './config';
 import redisClient from './redis';
 import logger from './logger';
 import probe_and_upsert from './probe_and_upsert';
-import { send } from 'process';
 
 const { file_ext } = config;
 
