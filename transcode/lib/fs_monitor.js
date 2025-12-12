@@ -1,5 +1,5 @@
 import chokidar from 'chokidar';
-import async from 'async';
+import async, { asyncify } from 'async';
 import { setTimeout as delay } from 'timers/promises';
 import config from './config';
 import redisClient from './redis';
@@ -37,9 +37,9 @@ export async function processFSEventQueue () {
       const [stream] = response;
       const messages = stream.messages;
       logger.info(`xRead returned ${messages.length} messages`, { label: 'REDIS STREAM READ RESPONSE' });
-      await async.eachSeries(messages, async ({ message, id }) => {
+      await async.eachSeries(messages, asyncify(async ({ message, id }) => {
         try {
-          logger.info({ message, STREAM_KEY }, { label: 'REDIS STREAM READ' });
+          logger.info({ message, STREAM_KEY, id }, { label: 'REDIS STREAM READ' });
           await probe_and_upsert(message.path);
           await redisClient.xTrim(STREAM_KEY, 'MINID', id);
         } catch (e) {
@@ -47,10 +47,11 @@ export async function processFSEventQueue () {
         } finally {
           return true;
         }
-      });
+      }));
     } else {
       logger.info('xRead returned no messages (timeout or empty stream)', { label: 'REDIS STREAM READ RESPONSE' });
     }
+    logger.info('Finished processing Redis stream messages', { label: 'REDIS STREAM RECEIVE COMPLETE' });
   } catch (e) {
     logger.error(e, { label: 'REDIS STREAM RECEIVE ERROR' });
   } finally {
