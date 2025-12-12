@@ -3,7 +3,6 @@ import config from './config';
 import redisClient from './redis';
 import logger from './logger';
 import probe_and_upsert from './probe_and_upsert';
-import { log } from 'async';
 
 const { file_ext } = config;
 
@@ -89,9 +88,10 @@ export default function fs_watch () {
 
   receiveFromStream(async (id, message_content) => {
     try {
+      logger.info(`Processing file system event for file: ${message_content.path}`, { label: 'REDIS STREAM READ', message_content });
       await probe_and_upsert(message_content.path);
     } catch (e) {
-      logger.error(e, { label: 'REDIS STREAM ERROR' });
+      logger.error(e, { label: 'REDIS STREAM READ ERROR' });
     }
   });
 
