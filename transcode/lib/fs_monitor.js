@@ -22,22 +22,26 @@ async function sendToStream (msg) {
 }
 
 async function receiveFromStream (callback) {
-  let lastId = '0-0';
-  while (true) {
-    const response = await redisClient.xRead(
-      [{ key: STREAM_KEY, id: lastId }],
-      { BLOCK: 0, COUNT: 1 }
-    );
-    if (response && response.length > 0) {
-      const [stream] = response;
-      const ids = stream.messages.map((message) => {
-        callback(message.id, message.message);
-        return message.id;
-      });
-      if (ids.length > 0) {
-        lastId = ids[ids.length - 1];
+  try {
+    let lastId = '0-0';
+    while (true) {
+      const response = await redisClient.xRead(
+        [{ key: STREAM_KEY, id: lastId }],
+        { BLOCK: 0, COUNT: 1 }
+      );
+      if (response && response.length > 0) {
+        const [stream] = response;
+        const ids = stream.messages.map((message) => {
+          callback(message.id, message.message);
+          return message.id;
+        });
+        if (ids.length > 0) {
+          lastId = ids[ids.length - 1];
+        }
       }
     }
+  } catch (e) {
+    logger.error(e, { label: 'REDIS STREAM RECEIVE ERROR' });
   }
 }
 
