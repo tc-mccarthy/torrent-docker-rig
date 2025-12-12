@@ -37,7 +37,7 @@ export async function processFSEventQueue () {
       const [stream] = response;
       const messages = stream.messages;
       logger.info(`xRead returned ${messages.length} messages`, { label: 'REDIS STREAM READ RESPONSE' });
-      await async.eachSeries(messages, asyncify(async ({ message, id }) => {
+      await async.eachLimit(messages, 5, asyncify(async ({ message, id }) => {
         try {
           logger.info({ message, STREAM_KEY, id }, { label: 'REDIS STREAM READ' });
           await probe_and_upsert(message.path);
