@@ -12,7 +12,7 @@ const { get_paths } = config;
 
 const PATHS = get_paths(config);
 
-const STREAM_KEY = 'transcode_file_events';
+const STREAM_KEY = 'transcode_file_events_20251212a';
 
 async function sendToStream (msg) {
   try {
@@ -51,6 +51,13 @@ export async function processFSEventQueue (lastId = '0-0') {
       });
       if (messages.length > 0) {
         nextId = messages[messages.length - 1].id;
+        try {
+          // Trim the stream so only messages after nextId remain
+          await redisClient.xTrim(STREAM_KEY, { minId: nextId });
+          logger.info(`Trimmed stream '${STREAM_KEY}' up to ID: ${nextId}`, { label: 'REDIS STREAM TRIM' });
+        } catch (trimErr) {
+          logger.error(trimErr, { label: 'REDIS STREAM TRIM ERROR' });
+        }
       }
     } else {
       logger.info('xRead returned no messages (timeout or empty stream)', { label: 'REDIS STREAM READ RESPONSE' });
@@ -86,6 +93,21 @@ export default function fs_watch () {
     awaitWriteFinish: true
   });
 
+  // Debounce map: path -> timer
+  const debounceTimers = new Map();
+  const DEBOUNCE_MS = 10000; // 10 seconds
+
+  function debounceSend(path) {
+    if (debounceTimers.has(path)) {
+      clearTimeout(debounceTimers.get(path));
+    }
+    debounceTimers.set(path, setTimeout(() => {
+      logger.debug('>> DEBOUNCED FILE EVENT >>', path);
+      sendToStream({ path });
+      debounceTimers.delete(path);
+    }, DEBOUNCE_MS));
+  }
+
   watcher
     .on('ready', () => {
       logger.debug('>> WATCHER IS READY AND WATCHING >>', watcher.getWatched());
@@ -94,19 +116,19 @@ export default function fs_watch () {
     .on('add', (path) => {
       if (file_ext.some((ext) => new RegExp(`.${ext}$`, 'i').test(path))) {
         logger.debug('>> NEW FILE DETECTED >>', path);
-        sendToStream({ path });
+        debounceSend(path);
       }
     })
     .on('change', (path) => {
       if (file_ext.some((ext) => new RegExp(`.${ext}$`, 'i').test(path))) {
         logger.debug('>> FILE CHANGE DETECTED >>', path);
-        sendToStream({ path });
+        debounceSend(path);
       }
     })
     .on('unlink', (path) => {
       if (file_ext.some((ext) => new RegExp(`.${ext}$`, 'i').test(path))) {
         logger.debug('>> FILE DELETE DETECTED >>', path);
-        sendToStream({ path });
+        debounceSend(path);
       }
     });
 
