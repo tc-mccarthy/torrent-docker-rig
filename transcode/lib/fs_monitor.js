@@ -51,13 +51,9 @@ export async function processFSEventQueue (lastId = '0-0') {
       });
       if (messages.length > 0) {
         nextId = messages[messages.length - 1].id;
-        try {
-          // Trim the stream so only messages after nextId remain
-          await redisClient.xTrim(STREAM_KEY, { minId: nextId });
-          logger.info(`Trimmed stream '${STREAM_KEY}' up to ID: ${nextId}`, { label: 'REDIS STREAM TRIM' });
-        } catch (trimErr) {
-          logger.error(trimErr, { label: 'REDIS STREAM TRIM ERROR' });
-        }
+
+        await redisClient.xTrim(STREAM_KEY, { minId: nextId });
+        logger.info(`Trimmed stream '${STREAM_KEY}' up to ID: ${nextId}`, { label: 'REDIS STREAM TRIM' });
       }
     } else {
       logger.info('xRead returned no messages (timeout or empty stream)', { label: 'REDIS STREAM READ RESPONSE' });
@@ -97,7 +93,7 @@ export default function fs_watch () {
   const debounceTimers = new Map();
   const DEBOUNCE_MS = 10000; // 10 seconds
 
-  function debounceSend(path) {
+  function debounceSend (path) {
     if (debounceTimers.has(path)) {
       clearTimeout(debounceTimers.get(path));
     }
