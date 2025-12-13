@@ -1,3 +1,4 @@
+// Helper to build a Redis key for Radarr GET requests
 // radarr_api.js (streaming JSON, native fetch, ESModule)
 //
 // Radarr API client for Node.js 22+ using native fetch and stream-json for efficient large payload handling.
@@ -12,6 +13,23 @@ import async, { asyncify } from 'async';
 import logger from './logger';
 import redisClient from './redis';
 import streamJsonReq from './stream-json-req';
+
+function radarrRedisKey (endpoint) {
+  return `radarr:${endpoint}`;
+}
+
+// Store data in Redis for a given endpoint (no expiration)
+async function storeRadarrCache (endpoint, data) {
+  const key = radarrRedisKey(endpoint);
+  await redisClient.set(key, JSON.stringify(data));
+}
+
+// Retrieve data from Redis for a given endpoint
+async function getRadarrCache (endpoint) {
+  const key = radarrRedisKey(endpoint);
+  const cached = await redisClient.get(key);
+  return cached ? JSON.parse(cached) : null;
+}
 
 const RADARR_API_KEY = process.env.RADARR_API_KEY;
 const RADARR_URL = process.env.RADARR_URL || 'http://localhost:7878';
@@ -50,42 +68,91 @@ async function radarrRequest (endpoint, method = 'GET', body = null) {
 }
 
 /**
- * Fetches all movies from Radarr.
- * Returns an array of movie objects.
+ * Fetches all movies from Radarr, with Redis fallback for reliability.
+ * Attempts to retrieve cached data first, then fetches from Radarr API.
+ * On success, updates the cache. On failure, falls back to cache if available.
+ *
+ * @returns {Promise<Array<Object>|null>} Array of movie objects, or null if unavailable.
  */
 export async function getMovies () {
-  return radarrRequest('/api/v3/movie');
+  const endpoint = '/api/v3/movie';
+  let data = await getRadarrCache(endpoint);
+  try {
+    // Attempt live Radarr API call
+    const result = await radarrRequest(endpoint);
+    // Update cache on success
+    await storeRadarrCache(endpoint, result);
+    data = result;
+  } catch (err) {
+    // Log and fall back to cache
+    logger.warn(`[Radarr] GET ${endpoint} failed, using cached data if available: ${err.message}`);
+  } finally {
+    // Always return best available data
+    return data;
+  }
 }
 
 /**
  * Updates a movie in Radarr by ID.
- * Returns the updated movie object.
+ *
+ * @param {number|string} movieId - The Radarr movie ID.
+ * @param {Object} movieData - The movie data to update.
+ * @returns {Promise<Object>} The updated movie object.
  */
 export async function updateMovie (movieId, movieData) {
   return radarrRequest(`/api/v3/movie/${movieId}`, 'PUT', movieData);
 }
 
 /**
- * Gets Radarr system status info.
+ * Gets Radarr system status info (no Redis fallback).
+ *
+ * @returns {Promise<Object>} The system status object.
  */
 export async function getSystemStatus () {
   return radarrRequest('/api/v3/system/status');
 }
 
 /**
- * Fetches all tags from Radarr.
- * Returns an array of tag objects.
+ * Fetches all tags from Radarr, with Redis fallback for reliability.
+ * Attempts to retrieve cached data first, then fetches from Radarr API.
+ * On success, updates the cache. On failure, falls back to cache if available.
+ *
+ * @returns {Promise<Array<Object>|null>} Array of tag objects, or null if unavailable.
  */
 export async function getTags () {
-  return radarrRequest('/api/v3/tag');
+  const endpoint = '/api/v3/tag';
+  let data = await getRadarrCache(endpoint);
+  try {
+    const result = await radarrRequest(endpoint);
+    await storeRadarrCache(endpoint, result);
+    data = result;
+  } catch (err) {
+    logger.warn(`[Radarr] GET ${endpoint} failed, using cached data if available: ${err.message}`);
+  } finally {
+    return data;
+  }
 }
 
 /**
- * Lists all files in a movie by Radarr movie ID.
- * Returns an array of file objects for the movie.
+ * Lists all files in a movie by Radarr movie ID, with Redis fallback for reliability.
+ * Attempts to retrieve cached data first, then fetches from Radarr API.
+ * On success, updates the cache. On failure, falls back to cache if available.
+ *
+ * @param {number|string} movieId - The Radarr movie ID.
+ * @returns {Promise<Array<Object>|null>} Array of file objects, or null if unavailable.
  */
 export async function getMovieFiles (movieId) {
-  return radarrRequest(`/api/v3/moviefile?movieId=${movieId}`);
+  const endpoint = `/api/v3/moviefile?movieId=${movieId}`;
+  let data = await getRadarrCache(endpoint);
+  try {
+    const result = await radarrRequest(endpoint);
+    await storeRadarrCache(endpoint, result);
+    data = result;
+  } catch (err) {
+    logger.warn(`[Radarr] GET ${endpoint} failed, using cached data if available: ${err.message}`);
+  } finally {
+    return data;
+  }
 }
 
 /**

@@ -13,6 +13,37 @@ import logger from './logger';
 import redisClient from './redis';
 import streamJsonReq from './stream-json-req';
 
+/**
+ * Builds a Redis key for Sonarr GET requests, namespaced by endpoint.
+ * @param {string} endpoint - The Sonarr API endpoint (e.g., '/api/v3/series').
+ * @returns {string} The Redis key for caching.
+ */
+function sonarrRedisKey (endpoint) {
+  return `sonarr:${endpoint}`;
+}
+
+/**
+ * Stores data in Redis for a given endpoint, with no expiration (persistent backup).
+ * @param {string} endpoint - The Sonarr API endpoint.
+ * @param {Object|Array} data - The data to cache.
+ * @returns {Promise<void>}
+ */
+async function storeSonarrCache (endpoint, data) {
+  const key = sonarrRedisKey(endpoint);
+  await redisClient.set(key, JSON.stringify(data));
+}
+
+/**
+ * Retrieves cached data from Redis for a given endpoint.
+ * @param {string} endpoint - The Sonarr API endpoint.
+ * @returns {Promise<Object|Array|null>} The cached data, or null if not found.
+ */
+async function getSonarrCache (endpoint) {
+  const key = sonarrRedisKey(endpoint);
+  const cached = await redisClient.get(key);
+  return cached ? JSON.parse(cached) : null;
+}
+
 const SONARR_API_KEY = process.env.SONARR_API_KEY;
 const SONARR_URL = process.env.SONARR_URL || 'http://localhost:8989';
 
@@ -50,11 +81,28 @@ async function sonarrRequest (endpoint, method = 'GET', body = null) {
 }
 
 /**
- * Fetches all series from Sonarr.
- * Returns an array of series objects.
+ * Fetches all series from Sonarr, with Redis fallback for reliability.
+ * Attempts to retrieve cached data first, then fetches from Sonarr API.
+ * On success, updates the cache. On failure, falls back to cache if available.
+ *
+ * @returns {Promise<Array<Object>|null>} Array of series objects, or null if unavailable.
  */
 export async function getSeries () {
-  return sonarrRequest('/api/v3/series');
+  const endpoint = '/api/v3/series';
+  let data = await getSonarrCache(endpoint);
+  try {
+    // Attempt live Sonarr API call
+    const result = await sonarrRequest(endpoint);
+    // Update cache on success
+    await storeSonarrCache(endpoint, result);
+    data = result;
+  } catch (err) {
+    // Log and fall back to cache
+    logger.warn(`[Sonarr] GET ${endpoint} failed, using cached data if available: ${err.message}`);
+  } finally {
+    // Always return best available data
+    return data;
+  }
 }
 
 /**
@@ -73,19 +121,46 @@ export async function getSystemStatus () {
 }
 
 /**
- * Fetches all tags from Sonarr.
- * Returns an array of tag objects.
+ * Fetches all tags from Sonarr, with Redis fallback for reliability.
+ * Attempts to retrieve cached data first, then fetches from Sonarr API.
+ * On success, updates the cache. On failure, falls back to cache if available.
+ *
+ * @returns {Promise<Array<Object>|null>} Array of tag objects, or null if unavailable.
  */
 export async function getTags () {
-  return sonarrRequest('/api/v3/tag');
+  const endpoint = '/api/v3/tag';
+  let data = await getSonarrCache(endpoint);
+  try {
+    const result = await sonarrRequest(endpoint);
+    await storeSonarrCache(endpoint, result);
+    data = result;
+  } catch (err) {
+    logger.warn(`[Sonarr] GET ${endpoint} failed, using cached data if available: ${err.message}`);
+  } finally {
+    return data;
+  }
 }
 
 /**
- * Lists all episode files in a series by Sonarr series ID.
- * Returns an array of episode file objects for the series.
+ * Lists all episode files in a series by Sonarr series ID, with Redis fallback for reliability.
+ * Attempts to retrieve cached data first, then fetches from Sonarr API.
+ * On success, updates the cache. On failure, falls back to cache if available.
+ *
+ * @param {number|string} seriesId - The Sonarr series ID.
+ * @returns {Promise<Array<Object>|null>} Array of episode file objects, or null if unavailable.
  */
 export async function getEpisodeFiles (seriesId) {
-  return sonarrRequest(`/api/v3/episodefile?seriesId=${seriesId}`);
+  const endpoint = `/api/v3/episodefile?seriesId=${seriesId}`;
+  let data = await getSonarrCache(endpoint);
+  try {
+    const result = await sonarrRequest(endpoint);
+    await storeSonarrCache(endpoint, result);
+    data = result;
+  } catch (err) {
+    logger.warn(`[Sonarr] GET ${endpoint} failed, using cached data if available: ${err.message}`);
+  } finally {
+    return data;
+  }
 }
 
 /**
