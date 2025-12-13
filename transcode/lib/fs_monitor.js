@@ -16,9 +16,9 @@ const STREAM_KEY = 'transcode_file_events_20251212a';
 
 async function sendToStream (msg) {
   try {
-    logger.info(msg, { label: 'REDIS STREAM SEND' });
+    logger.debug(msg, { label: 'REDIS STREAM SEND' });
     const result = await redisClient.xAdd(STREAM_KEY, '*', { ...msg });
-    logger.info(`Message added to stream with ID: ${result}`, { label: 'REDIS STREAM SEND' });
+    logger.debug(`Message added to stream with ID: ${result}`, { label: 'REDIS STREAM SEND' });
   } catch (e) {
     logger.error(e, { label: 'REDIS STREAM SEND ERROR' });
   }
@@ -26,28 +26,28 @@ async function sendToStream (msg) {
 
 export async function processFSEventQueue () {
   try {
-    logger.info(`About to call xRead for stream '${STREAM_KEY}'`, { label: 'REDIS STREAM RECEIVE' });
+    logger.debug(`About to call xRead for stream '${STREAM_KEY}'`, { label: 'REDIS STREAM RECEIVE' });
     const response = await redisClient.xRead(
       [{ key: STREAM_KEY, id: '0-0' }],
       { BLOCK: 5000, COUNT: 100 }
     );
-    logger.info({ response }, { label: 'REDIS STREAM READ RESPONSE' });
+    logger.debug({ response }, { label: 'REDIS STREAM READ RESPONSE' });
 
     if (response && response.length > 0) {
       const [stream] = response;
       const messages = stream.messages;
-      logger.info(`xRead returned ${messages.length} messages`, { label: 'REDIS STREAM READ RESPONSE' });
+      logger.debug(`xRead returned ${messages.length} messages`, { label: 'REDIS STREAM READ RESPONSE' });
       await async.eachLimit(messages, 5, asyncify(async ({ message, id }) => {
         try {
-          logger.info({ message, STREAM_KEY, id }, { label: 'REDIS STREAM READ' });
+          logger.debug({ message, STREAM_KEY, id }, { label: 'REDIS STREAM READ' });
           if (!message.processed) {
             await probe_and_upsert(message.path);
             // Mark message as processed in the stream
             await sendToStream({ path: message.path, processed: 'true' });
-            logger.info(`Marked message for path ${message.path} as processed`, { label: 'REDIS STREAM PROCESSED' });
+            logger.debug(`Marked message for path ${message.path} as processed`, { label: 'REDIS STREAM PROCESSED' });
           }
           const trim_results = await redisClient.xTrim(STREAM_KEY, 'MINID', id);
-          logger.info({ trim_results }, { label: 'REDIS STREAM TRIM' });
+          logger.debug({ trim_results }, { label: 'REDIS STREAM TRIM' });
         } catch (e) {
           logger.error(e, { label: 'REDIS STREAM READ LOOP ERROR' });
         } finally {
@@ -55,9 +55,9 @@ export async function processFSEventQueue () {
         }
       }));
     } else {
-      logger.info('xRead returned no messages (timeout or empty stream)', { label: 'REDIS STREAM READ RESPONSE' });
+      logger.debug('xRead returned no messages (timeout or empty stream)', { label: 'REDIS STREAM READ RESPONSE' });
     }
-    logger.info('Finished processing Redis stream messages', { label: 'REDIS STREAM RECEIVE COMPLETE' });
+    logger.debug('Finished processing Redis stream messages', { label: 'REDIS STREAM RECEIVE COMPLETE' });
   } catch (e) {
     logger.error(e, { label: 'REDIS STREAM RECEIVE ERROR' });
   } finally {
@@ -69,7 +69,7 @@ export async function processFSEventQueue () {
 }
 
 export default function fs_watch () {
-  logger.info('Starting file system monitor...', { label: 'FS MONITOR' });
+  logger.debug('Starting file system monitor...', { label: 'FS MONITOR' });
   const watcher = chokidar.watch(PATHS, {
     ignored: (file, stats) => {
       // if .deletedByTMM is in the path, ignore
@@ -107,7 +107,7 @@ export default function fs_watch () {
   watcher
     .on('ready', () => {
       logger.debug('>> WATCHER IS READY AND WATCHING >>', watcher.getWatched());
-      logger.info('File system monitor is now watching for changes.', { label: 'FS MONITOR READY' });
+      logger.debug('File system monitor is now watching for changes.', { label: 'FS MONITOR READY' });
     })
     .on('error', (error) => logger.error(`Watcher error: ${error}`))
     .on('add', (path) => {

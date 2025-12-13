@@ -9,19 +9,27 @@ import logger from './logger';
  *
  * Usage:
  *   import refresh_indexer_data from './refresh_indexer_data.js';
- *   refresh_indexer_data();
+ *   await refresh_indexer_data();
  */
 
 /**
  * Refreshes indexer data and updates file priorities.
- * First imports indexer data, then revises priorities using assessPriority.
- * Errors are logged but do not throw.
+ *
+ * This function first imports indexer data (from Radarr/Sonarr),
+ * then revises priorities using assessPriority. All errors are
+ * logged but do not throw, so the calling process is not interrupted.
+ *
+ * @function
+ * @returns {Promise<void>} Resolves when refresh is complete (or failed gracefully).
  */
-export default function refresh_indexer_data () {
-  // Import indexer data, then update priorities
-  importIndexerData()
-    .then(() => assessPriority())
-    .catch((err) => {
-      logger.error('Failed to import indexer data:', err);
-    });
+export default async function refresh_indexer_data () {
+  try {
+    // Import indexer data from Radarr/Sonarr
+    await importIndexerData();
+    // Update file priorities based on new indexer data
+    await assessPriority();
+  } catch (err) {
+    // Log any errors, but do not throw
+    logger.error('Failed to import indexer data:', err);
+  }
 }
