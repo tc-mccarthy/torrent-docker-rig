@@ -103,8 +103,9 @@ async function run () {
       });
     });
 
-    // update indexer data every hour
-    cron.schedule('0 1-23 * * *', () => {
+    // update indexer data every hour from 3am to 11pm
+    // to avoid peak usage times during the update_queue logic
+    cron.schedule('0 3-23 * * *', () => {
       refresh_indexer_data();
     });
   } catch (e) {

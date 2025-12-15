@@ -7,32 +7,39 @@ import calculateComputeScore from '../lib/calculateComputeScore';
 const { Schema, model } = mongoose;
 
 /**
- *  Mongoose docs say this value should be the singular word for the collection we want this stored in.
- * It's common practice to capitalize class names so I have made this guy User, which is what a single document would represent
- * This model will now automatically read and write from the `users` collection in our database
+ * File model (MongoDB / Mongoose).
  *
- * Note: This is being done as a variable so that you can simply dupe this file and change the model_name and schema to readily create a new model
- * */
+ * This collection is the central record of truth for everything the transcoder/indexer knows
+ * about a media file: where it lives (path), the latest ffprobe payload, transcode status,
+ * enrichment metadata, and scheduling/prioritization helpers.
+ *
+ * Notes:
+ * - Mongoose automatically pluralizes the model name to pick a collection (e.g., `File` -> `files`).
+ * - `path` is treated as the stable unique identifier.
+ */
 const model_name = 'File';
 
 // establish types and defaults for keys
 /**
  * @typedef {Object} FileDocument
- * @property {string} path - File path (unique)
- * @property {string} encode_version - Encode version
- * @property {string} status - File status (default: 'pending')
- * @property {Object} probe - Probe data (ffprobe output)
- * @property {Date} last_probe - Last probe date
- * @property {Object} transcode_details - Transcode details
- * @property {Object} sortFields - Sorting fields (priority, width, size, etc.)
- * @property {Array} audio_language - Audio language(s)
- * @property {Object} error - Error details
- * @property {Boolean} hasError - Error flag
- * @property {Boolean} integrityCheck - Integrity check flag
- * @property {Number} computeScore - Compute score (auto-calculated)
- * @property {Boolean} permitHWDecode - Hardware decode permission
- * @property {Number} reclaimedSpace - Space reclaimed by file
- * @property {Object} indexerData - Indexer metadata (Radarr/Sonarr)
+ * @property {string} path - Absolute file path (unique identifier).
+ * @property {string=} encode_version - Encode version tag used to decide if a file needs re-encode.
+ * @property {'pending'|'complete'|'ignore'|'error'} status - Current processing status.
+ * @property {Object=} probe - Raw ffprobe payload (stored as-is).
+ * @property {Date=} last_probe - Timestamp of the last successful ffprobe (not just "seen").
+ * @property {Date=} last_seen - Timestamp of the most recent sweep that encountered this path.
+ * @property {Object=} fsFingerprint - Cheap filesystem fingerprint used to skip unnecessary probing.
+ * @property {Object=} transcode_details - Transcode job metadata (engine-specific).
+ * @property {Object=} sortFields - Fields used for queue ordering (priority/size/width/etc).
+ * @property {Array=} audio_language - Normalized audio languages detected from ffprobe.
+ * @property {Object=} error - Error details if processing failed.
+ * @property {boolean=} hasError - Convenience flag (mirrors error presence).
+ * @property {boolean=} integrityCheck - Whether the file has passed/been scheduled for integrity checks.
+ * @property {number=} computeScore - Heuristic cost score derived from probe and helpers.
+ * @property {boolean=} permitHWDecode - Whether hardware decode is allowed for this file.
+ * @property {number=} reclaimedSpace - Space savings estimate from transcode.
+ * @property {Object=} indexerData - External enrichment payload (e.g., indexer tags).
+ * @property {number=} effectiveBitrate - Derived bitrate used for prioritization/analytics.
  */
 
 /**
@@ -80,6 +87,31 @@ const schema = new Schema(
       type: Date,
       required: false
     },
+    /**
+     * Last time the indexer saw this file during a sweep.
+     *
+     * This is intentionally separate from `last_probe`, which is reserved for
+     * "we actually ran ffprobe and stored the payload".
+     */
+    last_seen: {
+      type: Date,
+      required: false,
+      index: true
+    },
+    /**
+     * Filesystem fingerprint used to cheaply detect changes without reading file contents.
+     *
+     * On Linux local disks, `ctimeMs` is especially useful: it changes when the inode changes,
+     * including content changes, even when tools preserve `mtime`.
+     */
+    fsFingerprint: {
+      size: { type: Number, required: false, index: true }, // bytes
+      mtimeMs: { type: Number, required: false, index: true }, // milliseconds since epoch
+      ctimeMs: { type: Number, required: false, index: true }, // milliseconds since epoch
+      inode: { type: Number, required: false }, // st.ino
+      dev: { type: Number, required: false } // st.dev (optional)
+    },
+
     /**
      * Transcode details (metadata about transcode operation)
      */
@@ -258,6 +290,13 @@ schema.index({
   'sortFields.size': -1,
   'sortFields.width': -1
 });
+
+/**
+ * Fast path for \"should we probe?\" checks.
+ *
+ * When we sweep lots of files, we frequently do lookups by `path` and compare fingerprint fields.
+ */
+schema.index({ path: 1, 'fsFingerprint.size': 1, 'fsFingerprint.mtimeMs': 1, 'fsFingerprint.ctimeMs': 1 });
 
 // create a model object that uses the above schema
 export default model(model_name, schema);
