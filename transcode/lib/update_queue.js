@@ -13,18 +13,24 @@ import { trash } from './fs';
 const { encode_version, file_ext, concurrent_file_checks, get_paths, application_version } = config;
 const PATHS = get_paths(config);
 
+/**
+ * Update the transcoding queue and metadata index.
+ *
+ * Behavior:
+ * - During the day, we mostly rely on `find -newermt <last_probe>` to pick up changes quickly.
+ * - At midnight (by design), we perform a full sweep to fill in any gaps.
+ *
+ * Efficiency:
+ * - The full sweep can still be fast because `probe_and_upsert()` will skip ffprobe when
+ *   a cheap filesystem fingerprint hasn't changed.
+ *
+ * Concurrency:
+ * - Uses a Redis lock to prevent overlapping runs.
+ */
 export default async function update_queue () {
+  const lockKey = 'update_queue_lock';
   try {
     logger.info('update_queue: Starting update queue process');
-    // check for a lock in redis
-    const lock = await redisClient.get('update_queue_lock');
-
-    // short circuit the function if the lock is set
-    if (lock) {
-      logger.debug('Update queue locked. Exiting...');
-      throw new Error('Update queue is currently locked.');
-    }
-
     // update the status of any files who have an encode version that matches the current encode version and that haven't been marked as deleted
     await File.updateMany(
       { encode_version, status: { $ne: 'deleted' } },
@@ -42,9 +48,18 @@ export default async function update_queue () {
 
     const current_time = dayjs();
 
+    // Prevent overlapping runs (especially important with concurrent workers).
+    // Use an expiring lock so a crash doesn't deadlock the system.
+    const lockValue = `${process.pid}:${current_time.valueOf()}`;
+    const lockTTLSeconds = 6 * 60 * 60; // 6 hours (adjust if your sweep can exceed this)
+
+    const acquired = await redisClient.set(lockKey, lockValue, { NX: true, EX: lockTTLSeconds });
+    if (!acquired) {
+      logger.info('update_queue: lock already held; skipping this run');
+      return false;
+    }
     // get seconds until midnight
-    const seconds_until_midnight =
-      86400 - current_time.diff(current_time.endOf('day'), 'seconds') - 60;
+    const seconds_until_midnight = current_time.endOf('day').diff(current_time, 'seconds') - 60;
 
     logger.debug('Seconds until midnight', seconds_until_midnight);
 
@@ -82,7 +97,7 @@ export default async function update_queue () {
       // set a 60 second lock with each file so that the lock lives no longer than 60 seconds beyond the final probe
       await redisClient.set('update_queue_lock', 'locked', { EX: 60 });
       try {
-        const ffprobe_data = await probe_and_upsert(file);
+        const ffprobe_data = await probe_and_upsert(file, null, { touch_last_seen: true });
 
         // if the file is already encoded, remove it from the list
         if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
@@ -129,8 +144,7 @@ export default async function update_queue () {
 
         return true;
       } finally {
-        // clear the lock
-        await redisClient.del('update_queue_lock');
+        // clear the lock        // (Job-level Redis lock released at end of update_queue)
       }
     }));
 
@@ -140,14 +154,20 @@ export default async function update_queue () {
       { EX: seconds_until_midnight }
     );
 
-    // clear the lock
-    await redisClient.del('update_queue_lock');
+    // clear the lock        // (Job-level Redis lock released at end of update_queue)
     return true;
   } catch (e) {
     logger.error(e, { label: 'UPDATE QUEUE ERROR' });
     throw e;
   } finally {
-    // ensure the lock is cleared
+    // Always release the job lock if we acquired it.
+    // Safe even if the key expired or was never acquired.
+    try {
+      await redisClient.del(lockKey);
+    } catch (e) {
+      logger.warn('Failed to release update_queue lock', { error: e });
+    }
+
     logger.info('update_queue process complete.');
   }
 }
