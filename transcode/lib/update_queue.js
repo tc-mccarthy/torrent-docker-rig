@@ -46,6 +46,8 @@ export default async function update_queue () {
     const last_probe =
       (await redisClient.get(last_probe_cache_key)) || '1969-12-31 23:59:59';
 
+    logger.debug('Last probe time', { last_probe });
+
     const current_time = dayjs();
 
     // Prevent overlapping runs (especially important with concurrent workers).
