@@ -86,7 +86,8 @@ export default async function probe_and_upsert (file, record_id = null, opts = {
       if (touch_last_seen) {
         await File.updateOne(query, { $set: { last_seen: current_time } }).catch(() => {});
       }
-      return false;
+      // Return the existing probe data from the document instead of false.
+      return video_record?.probe || false;
     }
 
     // Full-path: run ffprobe and enrichment exactly as before.
