@@ -79,7 +79,7 @@ export default async function update_queue () {
       .subtract(30, 'minutes')
       .format('MM/DD/YYYY HH:mm:ss')}" -print0 | sort -z | xargs -0`;
 
-    logger.debug(findCMD, { label: 'FIND COMMAND' });
+    logger.info(findCMD, { label: 'FIND COMMAND' });
 
     const { stdout, stderr } = await exec_promise(findCMD);
 
