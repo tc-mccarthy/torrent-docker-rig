@@ -81,7 +81,7 @@ export default async function update_queue () {
     const CACHE_EXPIRY_SECONDS = 24 * 60 * 60;
 
     // Find files with mtime, ctime, or atime newer than last_probe (created, modified, or touched)
-    const probe_since = dayjs(last_probe).subtract(30, 'minutes').format('MM/DD/YYYY HH:mm:ss');
+    const probe_since = dayjs(last_probe).subtract(30, 'minutes').format(date_fmt);
     const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(' ')} \\(
       ${file_ext.map((ext) => `-iname "*.${ext}"`).join(' -o ')}
     \\) -not \\( -iname "*.tc.mkv" \\) \\
