@@ -8,6 +8,7 @@ import File from '../models/files';
 import language_map from './lang';
 import config from './config';
 import logger from './logger';
+import { log } from 'console';
 
 const { encode_version } = config;
 
@@ -38,7 +39,7 @@ export default async function probe_and_upsert (file, record_id = null, opts = {
   // Normalize any trailing newlines from `find` output.
   file = String(file).replace(/\n+$/, '');
 
-  const { force_probe = false, touch_last_seen = true } = opts;
+  const { force_probe = false } = opts;
 
   try {
     const current_time = dayjs();
@@ -81,13 +82,12 @@ export default async function probe_and_upsert (file, record_id = null, opts = {
       (prev.dev == null || prev.dev === fsFingerprint.dev);
 
     // Fast-path: unchanged file with an existing probe payload.
-    // Skip ffprobe + enrichment, optionally just "touch" last_seen.
+    // Skip ffprobe + enrichment, no last_seen update for performance.
     if (!force_probe && alreadyHasProbe && fingerprintMatches) {
-      if (touch_last_seen) {
-        await File.updateOne(query, { $set: { last_seen: current_time } }).catch(() => {});
-      }
-      // Return the existing probe data from the document instead of false.
+      logger.info(`Skipping probe for unchanged file: ${file}`);
       return video_record?.probe || false;
+    } else {
+      logger.info(`Probing file: ${file}`);
     }
 
     // Full-path: run ffprobe and enrichment exactly as before.
@@ -115,7 +115,6 @@ export default async function probe_and_upsert (file, record_id = null, opts = {
       encode_version: ffprobe_data?.format?.tags?.ENCODE_VERSION,
       status: ffprobe_data?.format?.tags?.ENCODE_VERSION === encode_version ? 'complete' : 'pending',
       last_probe: current_time,
-      last_seen: current_time,
       fsFingerprint,
       sortFields: {
         width: ffprobe_data?.streams?.find((s) => s.codec_type === 'video')?.width,
