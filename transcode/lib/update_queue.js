@@ -84,7 +84,7 @@ export default async function update_queue () {
     const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(' ')} \\(
       ${file_ext.map((ext) => `-iname "*.${ext}"`).join(' -o ')}
     \\) -not \\( -iname "*.tc.mkv" \\) \\
-      ( -newermt "${probe_since}" -o -newerct "${probe_since}" -o -newerat "${probe_since}" )
+      \\( -newermt "${probe_since}" -o -newerct "${probe_since}" -o -newerat "${probe_since}" \\)
       -print0 | sort -z | xargs -0`;
 
     logger.info(findCMD, { label: 'FIND COMMAND' });
