@@ -8,7 +8,6 @@ import File from '../models/files';
 import language_map from './lang';
 import config from './config';
 import logger from './logger';
-import { log } from 'console';
 
 const { encode_version } = config;
 
@@ -86,9 +85,8 @@ export default async function probe_and_upsert (file, record_id = null, opts = {
     if (!force_probe && alreadyHasProbe && fingerprintMatches) {
       logger.info(`Skipping probe for unchanged file: ${file}`);
       return video_record?.probe || false;
-    } else {
-      logger.info(`Probing file: ${file}`);
     }
+    logger.info(`Probing file: ${file}`);
 
     // Full-path: run ffprobe and enrichment exactly as before.
     const ffprobe_data = await ffprobe(file);
