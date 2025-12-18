@@ -32,8 +32,10 @@ export default async function update_queue () {
   try {
     logger.info('update_queue: Starting update queue process');
     // update the status of any files who have an encode version that matches the current encode version and that haven't been marked as deleted
+    // Use $in for status to leverage the compound index and improve performance
+    const nonDeletedStatuses = ['pending', 'complete', 'ignore', 'error']; // add any other valid statuses
     await File.updateMany(
-      { encode_version, status: { $ne: 'deleted' } },
+      { encode_version, status: { $in: nonDeletedStatuses } },
       { $set: { status: 'complete' } }
     );
 
@@ -69,7 +71,7 @@ export default async function update_queue () {
       seconds_until_midnight = MIN_EXPIRY;
     }
 
-    logger.info('Seconds until midnight (final)', seconds_until_midnight);
+    logger.info(seconds_until_midnight, { label: 'Seconds until midnight (final)' });
 
     const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(' ')} \\( ${file_ext
       .map((ext) => `-iname "*.${ext}"`)
