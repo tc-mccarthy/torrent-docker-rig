@@ -79,13 +79,13 @@ export default async function update_queue () {
     // Set cache expiry to 24 hours (86400 seconds) since the key changes daily
     const CACHE_EXPIRY_SECONDS = 24 * 60 * 60;
 
-    const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(' ')} \\( ${file_ext
-      .map((ext) => `-iname "*.${ext}"`)
-      .join(' -o ')} \\) -not \\( -iname "*.tc.mkv" \\) -newermt "${dayjs(
-      last_probe
-    )
-      .subtract(30, 'minutes')
-      .format('MM/DD/YYYY HH:mm:ss')}" -print0 | sort -z | xargs -0`;
+    // Find files with mtime, ctime, or atime newer than last_probe (created, modified, or touched)
+    const probe_since = dayjs(last_probe).subtract(30, 'minutes').format('MM/DD/YYYY HH:mm:ss');
+    const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(' ')} \\(
+      ${file_ext.map((ext) => `-iname "*.${ext}"`).join(' -o ')}
+    \\) -not \\( -iname "*.tc.mkv" \\) \\
+      ( -newermt "${probe_since}" -o -newerct "${probe_since}" -o -newerat "${probe_since}" )
+      -print0 | sort -z | xargs -0`;
 
     logger.info(findCMD, { label: 'FIND COMMAND' });
 
