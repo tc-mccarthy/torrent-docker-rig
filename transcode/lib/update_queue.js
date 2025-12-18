@@ -34,6 +34,7 @@ export default async function update_queue () {
     // update the status of any files who have an encode version that matches the current encode version and that haven't been marked as deleted
     // Use $in for status to leverage the compound index and improve performance
     const nonDeletedStatuses = ['pending', 'complete', 'ignore', 'error']; // add any other valid statuses
+    logger.info('update_queue: Updating statuses of previously encoded files to complete');
     await File.updateMany(
       { encode_version, status: { $in: nonDeletedStatuses } },
       { $set: { status: 'complete' } }
@@ -45,8 +46,13 @@ export default async function update_queue () {
     const last_probe_cache_key = `last_probe_${encode_version}_${current_date}_${application_version}_a`;
 
     // get the last probe time from redis
-    const last_probe =
-      (await redisClient.get(last_probe_cache_key)) || '1969-12-31 23:59:59';
+    let last_probe;
+    try {
+      last_probe = (await redisClient.get(last_probe_cache_key)) || '1969-12-31 23:59:59';
+    } catch (e) {
+      logger.error('Redis GET failed', { error: e, key: last_probe_cache_key });
+      last_probe = '1969-12-31 23:59:59';
+    }
 
     logger.debug('Last probe time', { last_probe });
 
@@ -57,7 +63,13 @@ export default async function update_queue () {
     const lockValue = `${process.pid}:${current_time.valueOf()}`;
     const lockTTLSeconds = 6 * 60 * 60; // 6 hours (adjust if your sweep can exceed this)
 
-    const acquired = await redisClient.set(lockKey, lockValue, { NX: true, EX: lockTTLSeconds });
+    let acquired;
+    try {
+      acquired = await redisClient.set(lockKey, lockValue, { NX: true, EX: lockTTLSeconds });
+    } catch (e) {
+      logger.error('Redis SET (lock) failed', { error: e, key: lockKey });
+      return false;
+    }
     if (!acquired) {
       logger.info('update_queue: lock already held; skipping this run');
       return false;
@@ -98,7 +110,11 @@ export default async function update_queue () {
         logger.info(`update_queue: Processing file ${file_idx + 1} of ${filelist.length} (${Math.round(((file_idx + 1) / filelist.length) * 100)}%)`);
       }
       // set a 60 second lock with each file so that the lock lives no longer than 60 seconds beyond the final probe
-      await redisClient.set('update_queue_lock', 'locked', { EX: 60 });
+      try {
+        await redisClient.set('update_queue_lock', 'locked', { EX: 60 });
+      } catch (e) {
+        logger.error('Redis SET (file lock) failed', { error: e, key: 'update_queue_lock', file });
+      }
       try {
         const ffprobe_data = await probe_and_upsert(file, null, { touch_last_seen: true });
 
@@ -148,11 +164,15 @@ export default async function update_queue () {
       }
     }));
 
-    await redisClient.set(
-      last_probe_cache_key,
-      current_time.format('MM/DD/YYYY HH:mm:ss'),
-      { EX: CACHE_EXPIRY_SECONDS }
-    );
+    try {
+      await redisClient.set(
+        last_probe_cache_key,
+        current_time.format('MM/DD/YYYY HH:mm:ss'),
+        { EX: CACHE_EXPIRY_SECONDS }
+      );
+    } catch (e) {
+      logger.error('Redis SET (last_probe_cache_key) failed', { error: e, key: last_probe_cache_key });
+    }
 
     // clear the lock        // (Job-level Redis lock released at end of update_queue)
     return true;
@@ -165,7 +185,7 @@ export default async function update_queue () {
     try {
       await redisClient.del(lockKey);
     } catch (e) {
-      logger.warn('Failed to release update_queue lock', { error: e });
+      logger.error('Redis DEL (lock) failed', { error: e, key: lockKey });
     }
 
     logger.info('update_queue process complete.');
