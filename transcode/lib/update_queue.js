@@ -63,15 +63,8 @@ export default async function update_queue () {
       return false;
     }
 
-    // get seconds until midnight, but ensure a minimum expiry (e.g., 1 hour)
-    let seconds_until_midnight = current_time.endOf('day').diff(current_time, 'seconds') - 60;
-    const MIN_EXPIRY = 60 * 60; // 1 hour
-    if (seconds_until_midnight < MIN_EXPIRY) {
-      logger.warn('seconds_until_midnight too short, using minimum expiry', { seconds_until_midnight, MIN_EXPIRY });
-      seconds_until_midnight = MIN_EXPIRY;
-    }
-
-    logger.info(seconds_until_midnight, { label: 'Seconds until midnight (final)' });
+    // Set cache expiry to 24 hours (86400 seconds) since the key changes daily
+    const CACHE_EXPIRY_SECONDS = 24 * 60 * 60;
 
     const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(' ')} \\( ${file_ext
       .map((ext) => `-iname "*.${ext}"`)
@@ -158,7 +151,7 @@ export default async function update_queue () {
     await redisClient.set(
       last_probe_cache_key,
       current_time.format('MM/DD/YYYY HH:mm:ss'),
-      { EX: seconds_until_midnight }
+      { EX: CACHE_EXPIRY_SECONDS }
     );
 
     // clear the lock        // (Job-level Redis lock released at end of update_queue)
