@@ -60,10 +60,16 @@ export default async function update_queue () {
       logger.info('update_queue: lock already held; skipping this run');
       return false;
     }
-    // get seconds until midnight
-    const seconds_until_midnight = current_time.endOf('day').diff(current_time, 'seconds') - 60;
 
-    logger.debug('Seconds until midnight', seconds_until_midnight);
+    // get seconds until midnight, but ensure a minimum expiry (e.g., 1 hour)
+    let seconds_until_midnight = current_time.endOf('day').diff(current_time, 'seconds') - 60;
+    const MIN_EXPIRY = 60 * 60; // 1 hour
+    if (seconds_until_midnight < MIN_EXPIRY) {
+      logger.warn('seconds_until_midnight too short, using minimum expiry', { seconds_until_midnight, MIN_EXPIRY });
+      seconds_until_midnight = MIN_EXPIRY;
+    }
+
+    logger.info('Seconds until midnight (final)', seconds_until_midnight);
 
     const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(' ')} \\( ${file_ext
       .map((ext) => `-iname "*.${ext}"`)
@@ -105,8 +111,6 @@ export default async function update_queue () {
         if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
           filelist[file_idx] = null;
         }
-
-        return true;
       } catch (e) {
         logger.error(e, { label: 'FFPROBE ERROR', file });
 
@@ -143,9 +147,8 @@ export default async function update_queue () {
 
         // any ffprobe command failure, this should be removed from the list
         filelist[file_idx] = null;
-
-        return true;
       } finally {
+        return true;
         // clear the lock        // (Job-level Redis lock released at end of update_queue)
       }
     }));
