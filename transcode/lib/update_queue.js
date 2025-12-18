@@ -48,10 +48,11 @@ export default async function update_queue () {
     // get the last probe time from redis
     let last_probe;
     try {
-      last_probe = (await redisClient.get(last_probe_cache_key)) || '1969-12-31 23:59:59';
+      const fallback = dayjs().subtract(24, 'hours').format('MM/DD/YYYY HH:mm:ss');
+      last_probe = (await redisClient.get(last_probe_cache_key)) || fallback;
     } catch (e) {
       logger.error('Redis GET failed', { error: e, key: last_probe_cache_key });
-      last_probe = '1969-12-31 23:59:59';
+      last_probe = dayjs().subtract(24, 'hours').format('MM/DD/YYYY HH:mm:ss');
     }
 
     logger.debug('Last probe time', { last_probe });
