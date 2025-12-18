@@ -86,7 +86,23 @@ export default async function probe_and_upsert (file, record_id = null, opts = {
       logger.info(`Skipping probe for unchanged file: ${file}`);
       return video_record?.probe || false;
     }
-    logger.info(`Probing file: ${file}`);
+
+    // If we are probing, log which fingerprint fields did not match, or if there was no fingerprint
+    if (!prev) {
+      logger.info(`Probing file: ${file} (no existing fingerprint)`);
+    } else {
+      const mismatches = [];
+      if (prev.size !== fsFingerprint.size) mismatches.push(`size (prev: ${prev.size}, curr: ${fsFingerprint.size})`);
+      if (prev.mtimeMs !== fsFingerprint.mtimeMs) mismatches.push(`mtimeMs (prev: ${prev.mtimeMs}, curr: ${fsFingerprint.mtimeMs})`);
+      if (prev.ctimeMs !== fsFingerprint.ctimeMs) mismatches.push(`ctimeMs (prev: ${prev.ctimeMs}, curr: ${fsFingerprint.ctimeMs})`);
+      if (prev.inode != null && prev.inode !== fsFingerprint.inode) mismatches.push(`inode (prev: ${prev.inode}, curr: ${fsFingerprint.inode})`);
+      if (prev.dev != null && prev.dev !== fsFingerprint.dev) mismatches.push(`dev (prev: ${prev.dev}, curr: ${fsFingerprint.dev})`);
+      if (mismatches.length > 0) {
+        logger.info(`Probing file: ${file} (fingerprint mismatch: ${mismatches.join(', ')})`);
+      } else {
+        logger.info(`Probing file: ${file} (unknown fingerprint mismatch)`);
+      }
+    }
 
     // Full-path: run ffprobe and enrichment exactly as before.
     const ffprobe_data = await ffprobe(file);
