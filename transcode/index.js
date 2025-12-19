@@ -85,6 +85,7 @@ async function run () {
     // Start the integrity queue (handles file integrity checks)
     const integrityQueue = new IntegrityQueue({ maxScore: concurrent_integrity_checks });
     // integrityQueue.start();
+    global.integrityQueue = integrityQueue; // Make the queue globally accessible
 
     // Schedule filelist regeneration every 5 minutes
     cron.schedule('*/5 * * * *', () => {
