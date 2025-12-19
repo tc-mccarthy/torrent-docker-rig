@@ -31,7 +31,10 @@ export async function downgradeAudio () {
         channels: { $gt: 2 }
       }
     }
-  });
+  })
+    // We only need the path for the rename operation.
+    .select({ path: 1 })
+    .lean();
 
   // Process each file in parallel (up to 2 at a time for safety)
   // For each file, rename it to indicate FDK AAC surround audio

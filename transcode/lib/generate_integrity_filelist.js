@@ -1,75 +1,42 @@
+/**
+ * @file generate_integrity_filelist.js
+ * @description
+ * Builds a list of candidate files for the integrity-check queue.
+ *
+ * This function can run frequently. For memory safety, it MUST return lean,
+ * projected objects (not hydrated Mongoose docs and not the full `probe` blob).
+ */
+
 import logger from './logger';
 import File from '../models/files';
 
 /**
- * @fileoverview Generates a prioritized list of files that need integrity checks.
+ * Generates a lean list of integrity-check candidates.
  *
- * Why this exists:
- * - The integrity queue polls frequently.
- * - Loading full Mongoose documents (especially with large fields like `probe`)
- *   creates heavy heap churn and can look like a memory leak.
- *
- * This helper intentionally returns SMALL, plain JavaScript objects (via `.lean()`)
- * with a tight projection so the scheduler can make decisions without pulling
- * megabytes of data into memory.
- *
- * When a job is actually executed, we re-load the full Mongoose document by _id
- * inside `integrityCheck()` (one at a time), which is cheap and safe.
+ * @param {Object|number} args - Either a limit number (legacy) or an options object.
+ * @param {number} [args.limit=1000] - Max number of jobs to return.
+ * @returns {Promise<Array<{_id:any, path:string, computeScore:number, sortFields:Object}>>}
  */
-
-/**
- * Builds a lean file list for integrity checks.
- *
- * @param {Object|number} [opts] Options or a numeric limit (backward compatible).
- * @param {number} [opts.limit=1000] Maximum number of candidates to return.
- * @param {string[]} [opts.excludeIds] Optional list of _id strings to exclude (e.g., running jobs).
- * @returns {Promise<Array<Object>>} Lean objects containing only scheduler-needed fields.
- */
-export default async function generate_integrity_filelist (opts = {}) {
-  // Backward compatibility: generate_integrity_filelist(50)
-  const normalized = (typeof opts === 'number')
-    ? { limit: opts }
-    : (opts || {});
-
-  const {
-    limit = 1000,
-    excludeIds = []
-  } = normalized;
-
-  logger.debug({ limit }, 'GENERATING INTEGRITY FILE LIST');
-
-  // Only return the minimal fields needed by the scheduler/runner:
-  // - _id: to load the full doc later
-  // - path: to display/log / pass to the runner
-  // - computeScore: to fit into available compute
-  const projection = {
-    _id: 1,
-    path: 1,
-    computeScore: 1
-  };
-
-  const query = {
+export default async function generate_integrity_filelist (args = 1000) {
+  const limit = typeof args === 'number' ? args : (args?.limit ?? 1000);
+  logger.debug('GENERATING INTEGRITY FILE LIST');
+  // query for any files that have an encode version that doesn't match the current encode version
+  // do not hydrate results into models
+  // sort by priority, then size, then width
+  const filelist = await File.find({
     status: 'pending',
-    integrityCheck: false
-  };
-
-  if (excludeIds.length > 0) {
-    query._id = { $nin: excludeIds };
-  }
-
-  // IMPORTANT:
-  // - `.lean()` avoids hydrating Mongoose documents (reduces memory usage).
-  // - `.select(projection)` avoids pulling large fields like `probe`.
-  const filelist = await File.find(query)
-    .select(projection)
+    integrityCheck: false,
+    _id: { $not: { $in: global.integrityQueue?.runningJobs?.map((f) => f._id.toString()) || [] } }
+  })
+    // Projection is critical: the integrity scheduler does not need full docs.
+    .select({ path: 1, computeScore: 1, sortFields: 1 })
     .sort({
       'sortFields.priority': 1,
       'sortFields.size': 1,
       'sortFields.width': -1
     })
-    .limit(limit)
-    .lean()
-    .exec();
+    .limit(limit);
 
-  return filelist;
+  // Lean prevents Mongoose hydration and reduces per-interval heap churn.
+  return filelist.lean();
 }
