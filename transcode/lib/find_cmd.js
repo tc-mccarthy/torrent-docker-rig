@@ -2,6 +2,8 @@
 import { spawn } from 'child_process';
 import logger from './logger';
 
+const { resolve, reject } = Promise;
+
 /**
  * Asynchronously runs a find command to locate files matching criteria.
  * Uses spawn to avoid shell escaping issues and to provide robust argument handling.
