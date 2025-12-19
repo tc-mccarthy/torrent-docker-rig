@@ -1,5 +1,29 @@
-if [[ $ENV == "local" ]]; then
-    yarn dev
+#!/usr/bin/env bash
+
+# Memory headroom guardrail:
+# Node/V8 can grow its heap under allocation bursts and often does not return
+# memory to the OS promptly. This reduces available RAM for ffmpeg and can lead
+# to OOM-kills (exit code 137).
+#
+# We set a conservative default max old space size unless the operator overrides
+# it with NODE_OPTIONS or NODE_MAX_OLD_SPACE_SIZE_MB.
+
+set -euo pipefail
+
+if [[ "${ENV:-local}" != "local" ]]; then
+  DEFAULT_MB="${NODE_MAX_OLD_SPACE_SIZE_MB:-2048}"
+  if [[ -z "${NODE_OPTIONS:-}" ]]; then
+    export NODE_OPTIONS="--max-old-space-size=${DEFAULT_MB}"
+  else
+    # Respect existing NODE_OPTIONS and prepend our cap only if the user didn't.
+    if [[ "${NODE_OPTIONS}" != *"--max-old-space-size"* ]]; then
+      export NODE_OPTIONS="--max-old-space-size=${DEFAULT_MB} ${NODE_OPTIONS}"
+    fi
+  fi
+fi
+
+if [[ "${ENV:-local}" == "local" ]]; then
+  yarn dev
 else
-    yarn start
+  yarn start
 fi

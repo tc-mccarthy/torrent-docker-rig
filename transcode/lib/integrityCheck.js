@@ -11,6 +11,31 @@ import { formatSecondsToHHMMSS } from './transcode';
 
 const { encode_version } = config;
 
+/**
+ * Loads a full Mongoose File document from a "job" input.
+ *
+ * The integrity queue passes a lean object (small projection) to avoid loading
+ * large fields into memory during scheduling. When we actually execute a job,
+ * we need the real Mongoose document (for saveDebounceDebounce(), etc.).
+ *
+ * @param {any} job Either a Mongoose document or a lean object containing `_id`.
+ * @returns {Promise<any>} A Mongoose File document.
+ */
+async function loadVideoRecord (job) {
+  // If it quacks like a Mongoose doc, use it as-is.
+  if (job && typeof job.save === 'function' && job._id) return job;
+
+  if (!job || !job._id) {
+    throw new Error('Integrity job is missing _id; cannot load video record');
+  }
+
+  const doc = await File.findById(job._id);
+  if (!doc) {
+    throw new Error(`Video record not found for _id=${job._id.toString?.() || job._id}`);
+  }
+  return doc;
+}
+
 function get_error_list (stderr) {
   const exceptions = [/speed[=]/i, /dts/i, /last\s+message\s+repeated/i, /referenced\s+qt\s+chapter\s+track\s+not\s+found/i];
 
@@ -38,8 +63,10 @@ export default function integrityCheck (file) {
       // mongo record of the video
       logger.debug(file, { label: 'INTEGRITY CHECKING FILE' });
 
-      const video_record = file;
-      file = file.path;
+      const video_record = await loadVideoRecord(file);
+
+      // Preserve the original file argument for logging, but use the persisted path.
+      file = video_record.path;
 
       const exists = fs.existsSync(file);
 

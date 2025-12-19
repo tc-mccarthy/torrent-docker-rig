@@ -300,7 +300,7 @@ services:
       - LOG_PRETTY=on
       - LOG_LEVEL=info
       - CHOKIDAR_USEPOLLING=1
-      - NODE_OPTIONS=--max-old-space-size=57344 --enable-source-maps
+      - NODE_OPTIONS=--max-old-space-size=4096 --enable-source-maps
       - MAX_MEMORY_SCORE
       - MAX_CPU_SCORE
       - CONCURRENT_FILE_CHECKS

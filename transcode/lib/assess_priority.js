@@ -24,7 +24,20 @@ import logger from './logger';
 export default async function assessPriority () {
   // Query for files with high priority
   const query = { 'sortFields.priority': { $gte: 90 }, status: 'pending' };
-  const files = await File.find(query);
+  // Projection is important here: default_priority needs only a small subset of probe/indexerData.
+  // Avoid pulling entire docs into memory.
+  const files = await File.find(query)
+    .select({
+      _id: 1,
+      path: 1,
+      status: 1,
+      sortFields: 1,
+      'probe.format.size': 1,
+      'probe.streams.codec_type': 1,
+      'probe.streams.codec_name': 1,
+      'indexerData.tags': 1
+    })
+    .lean();
 
   logger.info(`Assessing priority for ${files.length} files with priority >= 90`);
 

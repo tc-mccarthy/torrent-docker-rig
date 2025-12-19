@@ -11,7 +11,8 @@ export default async function db_cleanup () {
   await File.deleteMany({ status: 'deleted' });
 
   // then verify that all remaining files exist in the filesystem
-  const files = await File.find({}).sort({ path: 1 });
+  // Only fetch `path`. Pulling full documents (especially `probe`) wastes memory.
+  const files = await File.find({}).select({ path: 1 }).sort({ path: 1 }).lean();
   const to_remove = files.map((f) => f.path).filter((p) => !fs.existsSync(p));
 
   // delete any file whose path doesn't exist

@@ -11,8 +11,8 @@ import si from 'systeminformation';
 import transcode from './transcode';
 import logger from './logger';
 import generate_filelist from './generate_filelist';
-import File from '../models/files';
 import { getCpuLoadPercentage } from './getCpuLoadPercentage';
+import File from '../models/files';
 
 export default class TranscodeQueue {
   /**
@@ -27,7 +27,11 @@ export default class TranscodeQueue {
     this.maxCpuComputeScore = maxCpuComputeScore;
     this.memoryPenalty = 0;
     this.cpuPenalty = 0;
+    // Base poll delay between scheduling iterations.
+    // We'll adaptively back off when the queue is idle to reduce CPU + memory churn.
+    this.basePollDelay = pollDelay;
     this.pollDelay = pollDelay;
+    this.maxPollDelay = 15000; // cap backoff at 15s; keeps UI reasonably fresh
     this.runningJobs = [];
     this._isRunning = false;
 
@@ -95,7 +99,23 @@ export default class TranscodeQueue {
   /** Main loop: repeatedly attempts to schedule jobs */
   async loop () {
     while (this._isRunning) {
-      await this.scheduleJobs();
+      // scheduleJobs returns whether we actually started work and whether the
+      // queue had any candidates. We use this to implement adaptive polling.
+      const { scheduled, candidates } = await this.scheduleJobs();
+
+      // Adaptive polling:
+      // - If there are no candidates, back off to reduce resource churn.
+      // - If we scheduled work or there are candidates, stay responsive.
+      if (!candidates) {
+        this.pollDelay = Math.min(Math.ceil(this.pollDelay * 1.5), this.maxPollDelay);
+      } else if (scheduled) {
+        this.pollDelay = this.basePollDelay;
+      } else {
+        // Candidates exist but we didn't schedule (blocked/compute constrained).
+        // Keep a modest delay to remain responsive to state changes.
+        this.pollDelay = Math.min(this.pollDelay, this.basePollDelay);
+      }
+
       await delay(this.pollDelay);
     }
   }
@@ -175,7 +195,7 @@ export default class TranscodeQueue {
     const blockingJob = this.runningJobs.find((j) => j.action === 'staging' || j.action === 'finalizing');
     if (blockingJob) {
       logger.debug(`[QUEUE] Blocking new jobs: job ${blockingJob._id} is in '${blockingJob.action}' stage.`);
-      return;
+      return { scheduled: false, candidates: true };
     }
 
     const availableMemory = this.getAvailableMemoryCompute();
@@ -183,9 +203,13 @@ export default class TranscodeQueue {
     const availableCompute = this.getAvailableCompute();
 
     logger.debug(`Available compute (Memory: ${availableMemory}, CPU: ${availableCpu}, Unified: ${availableCompute})`);
-    if (availableCompute <= 0) return;
+    if (availableCompute <= 0) return { scheduled: false, candidates: true };
 
+    // IMPORTANT:
+    // generate_filelist returns lean, projected objects (small). This prevents
+    // heap churn and preserves memory headroom for ffmpeg.
     const jobs = await generate_filelist({ limit: 1000 });
+    if (!jobs || jobs.length === 0) return { scheduled: false, candidates: false };
 
     // Find the first job in the queue that cannot run due to lack of compute
     const blockedEntry = jobs.find((job) => {
@@ -219,62 +243,44 @@ export default class TranscodeQueue {
     });
 
     if (nextJob) {
-      // `generate_filelist()` returns a lean projection to keep scheduler memory stable.
-      // Fetch the full document (including probe payload) only for the single job we are about to run.
-      const jobDoc = await File.findOne({ _id: nextJob._id });
-      if (!jobDoc) {
-        logger.warn(`[QUEUE] Selected job disappeared before execution: ${nextJob._id}`);
-        return;
-      }
-      this.runJob(jobDoc, nextJob);
+      this.runJob(nextJob);
+      return { scheduled: true, candidates: true };
     }
+
+    return { scheduled: false, candidates: true };
   }
 
   /**
    * Starts the transcode process for a given job and removes it from memory when done.
    * @param {Object} job - Job document with ._id, .computeScore, and .path
    */
-  /**
- * Starts the transcode process for a given job and removes it from memory when done.
- *
- * PERFORMANCE NOTE
- * ----------------
- * The Mongo `File` documents can be very large due to the stored `probe` object.
- * We only keep a *small* job summary in `this.runningJobs` so the queue status flush
- * and global exclusions (generate_filelist) do not retain megabytes per job in RAM.
- *
- * @param {import('mongoose').Document} jobDoc Full mongoose document for the file (includes `probe`, etc).
- * @param {object} [jobSummary] Optional lean summary object (projection) for logging/metrics.
- * @returns {Promise<void>}
- */
-  async runJob (jobDoc, jobSummary = null) {
-    const jobId = jobDoc?._id?.toString();
-    const jobPath = jobDoc?.path;
-
-    // Minimal representation to keep in-memory state small.
-    const runningEntry = {
-      _id: jobDoc._id,
-      path: jobPath,
-      computeScore: jobSummary?.computeScore ?? jobDoc.computeScore,
-      sortFields: jobSummary?.sortFields ?? jobDoc.sortFields,
-      encode_version: jobSummary?.encode_version ?? jobDoc.encode_version,
-      status: jobSummary?.status ?? jobDoc.status,
-      action: 'transcoding',
-      startedAt: Date.now()
-    };
-
+  async runJob (job) {
     try {
-      this.runningJobs.push(runningEntry);
-      await transcode(jobDoc);
-    } catch (err) {
-      console.error(`Transcoding failed for ${jobPath}: ${err.message}`);
-    } finally {
-    // Remove from running set
-      this.runningJobs = this.runningJobs.filter((j) => j._id.toString() !== jobId);
+      // Keep the in-memory representation as small as possible.
+      // transcode.js will enrich this object with progress and metadata.
+      const runtimeJob = {
+        _id: job._id,
+        path: job.path,
+        file: job.path,
+        computeScore: job.computeScore,
+        sortFields: job.sortFields,
+        action: 'queued',
+        refreshed: Date.now()
+      };
+      this.runningJobs.push(runtimeJob);
 
-      // Refresh filelist output opportunistically, but avoid pulling large fields.
-      // Limit is intentionally smaller than the scheduler poll to keep this lightweight.
-      generate_filelist({ limit: 250, writeToFile: true });
+      // Load the full Mongoose document ONLY for the job we are executing.
+      // This avoids pulling massive documents (e.g., probe blobs) into memory
+      // for hundreds/thousands of candidates.
+      const fullDoc = await File.findById(job._id);
+      if (!fullDoc) throw new Error(`File record not found: ${job._id}`);
+
+      await transcode(fullDoc);
+    } catch (err) {
+      console.error(`Transcoding failed for ${job.path}: ${err.message}`);
+    } finally {
+      this.runningJobs = this.runningJobs.filter((j) => j._id.toString() !== job._id.toString());
+      generate_filelist({ limit: 1000, writeToFile: true });
     }
   }
 
@@ -289,8 +295,27 @@ export default class TranscodeQueue {
   /** Flushes the current job state and available compute scores to disk */
   async flushActiveJobs () {
     try {
+      // Flush only the minimal runtime metadata needed for dashboards.
+      // Avoid serializing large/accidental blobs into JSON (heap churn).
+      const active = this.runningJobs.map((j) => ({
+        _id: j._id,
+        path: j.path,
+        computeScore: j.computeScore,
+        action: j.action,
+        timemark: j.timemark,
+        percent: j.percent,
+        fps: j.fps,
+        currentFps: j.currentFps,
+        currentKbps: j.currentKbps,
+        targetSize: j.targetSize,
+        size: j.size,
+        eta: j.eta,
+        ffmpeg_cmd: j.ffmpeg_cmd,
+        refreshed: j.refreshed
+      }));
+
       const flushObj = {
-        active: this.runningJobs,
+        active,
         availableMemoryCompute: this.getAvailableMemoryCompute(),
         availableCpuCompute: this.getAvailableCpuCompute(),
         availableCompute: this.getAvailableCompute(),
