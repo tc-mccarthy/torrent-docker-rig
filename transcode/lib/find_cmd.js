@@ -2,8 +2,6 @@
 import { spawn } from 'child_process';
 import logger from './logger';
 
-const { resolve, reject } = Promise;
-
 /**
  * Asynchronously runs a find command to locate files matching criteria.
  * Uses spawn to avoid shell escaping issues and to provide robust argument handling.
@@ -68,9 +66,11 @@ export default async function findCMD (paths, fileExts, probeSince) {
   find.on('close', (code) => {
     if (code === 0) {
       // Success: resolve with file list
+      logger.info('Find command completed successfully');
       resolve(stdout);
     } else {
       // Failure: reject with error and stderr
+      logger.error(`Find command failed with code ${code}`, { stderr });
       reject(new Error(`find exited with code ${code}: ${stderr}`));
     }
   });
