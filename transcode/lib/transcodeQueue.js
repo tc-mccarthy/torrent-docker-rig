@@ -11,6 +11,7 @@ import si from 'systeminformation';
 import transcode from './transcode';
 import logger from './logger';
 import generate_filelist from './generate_filelist';
+import File from '../models/files';
 import { getCpuLoadPercentage } from './getCpuLoadPercentage';
 
 export default class TranscodeQueue {
@@ -217,22 +218,63 @@ export default class TranscodeQueue {
       return true;
     });
 
-    if (nextJob) this.runJob(nextJob);
+    if (nextJob) {
+      // `generate_filelist()` returns a lean projection to keep scheduler memory stable.
+      // Fetch the full document (including probe payload) only for the single job we are about to run.
+      const jobDoc = await File.findOne({ _id: nextJob._id });
+      if (!jobDoc) {
+        logger.warn(`[QUEUE] Selected job disappeared before execution: ${nextJob._id}`);
+        return;
+      }
+      this.runJob(jobDoc, nextJob);
+    }
   }
 
   /**
    * Starts the transcode process for a given job and removes it from memory when done.
    * @param {Object} job - Job document with ._id, .computeScore, and .path
    */
-  async runJob (job) {
+  /**
+ * Starts the transcode process for a given job and removes it from memory when done.
+ *
+ * PERFORMANCE NOTE
+ * ----------------
+ * The Mongo `File` documents can be very large due to the stored `probe` object.
+ * We only keep a *small* job summary in `this.runningJobs` so the queue status flush
+ * and global exclusions (generate_filelist) do not retain megabytes per job in RAM.
+ *
+ * @param {import('mongoose').Document} jobDoc Full mongoose document for the file (includes `probe`, etc).
+ * @param {object} [jobSummary] Optional lean summary object (projection) for logging/metrics.
+ * @returns {Promise<void>}
+ */
+  async runJob (jobDoc, jobSummary = null) {
+    const jobId = jobDoc?._id?.toString();
+    const jobPath = jobDoc?.path;
+
+    // Minimal representation to keep in-memory state small.
+    const runningEntry = {
+      _id: jobDoc._id,
+      path: jobPath,
+      computeScore: jobSummary?.computeScore ?? jobDoc.computeScore,
+      sortFields: jobSummary?.sortFields ?? jobDoc.sortFields,
+      encode_version: jobSummary?.encode_version ?? jobDoc.encode_version,
+      status: jobSummary?.status ?? jobDoc.status,
+      action: 'transcoding',
+      startedAt: Date.now()
+    };
+
     try {
-      this.runningJobs.push({ ...job.toObject(), file: job.path });
-      await transcode(job);
+      this.runningJobs.push(runningEntry);
+      await transcode(jobDoc);
     } catch (err) {
-      console.error(`Transcoding failed for ${job.path}: ${err.message}`);
+      console.error(`Transcoding failed for ${jobPath}: ${err.message}`);
     } finally {
-      this.runningJobs = this.runningJobs.filter((j) => j._id.toString() !== job._id.toString());
-      generate_filelist({ limit: 1000, writeToFile: true });
+    // Remove from running set
+      this.runningJobs = this.runningJobs.filter((j) => j._id.toString() !== jobId);
+
+      // Refresh filelist output opportunistically, but avoid pulling large fields.
+      // Limit is intentionally smaller than the scheduler poll to keep this lightweight.
+      generate_filelist({ limit: 250, writeToFile: true });
     }
   }
 
