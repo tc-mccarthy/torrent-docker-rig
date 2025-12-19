@@ -8,7 +8,7 @@
 import { setTimeout as delay } from 'timers/promises';
 import fs from 'fs/promises';
 import si from 'systeminformation';
-// import transcode from './transcode';
+import transcode from './transcode';
 import logger from './logger';
 import generate_filelist from './generate_filelist';
 import { getCpuLoadPercentage } from './getCpuLoadPercentage';
@@ -275,7 +275,7 @@ export default class TranscodeQueue {
       const fullDoc = await File.findById(job._id);
       if (!fullDoc) throw new Error(`File record not found: ${job._id}`);
 
-      // await transcode(fullDoc);
+      await transcode(fullDoc);
     } catch (err) {
       console.error(`Transcoding failed for ${job.path}: ${err.message}`);
     } finally {
