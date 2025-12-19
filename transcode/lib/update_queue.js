@@ -5,10 +5,10 @@ import config from './config';
 import dayjs from './dayjs';
 import ErrorLog from '../models/error';
 import File from '../models/files';
-import exec_promise from './exec_promise';
 import probe_and_upsert from './probe_and_upsert';
 import upsert_video from './upsert_video';
 import { trash } from './fs';
+import findCMD from './find_cmd';
 
 const { encode_version, file_ext, concurrent_file_checks, get_paths, application_version } = config;
 const PATHS = get_paths(config);
@@ -82,17 +82,10 @@ export default async function update_queue () {
 
     // Find files with mtime, ctime, or atime newer than last_probe (created, modified, or touched)
     const probe_since = dayjs(last_probe).subtract(30, 'minutes').format(date_fmt);
-    const findCMD = `find ${PATHS.map((p) => `"${p}"`).join(' ')} \\(
-      ${file_ext.map((ext) => `-iname "*.${ext}"`).join(' -o ')}
-    \\) -not \\( -iname "*.tc.mkv" \\) \\
-      \\( -newermt "${probe_since}" -o -newerct "${probe_since}" -o -newerat "${probe_since}" \\)
-      -print0 | sort -z | xargs -0`;
 
-    logger.info(findCMD, { label: 'FIND COMMAND' });
+    const find_results = await findCMD(PATHS, file_ext, probe_since);
 
-    const { stdout, stderr } = await exec_promise(findCMD);
-
-    const filelist = stdout
+    const filelist = find_results
       .split(/\s*\/source_media/)
       .filter((j) => j)
       .map((p) => `/source_media${p}`.replace('\x00', ''))
@@ -129,13 +122,13 @@ export default async function update_queue () {
 
         await upsert_video({
           path: file,
-          error: { error: e.message, stdout, stderr, trace: e.stack },
+          error: { error: e.message, find_results, trace: e.stack },
           hasError: true
         });
 
         await ErrorLog.create({
           path: file,
-          error: { error: e.message, stdout, stderr, trace: e.stack }
+          error: { error: e.message, find_results, trace: e.stack }
         });
 
         // if the file itself wasn't readable by ffprobe, remove it from the list
