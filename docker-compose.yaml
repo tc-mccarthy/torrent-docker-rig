@@ -393,17 +393,27 @@ services:
     restart: always
     labels:
       - "autoheal=true"
+
+    # ✅ Keep Mongo from consuming all RAM:
+    command: ["mongod", "--wiredTigerCacheSizeGB", "4"]
+
+    # ✅ Put Mongo in a memory box (Compose v2 supports this)
+    mem_limit: 6g
+    memswap_limit: 6g
+
     healthcheck:
       test: mongosh --eval "db.adminCommand('ping').ok" || exit 1
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-    logging: 
+
+    logging:
       driver: "json-file"
-      options: 
+      options:
         max-size: "200k"
         max-file: "10"
+
 
   # --------------------------------------------------------------------------
   # SONARR (direct, not VPN-routed)
