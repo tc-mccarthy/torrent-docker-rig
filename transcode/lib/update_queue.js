@@ -35,7 +35,7 @@ export default async function update_queue () {
     // Use $in for status to leverage the compound index and improve performance
     const nonDeletedStatuses = ['pending', 'complete', 'ignore', 'error']; // add any other valid statuses
     logger.info('update_queue: Updating statuses of previously encoded files to complete');
-    await File.updateMany(
+    File.updateMany(
       { encode_version, status: { $in: nonDeletedStatuses } },
       { $set: { status: 'complete' } }
     );
@@ -85,7 +85,7 @@ export default async function update_queue () {
 
     const find_results = await findCMD(PATHS, file_ext, probe_since);
 
-    logger.debug('Find command results', { find_results });
+    logger.info('Find command results', { find_results });
 
     const filelist = find_results
       .split(/\s*\/source_media/)
