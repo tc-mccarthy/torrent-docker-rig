@@ -35,8 +35,9 @@ export default async function generate_integrity_filelist (args = 1000) {
       'sortFields.size': 1,
       'sortFields.width': -1
     })
-    .limit(limit);
+    .limit(limit)
+    .lean();
 
   // Lean prevents Mongoose hydration and reduces per-interval heap churn.
-  return filelist.lean();
+  return filelist;
 }
