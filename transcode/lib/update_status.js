@@ -26,7 +26,7 @@ export async function getReclaimedSpace () {
   return reclaimedSpace;
 }
 
-export default async function update_status () {
+export default async function update_status ({ startup = false }) {
   try {
     logger.debug('Updating status metrics...');
     const data = {
@@ -45,9 +45,10 @@ export default async function update_status () {
     logger.debug('Status data complete');
 
     // Always set serviceStartTime to now on startup
-    if (!global.serviceStartTime) {
+    if (startup) {
       global.serviceStartTime = Date.now();
     }
+
     if (typeof global.processedOnStart === 'undefined') {
       global.processedOnStart = data.processed_files;
       global.processed_files_delta = 0;
