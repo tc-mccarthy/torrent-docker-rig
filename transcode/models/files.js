@@ -292,6 +292,18 @@ schema.index({
 });
 
 /**
+ * Compound index for generating the file list
+ *
+ */
+schema.index({
+  status: 1,
+  integrityCheck: 1,
+  'sortFields.priority': 1,
+  'sortFields.size': -1,
+  'sortFields.width': -1
+});
+
+/**
  * Fast path for \"should we probe?\" checks.
  *
  * When we sweep lots of files, we frequently do lookups by `path` and compare fingerprint fields.

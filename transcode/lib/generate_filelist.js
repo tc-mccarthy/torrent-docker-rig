@@ -1,10 +1,11 @@
 import fs from 'fs';
+import mongoose from 'mongoose';
 import logger from './logger';
-import config from './config';
+// import config from './config';
 import File from '../models/files';
 import dayjs from './dayjs';
 
-const { encode_version } = config;
+// const { encode_version } = config;
 
 export default async function generate_filelist ({ limit = 1, writeToFile = false }) {
   logger.debug('GENERATING PRIMARY FILE LIST');
@@ -36,9 +37,8 @@ export default async function generate_filelist ({ limit = 1, writeToFile = fals
   };
 
   const filelist = await File.find({
-    encode_version: { $ne: encode_version },
     status: 'pending',
-    _id: { $not: { $in: global.transcodeQueue?.runningJobs?.map((f) => f._id.toString()) || [] } },
+    _id: { $nin: global.transcodeQueue?.runningJobs?.map((f) => mongoose.Types.ObjectId(f._id.toString())) || [] },
     integrityCheck: true // only include files that have passed integrity check
   })
     .select(projection)
