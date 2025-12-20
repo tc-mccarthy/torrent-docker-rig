@@ -309,11 +309,12 @@ export default class TranscodeQueue {
         currentKbps: j.currentKbps,
         targetSize: j.targetSize,
         size: j.size,
-        eta: j.eta,
+        est_completed_timestamp: j.est_completed_timestamp,
         ffmpeg_cmd: j.ffmpeg_cmd,
         refreshed: j.refreshed,
         indexerData: j.indexerData,
-        audio_language: j.audio_language
+        audio_language: j.audio_language,
+        priority: j.sortFields?.priority || null
       }));
 
       const flushObj = {
