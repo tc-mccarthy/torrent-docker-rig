@@ -38,7 +38,7 @@ export default async function generate_filelist ({ limit = 1, writeToFile = fals
 
   const filelist = await File.find({
     status: 'pending',
-    _id: { $nin: global.transcodeQueue?.runningJobs?.map((f) => mongoose.Types.ObjectId(f._id.toString())) || [] },
+    _id: { $nin: global.transcodeQueue?.runningJobs?.map((f) => new mongoose.Types.ObjectId(f._id.toString())) || [] },
     integrityCheck: true // only include files that have passed integrity check
   })
     .select(projection)
