@@ -69,13 +69,25 @@ async function run () {
     get_disk_space();
 
     // Start the file system monitor (watches for new/changed files)
+    logger.info('Starting file system monitor');
     processFSEventQueue();
     fs_monitor();
 
     // Update the transcode queue and status, and generate the initial filelist
-    update_status();
-    update_queue().then(() => { refresh_indexer_data(); downgradeAudio(); });
-    generate_filelist({ limit: 1000, writeToFile: true });
+    logger.info('Updating system status metrics');
+    await update_status();
+
+    logger.info('Refreshing transcode queue');
+    await update_queue();
+
+    logger.info('Refreshing indexer data');
+    await refresh_indexer_data();
+
+    logger.info('Adjusting custom format scores for FDK AAC surround files');
+    await downgradeAudio();
+
+    logger.info('Generating initial filelist');
+    await generate_filelist({ limit: 1000, writeToFile: true });
 
     // Start the main transcode queue (handles video jobs)
     const transcodeQueue = new TranscodeQueue({ maxMemoryComputeScore: max_memory_score, maxCpuComputeScore: max_cpu_score, pollDelay: 10000 });
