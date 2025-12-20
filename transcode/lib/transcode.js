@@ -100,11 +100,19 @@ class LineRingBuffer {
  * @param {string} params.hwaccel - 'auto' or 'none'
  * @returns {{ args: string[], inputMaps: string[] }}
  */
-function buildFfmpegArgs ({ inputFile, outputFile, ffprobeData, instructions, hwaccel }) {
+function buildFfmpegArgs ({
+  inputFile,
+  outputFile,
+  ffprobeData,
+  instructions,
+  hwaccel
+}) {
   // Stream mappings: metadata + chapters + video/audio/subtitle streams
   const inputMaps = [
-    '-map_metadata', '0',
-    '-map', `0:${instructions.video.stream_index}`
+    '-map_metadata',
+    '0',
+    '-map',
+    `0:${instructions.video.stream_index}`
   ];
 
   instructions.audio.forEach((audio) => {
@@ -152,12 +160,17 @@ function buildFfmpegArgs ({ inputFile, outputFile, ffprobeData, instructions, hw
   // - `-nostats` suppresses the default progress line spam on stderr.
   // - `-hwaccel auto|none` preserves your runtime behavior.
   const args = [
-    '-v', 'fatal',
+    '-v',
+    'fatal',
     '-nostats',
-    '-progress', 'pipe:1',
-    '-stats_period', '1',
-    '-hwaccel', hwaccel,
-    '-i', inputFile,
+    '-progress',
+    'pipe:1',
+    '-stats_period',
+    '1',
+    '-hwaccel',
+    hwaccel,
+    '-i',
+    inputFile,
     ...inputMaps,
     ...out,
     outputFile
@@ -175,7 +188,9 @@ function buildFfmpegArgs ({ inputFile, outputFile, ffprobeData, instructions, hw
  * @returns {{ totalFrames: number, fps: number|null, durationSeconds: number|null }}
  */
 function getProgressReference (ffprobeData) {
-  const mainVideoStream = (ffprobeData.streams || []).find((s) => s.codec_type === 'video');
+  const mainVideoStream = (ffprobeData.streams || []).find(
+    (s) => s.codec_type === 'video'
+  );
   const nbFrames = parseInt(mainVideoStream?.nb_frames || 0, 10);
   const totalFrames = Number.isFinite(nbFrames) && nbFrames > 0 ? nbFrames : 0;
 
@@ -205,7 +220,9 @@ function getProgressReference (ffprobeData) {
  */
 function patchRunningJob (recordId, patch) {
   if (!global.transcodeQueue || !recordId) return;
-  const idx = global.transcodeQueue.runningJobs.findIndex((j) => String(j._id) === String(recordId));
+  const idx = global.transcodeQueue.runningJobs.findIndex(
+    (j) => String(j._id) === String(recordId)
+  );
   if (idx === -1) return;
   Object.assign(global.transcodeQueue.runningJobs[idx], patch);
 }
@@ -248,7 +265,8 @@ export default function transcode (file) {
       }
 
       // Generate transcode instructions based on video metadata
-      const transcode_instructions = generateTranscodeInstructions(video_record);
+      const transcode_instructions =
+        generateTranscodeInstructions(video_record);
       logger.debug(transcode_instructions, { label: 'Transcode Instructions' });
 
       if (!transcode_instructions.video) {
@@ -256,7 +274,8 @@ export default function transcode (file) {
       }
 
       // Generate file paths for scratch, destination, and staging
-      const { scratch_file, dest_file, stage_file } = generate_file_paths(inputFile);
+      const { scratch_file, dest_file, stage_file } =
+        generate_file_paths(inputFile);
 
       /**
        * If stage_file is set, copy the source file to stage_file and use stage_file for transcoding.
@@ -271,10 +290,14 @@ export default function transcode (file) {
           if (fs.existsSync(stage_file)) {
             const stageStats = await stat(stage_file);
             if (stageStats.size === totalSize) {
-              logger.debug(`Stage file already exists and matches source size (${totalSize} bytes). Skipping copy.`);
+              logger.debug(
+                `Stage file already exists and matches source size (${totalSize} bytes). Skipping copy.`
+              );
               skipCopy = true;
             } else {
-              logger.debug(`Stage file exists but size mismatch (source: ${totalSize}, stage: ${stageStats.size}). Re-copying.`);
+              logger.debug(
+                `Stage file exists but size mismatch (source: ${totalSize}, stage: ${stageStats.size}). Re-copying.`
+              );
             }
           }
 
@@ -291,21 +314,33 @@ export default function transcode (file) {
                   if (fs.existsSync(stage_file)) {
                     const stageStats = fs.statSync(stage_file);
                     const copied = stageStats.size;
-                    const percent = Math.min(((copied / totalSize) * 100), 100).toFixed(2);
+                    const percent = Math.min(
+                      (copied / totalSize) * 100,
+                      100
+                    ).toFixed(2);
                     const elapsed = (Date.now() - startTime) / 1000;
                     const pct_per_second = Number(percent) / elapsed;
-                    const seconds_pct = pct_per_second > 0 ? 1 / pct_per_second : Infinity;
+                    const seconds_pct =
+                      pct_per_second > 0 ? 1 / pct_per_second : Infinity;
                     const pct_remaining = 100 - Number(percent);
                     const est_completed_seconds = pct_remaining * seconds_pct;
-                    const est_completed_timestamp = Date.now() + (est_completed_seconds * 1000);
-                    const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
+                    const est_completed_timestamp =
+                      Date.now() + est_completed_seconds * 1000;
+                    const time_remaining = formatSecondsToHHMMSS(
+                      est_completed_seconds
+                    );
 
                     // Calculate currentKbps (kilobits per second), rounded
-                    const currentKbps = elapsed > 0 ? Math.round(((copied * 8) / 1024) / elapsed) : 0;
+                    const currentKbps =
+                      elapsed > 0
+                        ? Math.round((copied * 8) / 1024 / elapsed)
+                        : 0;
 
                     // Log progress only if percent changed
                     if (percent !== lastPercent) {
-                      logger.debug(`${stage_file} copy progress: ${percent}% (${copied}/${totalSize} bytes, ${currentKbps} kbps)`);
+                      logger.debug(
+                        `${stage_file} copy progress: ${percent}% (${copied}/${totalSize} bytes, ${currentKbps} kbps)`
+                      );
                       lastPercent = percent;
                     }
 
@@ -327,7 +362,9 @@ export default function transcode (file) {
             }
 
             // Use OS-level cp for fast copy
-            await exec_promise(`cp --reflink=never --sparse=never --preserve=timestamps "${inputFile}" "${stage_file}"`);
+            await exec_promise(
+              `cp --reflink=never --sparse=never --preserve=timestamps "${inputFile}" "${stage_file}"`
+            );
             if (interval) clearInterval(interval);
 
             // After copy, report 100% progress
@@ -335,9 +372,12 @@ export default function transcode (file) {
             const time_remaining = formatSecondsToHHMMSS(0);
             const est_completed_timestamp = Date.now();
             const elapsed = (est_completed_timestamp - startTime) / 1000;
-            const currentKbps = elapsed > 0 ? Math.round(((totalSize * 8) / 1024) / elapsed) : 0;
+            const currentKbps =
+              elapsed > 0 ? Math.round((totalSize * 8) / 1024 / elapsed) : 0;
 
-            logger.debug(`${stage_file} copy complete: 100% (${totalSize}/${totalSize} bytes, ${currentKbps} kbps)`);
+            logger.debug(
+              `${stage_file} copy complete: 100% (${totalSize}/${totalSize} bytes, ${currentKbps} kbps)`
+            );
             patchRunningJob(video_record._id, {
               percent,
               est_completed_timestamp,
@@ -351,14 +391,23 @@ export default function transcode (file) {
           // Use stage_file for transcoding
           inputFile = stage_file;
         } catch (copyErr) {
-          logger.error(copyErr, { label: 'STAGE FILE COPY ERROR', inputFile, stage_file });
-          throw new Error(`Failed to copy source file to stage_file: ${copyErr.message}`);
+          logger.error(copyErr, {
+            label: 'STAGE FILE COPY ERROR',
+            inputFile,
+            stage_file
+          });
+          throw new Error(
+            `Failed to copy source file to stage_file: ${copyErr.message}`
+          );
         }
       }
 
       // Short-circuit if this encode version already exists (prevents double-encoding)
       if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
-        logger.debug({ file: inputFile, encode_version }, { label: 'File already encoded' });
+        logger.debug(
+          { file: inputFile, encode_version },
+          { label: 'File already encoded' }
+        );
         video_record.encode_version = ffprobe_data.format.tags?.ENCODE_VERSION;
         await video_record.saveDebounce();
         return resolve({ locked: true });
@@ -366,17 +415,24 @@ export default function transcode (file) {
 
       // Check file integrity if not previously validated
       if (!video_record.integrityCheck) {
-        logger.debug("File hasn't been integrity checked. Checking before transcode");
+        logger.debug(
+          "File hasn't been integrity checked. Checking before transcode"
+        );
         await integrityCheck(video_record);
       }
 
       // Hardware acceleration and codec info
       const hwaccel = video_record.permitHWDecode ? 'auto' : 'none';
-      const source_video_codec = (ffprobe_data.streams || []).find((s) => s.codec_type === 'video')?.codec_name;
-      const source_audio_codec = (ffprobe_data.streams || []).find((s) => s.codec_type === 'audio')?.codec_name;
+      const source_video_codec = (ffprobe_data.streams || []).find(
+        (s) => s.codec_type === 'video'
+      )?.codec_name;
+      const source_audio_codec = (ffprobe_data.streams || []).find(
+        (s) => s.codec_type === 'audio'
+      )?.codec_name;
       const { audio_language } = video_record;
 
-      const { totalFrames, durationSeconds } = getProgressReference(ffprobe_data);
+      const { totalFrames, durationSeconds } =
+        getProgressReference(ffprobe_data);
 
       // Track ffmpeg command, start time, and original file size for reporting
       let ffmpeg_cmd = null;
@@ -394,7 +450,12 @@ export default function transcode (file) {
       });
 
       // For debugging / UI: store a shell-escaped-ish command line string.
-      ffmpeg_cmd = `ffmpeg ${args.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ')}`;
+      ffmpeg_cmd = `ffmpeg ${args
+        .map((a) => (a.includes(' ') ? `"${a}"` : a))
+        .join(' ')}`;
+
+      // Log the ffmpeg command when transcoding starts
+      logger.info({ ffmpeg_cmd }, { label: 'Starting transcode with command' });
 
       // Kick UI job state at start
       patchRunningJob(video_record._id, {
@@ -475,7 +536,7 @@ export default function transcode (file) {
         const seconds_pct = pct_per_second > 0 ? 1 / pct_per_second : Infinity;
         const pct_remaining = 100 - percent;
         const est_completed_seconds = pct_remaining * seconds_pct;
-        const est_completed_timestamp = now + (est_completed_seconds * 1000);
+        const est_completed_timestamp = now + est_completed_seconds * 1000;
         const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
 
         // Build a timemark (HH:mm:ss.xx) for deduping UI updates.
@@ -491,7 +552,8 @@ export default function transcode (file) {
 
         // Estimated final size (best effort)
         const targetSizeKB = totalSizeBytes > 0 ? totalSizeBytes / 1024 : 0;
-        const estimated_final_kb = percent > 0 ? (targetSizeKB / percent) * 100 : 0;
+        const estimated_final_kb =
+          percent > 0 ? (targetSizeKB / percent) * 100 : 0;
 
         // Only update if timemark advanced (avoids churn)
         if (timemark && timemark === lastTimemark) return;
@@ -530,7 +592,11 @@ export default function transcode (file) {
               mb: estimated_final_kb / 1024,
               gb: estimated_final_kb / 1024 / 1024,
               change: ffprobe_data.format?.size
-                ? `${((estimated_final_kb - (ffprobe_data.format.size / 1024)) / (ffprobe_data.format.size / 1024)) * 100}%`
+                ? `${
+                    ((estimated_final_kb - ffprobe_data.format.size / 1024) /
+                      (ffprobe_data.format.size / 1024)) *
+                    100
+                  }%`
                 : 'calculating'
             },
             original: {
@@ -543,15 +609,27 @@ export default function transcode (file) {
         };
 
         // Update the in-memory job record (kept intentionally small elsewhere)
-        patchRunningJob(video_record._id, { ffmpeg_cmd, audio_language, file: inputFile, ...output });
+        patchRunningJob(video_record._id, {
+          ffmpeg_cmd,
+          audio_language,
+          file: inputFile,
+          ...output
+        });
 
         // If job appears stale, remove it (same safety behavior as before)
-        const idx = global.transcodeQueue?.runningJobs?.findIndex((j) => String(j._id) === String(video_record._id)) ?? -1;
+        const idx =
+          global.transcodeQueue?.runningJobs?.findIndex(
+            (j) => String(j._id) === String(video_record._id)
+          ) ?? -1;
         if (idx !== -1) {
-          const refreshed = global.transcodeQueue.runningJobs[idx]?.refreshed || 0;
+          const refreshed =
+            global.transcodeQueue.runningJobs[idx]?.refreshed || 0;
           if (refreshed < Date.now() - 8 * 60 * 60 * 1000) {
             logger.warn(`Removing stalled job ${video_record._id}`);
-            global.transcodeQueue.runningJobs = global.transcodeQueue.runningJobs.filter((j) => String(j._id) !== String(video_record._id));
+            global.transcodeQueue.runningJobs =
+              global.transcodeQueue.runningJobs.filter(
+                (j) => String(j._id) !== String(video_record._id)
+              );
           }
         }
       };
@@ -587,12 +665,19 @@ export default function transcode (file) {
         try {
           const stderr = stderrRing.toString();
           logger.error(err, { label: 'FFMPEG SPAWN ERROR', stderr });
-          fs.appendFileSync('/usr/app/logs/ffmpeg.log', JSON.stringify({
-            error: err.message,
-            stderr,
-            ffmpeg_cmd,
-            trace: err.stack
-          }, null, 4));
+          fs.appendFileSync(
+            '/usr/app/logs/ffmpeg.log',
+            JSON.stringify(
+              {
+                error: err.message,
+                stderr,
+                ffmpeg_cmd,
+                trace: err.stack
+              },
+              null,
+              4
+            )
+          );
 
           Object.assign(video_record, {
             error: { error: err.message, stderr, ffmpeg_cmd, trace: err.stack },
@@ -615,11 +700,23 @@ export default function transcode (file) {
 
       child.on('close', async (code, signal) => {
         // Ensure readline interfaces are closed
-        try { rlOut.close(); } catch (e) { logger.warn('Failed to close rlOut', { error: e }); }
-        try { rlErr.close(); } catch (e) { logger.warn('Failed to close rlErr', { error: e }); }
+        try {
+          rlOut.close();
+        } catch (e) {
+          logger.warn('Failed to close rlOut', { error: e });
+        }
+        try {
+          rlErr.close();
+        } catch (e) {
+          logger.warn('Failed to close rlErr', { error: e });
+        }
 
         // If we ended normally, flush any partial progress once
-        try { flushProgressBlock(); } catch (e) { logger.warn('Failed to flush progress block', { error: e }); }
+        try {
+          flushProgressBlock();
+        } catch (e) {
+          logger.warn('Failed to flush progress block', { error: e });
+        }
 
         // Success path
         if (code === 0) {
@@ -628,7 +725,9 @@ export default function transcode (file) {
             await wait(5);
 
             if (!fs.existsSync(scratch_file)) {
-              throw new Error(`Scratch file ${scratch_file} not found after transcode complete.`);
+              throw new Error(
+                `Scratch file ${scratch_file} not found after transcode complete.`
+              );
             }
 
             // Finalizing step: move scratch_file to dest_file
@@ -642,17 +741,29 @@ export default function transcode (file) {
                   if (fs.existsSync(dest_file)) {
                     const destStats = fs.statSync(dest_file);
                     const copied = destStats.size;
-                    const percent = Math.min(((copied / scratchSize) * 100), 100).toFixed(2);
+                    const percent = Math.min(
+                      (copied / scratchSize) * 100,
+                      100
+                    ).toFixed(2);
                     const elapsed = (Date.now() - moveStartTime) / 1000;
                     const pct_per_second = Number(percent) / elapsed;
-                    const seconds_pct = pct_per_second > 0 ? 1 / pct_per_second : Infinity;
+                    const seconds_pct =
+                      pct_per_second > 0 ? 1 / pct_per_second : Infinity;
                     const pct_remaining = 100 - Number(percent);
                     const est_completed_seconds = pct_remaining * seconds_pct;
-                    const est_completed_timestamp = Date.now() + (est_completed_seconds * 1000);
-                    const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
-                    const currentKbps = elapsed > 0 ? Math.round(((copied * 8) / 1024) / elapsed) : 0;
+                    const est_completed_timestamp =
+                      Date.now() + est_completed_seconds * 1000;
+                    const time_remaining = formatSecondsToHHMMSS(
+                      est_completed_seconds
+                    );
+                    const currentKbps =
+                      elapsed > 0
+                        ? Math.round((copied * 8) / 1024 / elapsed)
+                        : 0;
 
-                    logger.debug(`${dest_file} move progress: ${percent}% (${copied}/${scratchSize} bytes, ${currentKbps} kbps)`);
+                    logger.debug(
+                      `${dest_file} move progress: ${percent}% (${copied}/${scratchSize} bytes, ${currentKbps} kbps)`
+                    );
                     patchRunningJob(video_record._id, {
                       percent,
                       est_completed_timestamp,
@@ -672,7 +783,9 @@ export default function transcode (file) {
 
             // if the file and dest_file are not the same, delete the original file
             if (dest_file !== original_file) {
-              logger.info(`Deleting original file after transcode: ${original_file}`);
+              logger.info(
+                `Deleting original file after transcode: ${original_file}`
+              );
               await trash(original_file, true);
             }
 
@@ -683,9 +796,12 @@ export default function transcode (file) {
             const time_remaining = formatSecondsToHHMMSS(0);
             const est_completed_timestamp = Date.now();
             const elapsed = (est_completed_timestamp - moveStartTime) / 1000;
-            const currentKbps = elapsed > 0 ? Math.round(((scratchSize * 8) / 1024) / elapsed) : 0;
+            const currentKbps =
+              elapsed > 0 ? Math.round((scratchSize * 8) / 1024 / elapsed) : 0;
 
-            logger.debug(`${dest_file} move complete: 100% (${scratchSize}/${scratchSize} bytes, ${currentKbps} kbps)`);
+            logger.debug(
+              `${dest_file} move complete: 100% (${scratchSize}/${scratchSize} bytes, ${currentKbps} kbps)`
+            );
             patchRunningJob(video_record._id, {
               percent,
               est_completed_timestamp,
@@ -699,9 +815,14 @@ export default function transcode (file) {
             if (stage_file && fs.existsSync(stage_file)) {
               try {
                 await fs.promises.unlink(stage_file);
-                logger.debug(`Deleted stage_file after transcode: ${stage_file}`);
+                logger.debug(
+                  `Deleted stage_file after transcode: ${stage_file}`
+                );
               } catch (stageDelErr) {
-                logger.warn(`Failed to delete stage_file: ${stage_file}`, stageDelErr);
+                logger.warn(
+                  `Failed to delete stage_file: ${stage_file}`,
+                  stageDelErr
+                );
               }
             }
 
@@ -736,21 +857,35 @@ export default function transcode (file) {
         // Error path: capture bounded stderr, preserve your previous behavior as much as possible
         try {
           const stderr = stderrRing.toString();
-          const errMsg = `ffmpeg exited with code=${code} signal=${signal || 'none'}`;
+          const errMsg = `ffmpeg exited with code=${code} signal=${
+            signal || 'none'
+          }`;
 
           // Detect hwaccel init failures (your prior retry logic looked for "251")
           if (/251/i.test(stderr) || /251/i.test(errMsg)) {
-            logger.warn('FFmpeg error 251 detected. Disabling hardware acceleration for this video.');
+            logger.warn(
+              'FFmpeg error 251 detected. Disabling hardware acceleration for this video.'
+            );
             video_record.permitHWDecode = false;
           }
 
-          logger.error({ code, signal, stderr: stderr.slice(-2000) }, { label: 'Cannot process video (ffmpeg exit)' });
+          logger.error(
+            { code, signal, stderr: stderr.slice(-2000) },
+            { label: 'Cannot process video (ffmpeg exit)' }
+          );
 
-          fs.appendFileSync('/usr/app/logs/ffmpeg.log', JSON.stringify({
-            error: errMsg,
-            stderr,
-            ffmpeg_cmd
-          }, null, 4));
+          fs.appendFileSync(
+            '/usr/app/logs/ffmpeg.log',
+            JSON.stringify(
+              {
+                error: errMsg,
+                stderr,
+                ffmpeg_cmd
+              },
+              null,
+              4
+            )
+          );
 
           await trash(scratch_file, false);
 
@@ -773,15 +908,26 @@ export default function transcode (file) {
     } catch (e) {
       // Top-level error: log, update Mongo record, cleanup
       logger.error(e, { label: 'TRANSCODE ERROR' });
-      await upsert_video({ path: file?.path || file, error: { error: e.message, trace: e.stack }, hasError: true });
-      await ErrorLog.create({ path: file?.path || file, error: { error: e.message, trace: e.stack } });
+      await upsert_video({
+        path: file?.path || file,
+        error: { error: e.message, trace: e.stack },
+        hasError: true
+      });
+      await ErrorLog.create({
+        path: file?.path || file,
+        error: { error: e.message, trace: e.stack }
+      });
 
       // Trash file if no video/audio stream or file not found
       if (/no\s+(video|audio)\s+stream\s+found/gi.test(e.message)) await trash(file?.path || file);
       if (/file\s+not\s+found/gi.test(e.message)) await trash(file?.path || file);
 
       // Ensure child is cleaned up if partially started
-      try { if (child && !child.killed) child.kill('SIGKILL'); } catch (e) { logger.warn('Failed to kill child process', { error: e }); }
+      try {
+        if (child && !child.killed) child.kill('SIGKILL');
+      } catch (e) {
+        logger.warn('Failed to kill child process', { error: e });
+      }
 
       resolve({});
     }
