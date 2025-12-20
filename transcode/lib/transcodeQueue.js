@@ -314,7 +314,8 @@ export default class TranscodeQueue {
         refreshed: j.refreshed,
         indexerData: j.indexerData,
         audio_language: j.audio_language,
-        priority: j.sortFields?.priority || null
+        priority: j.sortFields?.priority || null,
+        startTime: j.startTime
       }));
 
       const flushObj = {

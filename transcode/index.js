@@ -75,7 +75,7 @@ async function run () {
 
     // Update the transcode queue and status, and generate the initial filelist
     logger.info('Updating system status metrics');
-    await update_status();
+    await update_status({ startup: true });
 
     logger.info('Refreshing transcode queue');
     await update_queue();
