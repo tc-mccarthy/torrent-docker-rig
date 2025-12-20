@@ -313,7 +313,7 @@ export default class TranscodeQueue {
         ffmpeg_cmd: j.ffmpeg_cmd,
         refreshed: j.refreshed,
         indexerData: j.indexerData,
-        audioLanguages: j.audioLanguages
+        audio_language: j.audio_language
       }));
 
       const flushObj = {
