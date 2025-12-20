@@ -47,9 +47,6 @@ export default async function update_status ({ startup = false }) {
     // Always set serviceStartTime to now on startup
     if (startup) {
       global.serviceStartTime = Date.now();
-    }
-
-    if (typeof global.processedOnStart === 'undefined') {
       global.processedOnStart = data.processed_files;
       global.processed_files_delta = 0;
     }
