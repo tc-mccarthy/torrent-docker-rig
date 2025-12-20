@@ -56,7 +56,7 @@ export default class TranscodeQueue {
   async start () {
     if (this._isRunning) return;
     this._isRunning = true;
-    logger.debug('Transcode queue started.');
+    logger.info('Transcode queue started.');
     this.startResourceMonitors();
     this.startFlushLoop();
     await this.loop();
@@ -311,7 +311,9 @@ export default class TranscodeQueue {
         size: j.size,
         eta: j.eta,
         ffmpeg_cmd: j.ffmpeg_cmd,
-        refreshed: j.refreshed
+        refreshed: j.refreshed,
+        indexerData: j.indexerData,
+        audioLanguages: j.audioLanguages
       }));
 
       const flushObj = {
