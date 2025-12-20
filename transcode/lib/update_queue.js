@@ -4,187 +4,178 @@ import logger from './logger';
 import config from './config';
 import dayjs from './dayjs';
 import ErrorLog from '../models/error';
-import File from '../models/files';
 import probe_and_upsert from './probe_and_upsert';
 import upsert_video from './upsert_video';
 import { trash } from './fs';
 import findCMD from './find_cmd';
 
-const { encode_version, file_ext, concurrent_file_checks, get_paths, application_version } = config;
+const {
+  encode_version,
+  file_ext,
+  concurrent_file_checks,
+  get_paths,
+  application_version
+} = config;
+
 const PATHS = get_paths(config);
 
 /**
- * Update the transcoding queue and metadata index.
+ * @file update_queue.js
  *
- * Behavior:
- * - During the day, we mostly rely on `find -newermt <last_probe>` to pick up changes quickly.
- * - At midnight (by design), we perform a full sweep to fill in any gaps.
+ * Memory-safe probe scheduler that supports:
+ * - Frequent incremental probes throughout the day (tracked in Redis)
+ * - A nightly "sweep" behavior (keyed by date) to fill gaps when `find` misses changes
  *
- * Efficiency:
- * - The full sweep can still be fast because `probe_and_upsert()` will skip ffprobe when
- *   a cheap filesystem fingerprint hasn't changed.
+ * The critical memory fix vs PR #44:
+ * - Never buffer full `find` output into a giant string or split into a huge array.
+ * - Never log or persist the full list of matched files.
  *
- * Concurrency:
- * - Uses a Redis lock to prevent overlapping runs.
+ * Instead:
+ * - Stream `find -print0` results and push paths directly into an async queue.
+ * - Keep only a small summary for debug and error context.
  */
+
+/**
+ * Build a small error payload safe for logging and persistence.
+ * Never include full file lists or raw command output.
+ *
+ * @param {Object} params
+ * @param {string} params.file
+ * @param {string} params.probeSince
+ * @param {Object|null} params.findSummary
+ * @param {Error} params.error
+ * @returns {Object}
+ */
+function buildErrorPayload ({ file, probeSince, findSummary, error }) {
+  return {
+    file,
+    probe_since: probeSince,
+    find_summary: {
+      count: findSummary?.count ?? null,
+      sampleHead: findSummary?.sampleHead ?? [],
+      sampleTail: findSummary?.sampleTail ?? []
+    },
+    error: {
+      message: error?.message,
+      trace: error?.stack
+    }
+  };
+}
+
 export default async function update_queue () {
-  const lockKey = 'update_queue_lock';
+  const current_date = dayjs().format('MMDDYYYY');
+  const last_probe_cache_key = `last_probe_${encode_version}_${current_date}_${application_version}_a`;
+
+  const now = dayjs();
+  const seconds_until_midnight = now.endOf('day').diff(now, 'seconds') - 60;
+  const date_fmt = 'YYYY-MM-DD HH:mm:ss';
+
+  let last_probe;
   try {
-    logger.info('update_queue: Starting update queue process');
-    // update the status of any files who have an encode version that matches the current encode version and that haven't been marked as deleted
-    // Use $in for status to leverage the compound index and improve performance
-    const nonDeletedStatuses = ['pending', 'complete', 'ignore', 'error']; // add any other valid statuses
-    logger.info('update_queue: Updating statuses of previously encoded files to complete');
-    File.updateMany(
-      { encode_version, status: { $in: nonDeletedStatuses } },
-      { $set: { status: 'complete' } }
-    );
+    const fallback = dayjs().subtract(24, 'hours').format(date_fmt);
+    last_probe = (await redisClient.get(last_probe_cache_key)) || fallback;
+  } catch (e) {
+    logger.error('Redis GET failed (last_probe)', { error: e, key: last_probe_cache_key });
+    last_probe = dayjs().subtract(24, 'hours').format(date_fmt);
+  }
 
-    // get current date
-    const current_date = dayjs().format('MMDDYYYY');
-    // Get the list of files to be converted
-    const last_probe_cache_key = `last_probe_${encode_version}_${current_date}_${application_version}_a`;
+  // Be conservative (fills gaps).
+  const probe_since = dayjs(last_probe).subtract(30, 'minutes').format(date_fmt);
 
-    // get the last probe time from redis
-    let last_probe;
-    const date_fmt = 'YYYY-MM-DD HH:mm:ss';
-    try {
-      const fallback = dayjs().subtract(24, 'hours').format(date_fmt);
-      last_probe = (await redisClient.get(last_probe_cache_key)) || fallback;
-    } catch (e) {
-      logger.error('Redis GET failed', { error: e, key: last_probe_cache_key });
-      last_probe = dayjs().subtract(24, 'hours').format(date_fmt);
-    }
+  // Small summary object for error context; filled after find completes.
+  let currentFindSummary = null;
 
-    logger.debug('Last probe time', { last_probe });
-
-    const current_time = dayjs();
-
-    // Prevent overlapping runs (especially important with concurrent workers).
-    // Use an expiring lock so a crash doesn't deadlock the system.
-    const lockValue = `${process.pid}:${current_time.valueOf()}`;
-    const lockTTLSeconds = 6 * 60 * 60; // 6 hours (adjust if your sweep can exceed this)
-
-    let acquired;
-    try {
-      acquired = await redisClient.set(lockKey, lockValue, { NX: true, EX: lockTTLSeconds });
-    } catch (e) {
-      logger.error('Redis SET (lock) failed', { error: e, key: lockKey });
-      return false;
-    }
-    if (!acquired) {
-      logger.info('update_queue: lock already held; skipping this run');
-      return false;
-    }
-
-    // Set cache expiry to 24 hours (86400 seconds) since the key changes daily
-    const CACHE_EXPIRY_SECONDS = 24 * 60 * 60;
-
-    // Find files with mtime, ctime, or atime newer than last_probe (created, modified, or touched)
-    const probe_since = dayjs(last_probe).subtract(30, 'minutes').format(date_fmt);
-
-    const find_results = await findCMD(PATHS, file_ext, probe_since);
-
-    logger.info('Find command results', { find_results });
-
-    const filelist = find_results
-      .split(/\s*\/source_media/)
-      .filter((j) => j)
-      .map((p) => `/source_media${p}`.replace('\x00', ''))
-      .slice(1);
-
-    logger.debug('', { label: 'NEW FILES IDENTIFIED. PROBING...' });
-
-    await async.eachLimit(filelist, concurrent_file_checks, asyncify(async (file) => {
-      const file_idx = filelist.indexOf(file);
-      logger.debug('Processing file', {
-        file,
-        file_idx,
-        total: filelist.length,
-        pct: Math.round((file_idx / filelist.length) * 100)
-      });
-      if (filelist.length > 0) {
-        logger.info(`update_queue: Processing file ${file_idx + 1} of ${filelist.length} (${Math.round(((file_idx + 1) / filelist.length) * 100)}%)`);
-      }
-      // set a 60 second lock with each file so that the lock lives no longer than 60 seconds beyond the final probe
+  // Queue for probing work (bounded concurrency).
+  const q = async.queue(
+    asyncify(async (file) => {
       try {
-        await redisClient.set('update_queue_lock', 'locked', { EX: 60 });
-      } catch (e) {
-        logger.error('Redis SET (file lock) failed', { error: e, key: 'update_queue_lock', file });
-      }
-      try {
+        // Normalize newline artifacts just in case.
+        file = file.replace(/\n+$/, '');
+
         const ffprobe_data = await probe_and_upsert(file, null, { touch_last_seen: true });
 
-        // if the file is already encoded, remove it from the list
-        if (ffprobe_data.format.tags?.ENCODE_VERSION === encode_version) {
-          filelist[file_idx] = null;
+        // If we probed and it is already encoded, do nothing else here.
+        // probe_and_upsert + your other systems will manage status transitions.
+        if (ffprobe_data && ffprobe_data.format?.tags?.ENCODE_VERSION === encode_version) {
+          // no-op
+        }
+
+        // Progress last_probe forward as we successfully process work.
+        const ts = dayjs().format(date_fmt);
+        try {
+          await redisClient.set(last_probe_cache_key, ts, 'EX', seconds_until_midnight);
+        } catch (e) {
+          logger.error('Redis SET failed (last_probe)', { error: e, key: last_probe_cache_key });
         }
       } catch (e) {
-        logger.error(e, { label: 'FFPROBE ERROR', file });
+        const payload = buildErrorPayload({
+          file,
+          probeSince: probe_since,
+          findSummary: currentFindSummary,
+          error: e
+        });
+
+        logger.error('Error probing file', payload);
 
         await upsert_video({
           path: file,
-          error: { error: e.message, find_results, trace: e.stack },
+          error: payload,
           hasError: true
         });
 
         await ErrorLog.create({
           path: file,
-          error: { error: e.message, find_results, trace: e.stack }
+          error: payload
         });
 
-        // if the file itself wasn't readable by ffprobe, remove it from the list
+        // Preserve your existing "trash unreadable video" behavior.
         if (/command\s+failed/gi.test(e.message)) {
-          // if this is an unreadable file, trash it.
-          const ext_expression = new RegExp(`.${file_ext.join('|')}`, 'i');
-          if (ext_expression.test(e.message)) {
-            logger.error(file, {
-              label: 'UNREADABLE VIDEO FILE. REMOVING FROM LIST'
-            });
-            trash(file);
+          const ext_expression = new RegExp(`\\.(${file_ext.join('|')})$`, 'i');
+          if (ext_expression.test(file)) {
+            try {
+              await trash(file);
+            } catch (trashErr) {
+              logger.error('Failed to trash unreadable file', { file, error: trashErr?.message });
+            }
           }
         }
-
-        // if the video stream is corrupt, delete it
-        if (/display_aspect_ratio/gi.test(e.message)) {
-          logger.error(file, {
-            label: 'UNREADABLE VIDEO STREAM. REMOVING FROM LIST'
-          });
-          trash(file);
-        }
-
-        // any ffprobe command failure, this should be removed from the list
-        filelist[file_idx] = null;
-      } finally {
-        return true;
-        // clear the lock        // (Job-level Redis lock released at end of update_queue)
       }
-    }));
+    }),
+    concurrent_file_checks
+  );
 
-    try {
-      await redisClient.set(
-        last_probe_cache_key,
-        current_time.format('MM/DD/YYYY HH:mm:ss'),
-        { EX: CACHE_EXPIRY_SECONDS }
-      );
-    } catch (e) {
-      logger.error('Redis SET (last_probe_cache_key) failed', { error: e, key: last_probe_cache_key });
-    }
+  // Drain promise helper (async.queue uses callback-style drain).
+  const drainPromise = new Promise((resolve) => {
+    q.drain(() => resolve());
+  });
 
-    // clear the lock        // (Job-level Redis lock released at end of update_queue)
-    return true;
-  } catch (e) {
-    logger.error(e, { label: 'UPDATE QUEUE ERROR' });
-    throw e;
-  } finally {
-    // Always release the job lock if we acquired it.
-    // Safe even if the key expired or was never acquired.
-    try {
-      await redisClient.del(lockKey);
-    } catch (e) {
-      logger.error('Redis DEL (lock) failed', { error: e, key: lockKey });
-    }
+  // Stream the find results and enqueue; never hold full results in memory.
+  currentFindSummary = await findCMD(PATHS, file_ext, probe_since, {
+    onPath: async (rawPath) => {
+      let file = rawPath;
 
-    logger.info('update_queue process complete.');
-  }
+      // Normalize to /source_media when possible, matching your container mount layout.
+      if (!file.startsWith('/source_media')) {
+        const idx = file.indexOf('/source_media');
+        if (idx !== -1) file = file.slice(idx);
+      }
+
+      q.push(file);
+    },
+    sampleSize: 10
+  });
+
+  logger.info('Find completed (streamed)', {
+    probe_since,
+    count: currentFindSummary.count,
+    sampleHead: currentFindSummary.sampleHead,
+    sampleTail: currentFindSummary.sampleTail
+  });
+
+  await drainPromise;
+
+  logger.info('update_queue completed', {
+    processed: currentFindSummary.count,
+    probe_since
+  });
 }
