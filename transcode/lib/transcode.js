@@ -3,16 +3,12 @@
  * @description
  * Hardware-accelerated, metadata-preserving video transcoding using FFmpeg.
  *
- * This module used to rely on the `fluent-ffmpeg` wrapper. Since fluent-ffmpeg is no
- * longer maintained, we now spawn `ffmpeg` directly via Node's `child_process.spawn`.
+ * This module spawns `ffmpeg` directly via Node's `child_process.spawn` for full control and reliability.
  *
- * Key goals of this refactor:
- * - Preserve all existing functionality (stream mapping, metadata preservation, staging,
- *   integrity checks, and post-transcode bookkeeping).
- * - Preserve progress monitoring (frame-accurate when possible) without unbounded memory
- *   growth. We use `-progress pipe:1` and a bounded stderr ring buffer.
- * - Keep memory headroom predictable under long-running workloads (no stdout/stderr
- *   buffering of entire sessions).
+ * Key features:
+ * - Stream mapping, metadata preservation, file staging, integrity checks, and post-transcode bookkeeping.
+ * - Frame-accurate progress monitoring using `-progress pipe:1` and a bounded stderr ring buffer.
+ * - Predictable memory usage under long-running workloads (no unbounded stdout/stderr buffering).
  *
  * Developed by TC, with enhancements assisted by ChatGPT from OpenAI.
  */
@@ -42,10 +38,10 @@ const { encode_version } = config;
 
 /**
  * Converts seconds into a zero-padded HH:mm:ss string.
- * Used for ETA and progress reporting.
+ * Used for ETA and progress reporting in the UI and logs.
  *
- * @param {number} totalSeconds - Number of seconds to format
- * @returns {string} Formatted time string (HH:mm:ss)
+ * @param {number} totalSeconds Number of seconds to format.
+ * @returns {string} Formatted time string (HH:mm:ss) or 'calculating' if input is NaN.
  */
 export function formatSecondsToHHMMSS (totalSeconds) {
   if (Number.isNaN(totalSeconds)) return 'calculating';
@@ -62,8 +58,7 @@ export function formatSecondsToHHMMSS (totalSeconds) {
 /**
  * A tiny ring buffer for log lines.
  * Keeps the last `maxLines` lines to avoid unbounded memory growth when ffmpeg is chatty.
- *
- * @param {number} maxLines - Maximum number of lines to retain.
+ * Used for capturing stderr output for error reporting and debugging.
  */
 class LineRingBuffer {
   constructor (maxLines) {
@@ -85,20 +80,20 @@ class LineRingBuffer {
 }
 
 /**
- * Build the ffmpeg CLI argument list matching the prior fluent-ffmpeg configuration.
+ * Builds the ffmpeg CLI argument list for transcoding, matching the prior fluent-ffmpeg configuration.
  *
  * Notes:
- * - We prefer `-progress pipe:1` for structured progress events.
- * - We keep `-v fatal` (as before) to avoid verbose stderr. We also set `-nostats`
- *   to reduce the default stat line spam; progress is obtained via `-progress`.
+ * - Uses `-progress pipe:1` for structured progress events.
+ * - Uses `-v fatal` and `-nostats` to minimize stderr noise.
+ * - Preserves stream mapping, metadata, and chapters.
  *
  * @param {Object} params
- * @param {string} params.inputFile
- * @param {string} params.outputFile
- * @param {Object} params.ffprobeData
- * @param {Object} params.instructions - Result of generateTranscodeInstructions(video_record)
- * @param {string} params.hwaccel - 'auto' or 'none'
- * @returns {{ args: string[], inputMaps: string[] }}
+ * @param {string} params.inputFile Path to the input file.
+ * @param {string} params.outputFile Path to the output file.
+ * @param {Object} params.ffprobeData ffprobe metadata for the input file.
+ * @param {Object} params.instructions Transcode instructions (from generateTranscodeInstructions).
+ * @param {string} params.hwaccel Hardware acceleration mode ('auto' or 'none').
+ * @returns {{ args: string[], inputMaps: string[] }} ffmpeg argument list and input stream mappings.
  */
 function buildFfmpegArgs ({
   inputFile,
@@ -160,6 +155,7 @@ function buildFfmpegArgs ({
   // - `-nostats` suppresses the default progress line spam on stderr.
   // - `-hwaccel auto|none` preserves your runtime behavior.
   const args = [
+    '-y',
     '-v',
     'fatal',
     '-nostats',
@@ -180,11 +176,10 @@ function buildFfmpegArgs ({
 }
 
 /**
- * Extracts a best-effort total frame count from ffprobe, used for percent calculations.
- * Some containers do not include nb_frames; in that case we fall back to 0 and use time-based
- * progress if available.
+ * Extracts a best-effort total frame count, FPS, and duration from ffprobe data.
+ * Used for percent calculations and progress reporting.
  *
- * @param {Object} ffprobeData
+ * @param {Object} ffprobeData ffprobe metadata for the input file.
  * @returns {{ totalFrames: number, fps: number|null, durationSeconds: number|null }}
  */
 function getProgressReference (ffprobeData) {
@@ -215,8 +210,8 @@ function getProgressReference (ffprobeData) {
  * Updates the in-memory runningJobs entry with new fields, if it exists.
  * Keeps this helper small so we don't accidentally retain huge objects.
  *
- * @param {string} recordId
- * @param {Object} patch
+ * @param {string} recordId The MongoDB _id of the job record.
+ * @param {Object} patch Fields to merge into the running job entry.
  */
 function patchRunningJob (recordId, patch) {
   if (!global.transcodeQueue || !recordId) return;
@@ -231,8 +226,19 @@ function patchRunningJob (recordId, patch) {
  * Transcodes a video file using hardware acceleration and dynamic instructions.
  * Handles file staging, integrity checks, progress reporting, and error logging.
  *
- * @param {Object} file - MongoDB File record
- * @returns {Promise<Object>} Resolves when transcode completes or fails
+ * Steps:
+ *   1. Validates input and Mongo record.
+ *   2. Probes input file for metadata (ffprobe).
+ *   3. Generates transcode instructions and file paths.
+ *   4. Deletes any existing scratch file to avoid remnants from previous runs.
+ *   5. Optionally stages the file (copy to fast disk).
+ *   6. Skips if already encoded with current version.
+ *   7. Checks file integrity if not previously validated.
+ *   8. Spawns ffmpeg and parses progress output.
+ *   9. Handles completion, error, and cleanup.
+ *
+ * @param {Object} file MongoDB File record (must include ._id and .path).
+ * @returns {Promise<Object>} Resolves when transcode completes or fails.
  */
 export default function transcode (file) {
   return new Promise(async (resolve) => {
@@ -274,17 +280,8 @@ export default function transcode (file) {
       }
 
       // Generate file paths for scratch, destination, and staging
+      // scratch_file: temp output for ffmpeg, dest_file: final output, stage_file: optional staging copy
       const { scratch_file, dest_file, stage_file } = generate_file_paths(inputFile);
-
-      // If scratch file exists at startup, delete it to avoid remnants from previous transcodes
-      if (fs.existsSync(scratch_file)) {
-        try {
-          await fs.promises.unlink(scratch_file);
-          logger.info(`Deleted existing scratch file at transcode startup: ${scratch_file}`);
-        } catch (e) {
-          logger.warn(`Failed to delete existing scratch file: ${scratch_file}`, e);
-        }
-      }
 
       /**
        * If stage_file is set, copy the source file to stage_file and use stage_file for transcoding.
