@@ -103,11 +103,6 @@ async function run () {
     integrityQueue.start();
     global.integrityQueue = integrityQueue; // Make the queue globally accessible
 
-    // Schedule filelist regeneration every 5 minutes
-    cron.schedule('*/5 * * * *', () => {
-      generate_filelist({ limit: 1000, writeToFile: true });
-    });
-
     // Schedule pre-sanitize cleanup every 3 hours
     cron.schedule('0 */3 * * *', () => {
       pre_sanitize();
