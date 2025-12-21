@@ -846,7 +846,7 @@ export default function transcode (file) {
               reclaimedSpace: original_size - dest_file_size
             });
 
-            await update_status();
+            update_status();
           } catch (e) {
             logger.error(e, { label: 'POST TRANSCODE ERROR' });
           } finally {
