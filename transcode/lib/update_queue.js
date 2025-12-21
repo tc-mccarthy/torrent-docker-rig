@@ -72,11 +72,12 @@ export default async function update_queue () {
 
   let last_probe;
   try {
-    const fallback = dayjs().subtract(24, 'hours').format(date_fmt);
+    // Fallback to 12-31-1969 11:59:59 pm for a full sweep once a day
+    const fallback = '1969-12-31 23:59:59';
     last_probe = (await redisClient.get(last_probe_cache_key)) || fallback;
   } catch (e) {
     logger.error('Redis GET failed (last_probe)', { error: e, key: last_probe_cache_key });
-    last_probe = dayjs().subtract(24, 'hours').format(date_fmt);
+    last_probe = '1969-12-31 23:59:59';
   }
 
   // Be conservative (fills gaps).
