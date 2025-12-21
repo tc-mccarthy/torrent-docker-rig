@@ -69,9 +69,9 @@ async function run () {
     get_disk_space();
 
     // Start the file system monitor (watches for new/changed files)
-    logger.info('Starting file system monitor');
-    processFSEventQueue();
-    fs_monitor();
+    // logger.info('Starting file system monitor');
+    // processFSEventQueue();
+    // fs_monitor();
 
     // Update the transcode queue and status, and generate the initial filelist
     logger.info('Updating system status metrics');
