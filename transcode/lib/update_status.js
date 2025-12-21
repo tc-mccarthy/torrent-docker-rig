@@ -12,21 +12,31 @@ export async function getReclaimedSpace () {
 
   // Redis returns strings, so parse to number if possible
   if (reclaimedSpace !== null && !Number.isNaN(Number(reclaimedSpace))) {
+    // Stale-while-revalidate: trigger background refresh
+    (async () => {
+      try {
+        const aggResult = await File.aggregate([
+          { $match: { encode_version } },
+          { $group: { _id: null, total: { $sum: { $ifNull: ['$reclaimedSpace', 0] } } } }
+        ]);
+        const freshValue = aggResult[0]?.total || 0;
+        await redisClient.set('transcode_reclaimed_space', freshValue, { EX: 7 * 24 * 60 * 60 }); // 7 days
+      } catch (err) {
+        logger.error(err, { label: 'getReclaimedSpace background refresh error' });
+      }
+    })();
     return Number(reclaimedSpace);
   }
 
-  logger.debug('Reclaimed space value not found in cache, calculating...');
+  logger.debug('Reclaimed space value not found in cache, calculating (blocking)...');
 
-  // Use MongoDB aggregation to sum reclaimedSpace efficiently
+  // Blocking: no cache, must query Mongo
   const aggResult = await File.aggregate([
     { $match: { encode_version } },
     { $group: { _id: null, total: { $sum: { $ifNull: ['$reclaimedSpace', 0] } } } }
   ]);
   reclaimedSpace = aggResult[0]?.total || 0;
-
-  // store the reclaimed space in cache for 15 minutes
-  await redisClient.set('transcode_reclaimed_space', reclaimedSpace, { EX: 15 * 60 });
-
+  await redisClient.set('transcode_reclaimed_space', reclaimedSpace, { EX: 7 * 24 * 60 * 60 }); // 7 days
   return reclaimedSpace;
 }
 
