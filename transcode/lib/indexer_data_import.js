@@ -3,7 +3,7 @@ import { getMovies, getTags as getRadarrTags } from './radarr_api';
 import { getSeries, getTags as getSonarrTags } from './sonarr_api';
 import File from '../models/files';
 import logger from './logger';
-import redisClient from './redis';
+import redisClient, { nsKey } from './redis';
 
 /**
  * @fileoverview Imports indexer data from Radarr and Sonarr, mapping tag IDs to names and updating File records in MongoDB.
@@ -21,8 +21,8 @@ import redisClient from './redis';
  * @returns {Promise<void>} Resolves when import is complete.
  */
 export async function importIndexerData () {
-  const LOCK_KEY = 'indexer-data-import-lock';
-  const LOCK_TTL = 1800; // 30 minutes in seconds
+  const LOCK_KEY = nsKey('indexer-data-import-lock');
+  const LOCK_TTL = 30; // 30 seconds
   // Check for lock and short-circuit if found
   if (await redisClient.get(LOCK_KEY)) {
     logger.warn('Indexer data import already in progress (lock found). Aborting.');
@@ -30,6 +30,20 @@ export async function importIndexerData () {
   }
   // Set lock before starting
   await redisClient.set(LOCK_KEY, 'locked', { EX: LOCK_TTL });
+
+  // Heartbeat: refresh lock every 20s while running
+  let heartbeatActive = true;
+  const heartbeat = setInterval(async () => {
+    if (heartbeatActive) {
+      try {
+        await redisClient.set(LOCK_KEY, 'locked', { EX: LOCK_TTL });
+        logger.debug('Heartbeat: refreshed indexer-data-import-lock', { label: 'INDEXER IMPORT HEARTBEAT' });
+      } catch (e) {
+        logger.error('Heartbeat failed to refresh lock', e);
+      }
+    }
+  }, 20000);
+  let result;
   try {
     // --- RADARR ---
     logger.info('Importing Radarr indexer data...');
@@ -140,12 +154,17 @@ export async function importIndexerData () {
 
     logger.info(`Sonarr bulkWrite operations completed for ${sonarrBulkOps.length} series.`);
     logger.info('Indexer data import complete.');
+    result = true;
     await redisClient.del(LOCK_KEY);
-    return true;
+    return result;
   } catch (err) {
     // Log error and stack trace for debugging
     logger.error('Indexer data import failed:', err);
+    result = err;
     await redisClient.del(LOCK_KEY);
-    throw err;
+    throw result;
+  } finally {
+    heartbeatActive = false;
+    clearInterval(heartbeat);
   }
 }

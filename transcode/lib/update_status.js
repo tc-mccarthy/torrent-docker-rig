@@ -3,12 +3,13 @@ import File from '../models/files';
 import config from './config';
 import { formatSecondsToHHMMSS } from './transcode';
 import logger from './logger';
-import redisClient from './redis';
+import redisClient, { nsKey } from './redis';
 
 const { encode_version } = config;
 
 export async function getReclaimedSpace () {
-  let reclaimedSpace = await redisClient.get('transcode_reclaimed_space');
+  const reclaimedSpaceKey = nsKey('reclaimed_space');
+  let reclaimedSpace = await redisClient.get(reclaimedSpaceKey);
 
   // Redis returns strings, so parse to number if possible
   if (reclaimedSpace !== null && !Number.isNaN(Number(reclaimedSpace))) {
@@ -20,7 +21,7 @@ export async function getReclaimedSpace () {
           { $group: { _id: null, total: { $sum: { $ifNull: ['$reclaimedSpace', 0] } } } }
         ]);
         const freshValue = aggResult[0]?.total || 0;
-        await redisClient.set('transcode_reclaimed_space', freshValue, { EX: 7 * 24 * 60 * 60 }); // 7 days
+        await redisClient.set(reclaimedSpaceKey, freshValue, { EX: 7 * 24 * 60 * 60 }); // 7 days
       } catch (err) {
         logger.error(err, { label: 'getReclaimedSpace background refresh error' });
       }
@@ -36,7 +37,7 @@ export async function getReclaimedSpace () {
     { $group: { _id: null, total: { $sum: { $ifNull: ['$reclaimedSpace', 0] } } } }
   ]);
   reclaimedSpace = aggResult[0]?.total || 0;
-  await redisClient.set('transcode_reclaimed_space', reclaimedSpace, { EX: 7 * 24 * 60 * 60 }); // 7 days
+  await redisClient.set(reclaimedSpaceKey, reclaimedSpace, { EX: 7 * 24 * 60 * 60 }); // 7 days
   return reclaimedSpace;
 }
 
