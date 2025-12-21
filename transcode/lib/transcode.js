@@ -538,6 +538,7 @@ export default function transcode (file) {
         const est_completed_seconds = pct_remaining * seconds_pct;
         const est_completed_timestamp = now + est_completed_seconds * 1000;
         const time_remaining = formatSecondsToHHMMSS(est_completed_seconds);
+        const original_file_size_bytes = (ffprobe_data.format.size || 0) * 1024;
 
         // Build a timemark (HH:mm:ss.xx) for deduping UI updates.
         // If out_time is present, keep it; otherwise synthesize from outSeconds.
@@ -591,18 +592,18 @@ export default function transcode (file) {
               kb: estimated_final_kb,
               mb: estimated_final_kb / 1024,
               gb: estimated_final_kb / 1024 / 1024,
-              change: ffprobe_data.format?.size
+              change: original_file_size_bytes
                 ? `${
-                    ((estimated_final_kb - ffprobe_data.format.size / 1024) /
-                      (ffprobe_data.format.size / 1024)) *
+                    ((estimated_final_kb - original_file_size_bytes / 1024) /
+                      (original_file_size_bytes / 1024)) *
                     100
                   }%`
                 : 'calculating'
             },
             original: {
-              kb: ffprobe_data.format.size / 1024,
-              mb: ffprobe_data.format.size / 1024 / 1024,
-              gb: ffprobe_data.format.size / 1024 / 1024 / 1024
+              kb: original_file_size_bytes / 1024,
+              mb: original_file_size_bytes / 1024 / 1024,
+              gb: original_file_size_bytes / 1024 / 1024 / 1024
             }
           },
           action: 'transcoding'
