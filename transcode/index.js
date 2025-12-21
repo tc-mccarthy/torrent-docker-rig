@@ -34,6 +34,24 @@ const {
   application_version
 } = config;
 
+async function pre_start () {
+  // Update the transcode queue and status, and generate the initial filelist
+  logger.info('Updating system status metrics');
+  await update_status({ startup: true });
+
+  logger.info('Refreshing transcode queue');
+  await update_queue();
+
+  logger.info('Refreshing indexer data');
+  await refresh_indexer_data();
+
+  logger.info('Adjusting custom format scores for FDK AAC surround files');
+  await downgradeAudio();
+
+  logger.info('Generating initial filelist');
+  await generate_filelist({ limit: 1000, writeToFile: true });
+}
+
 /**
  * Main startup routine for the transcode service.
  *
@@ -73,21 +91,7 @@ async function run () {
     // processFSEventQueue();
     // fs_monitor();
 
-    // Update the transcode queue and status, and generate the initial filelist
-    logger.info('Updating system status metrics');
-    await update_status({ startup: true });
-
-    logger.info('Refreshing transcode queue');
-    await update_queue();
-
-    logger.info('Refreshing indexer data');
-    await refresh_indexer_data();
-
-    logger.info('Adjusting custom format scores for FDK AAC surround files');
-    await downgradeAudio();
-
-    logger.info('Generating initial filelist');
-    await generate_filelist({ limit: 1000, writeToFile: true });
+    pre_start();
 
     // Start the main transcode queue (handles video jobs)
     const transcodeQueue = new TranscodeQueue({ maxMemoryComputeScore: max_memory_score, maxCpuComputeScore: max_cpu_score, pollDelay: 10000 });
