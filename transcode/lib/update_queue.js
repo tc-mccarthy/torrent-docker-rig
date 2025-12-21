@@ -1,5 +1,5 @@
 import async, { asyncify } from 'async';
-import redisClient from './redis';
+import redisClient, { nsKey } from './redis';
 import logger from './logger';
 import config from './config';
 import dayjs from './dayjs';
@@ -13,8 +13,7 @@ const {
   encode_version,
   file_ext,
   concurrent_file_checks,
-  get_paths,
-  application_version
+  get_paths
 } = config;
 
 const PATHS = get_paths(config);
@@ -64,7 +63,7 @@ function buildErrorPayload ({ file, probeSince, findSummary, error }) {
 
 export default async function update_queue () {
   const current_date = dayjs().format('MMDDYYYY');
-  const last_probe_cache_key = `last_probe_${encode_version}_${current_date}_${application_version}_a`;
+  const last_probe_cache_key = nsKey(`last_probe_${encode_version}_${current_date}_a`);
 
   const now = dayjs();
   const seconds_until_midnight = now.endOf('day').diff(now, 'seconds') - 60;

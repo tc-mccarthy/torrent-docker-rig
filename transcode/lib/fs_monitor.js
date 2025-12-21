@@ -2,7 +2,7 @@ import chokidar from 'chokidar';
 import async, { asyncify } from 'async';
 import { setTimeout as delay } from 'timers/promises';
 import config from './config';
-import redisClient from './redis';
+import redisClient, { nsKey } from './redis';
 import logger from './logger';
 import probe_and_upsert from './probe_and_upsert';
 
@@ -12,7 +12,7 @@ const { get_paths } = config;
 
 const PATHS = get_paths(config);
 
-const STREAM_KEY = 'transcode_file_events_20251212a';
+const STREAM_KEY = nsKey('file_events_20251212a');
 
 async function sendToStream (msg) {
   try {

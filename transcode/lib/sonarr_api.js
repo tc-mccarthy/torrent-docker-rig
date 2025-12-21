@@ -10,7 +10,7 @@
 import { setTimeout as delay } from 'timers/promises';
 import async, { asyncify } from 'async';
 import logger from './logger';
-import redisClient from './redis';
+import redisClient, { nsKey } from './redis';
 import streamJsonReq from './stream-json-req';
 
 /**
@@ -19,7 +19,7 @@ import streamJsonReq from './stream-json-req';
  * @returns {string} The Redis key for caching.
  */
 function sonarrRedisKey (endpoint) {
-  return `sonarr:${endpoint}`;
+  return nsKey(`sonarr:${endpoint}`);
 }
 
 /**
