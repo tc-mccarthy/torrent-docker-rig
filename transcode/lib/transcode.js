@@ -274,8 +274,17 @@ export default function transcode (file) {
       }
 
       // Generate file paths for scratch, destination, and staging
-      const { scratch_file, dest_file, stage_file } =
-        generate_file_paths(inputFile);
+      const { scratch_file, dest_file, stage_file } = generate_file_paths(inputFile);
+
+      // If scratch file exists at startup, delete it to avoid remnants from previous transcodes
+      if (fs.existsSync(scratch_file)) {
+        try {
+          await fs.promises.unlink(scratch_file);
+          logger.info(`Deleted existing scratch file at transcode startup: ${scratch_file}`);
+        } catch (e) {
+          logger.warn(`Failed to delete existing scratch file: ${scratch_file}`, e);
+        }
+      }
 
       /**
        * If stage_file is set, copy the source file to stage_file and use stage_file for transcoding.
