@@ -30,7 +30,7 @@ export async function getReclaimedSpace () {
   return reclaimedSpace;
 }
 
-export default async function update_status ({ startup = false }) {
+export default async function update_status ({ startup = false } = {}) {
   try {
     logger.debug('Updating status metrics...');
     const processed_files = await File.countDocuments({ status: 'complete' });
