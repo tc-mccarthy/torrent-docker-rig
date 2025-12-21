@@ -313,9 +313,11 @@ export default class TranscodeQueue {
         ffmpeg_cmd: j.ffmpeg_cmd,
         refreshed: j.refreshed,
         indexerData: j.indexerData,
-        audio_language: j.audio_language,
+        audio_language: j.audio_language || [],
         priority: j.sortFields?.priority || null,
-        startTime: j.startTime
+        startTime: j.startTime,
+        source_video_codec: j.source_video_codec || null,
+        source_audio_codec: j.source_audio_codec || null
       }));
 
       const flushObj = {
