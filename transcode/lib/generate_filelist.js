@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import logger from './logger';
 import File from '../models/files';
 import dayjs from './dayjs';
+import assessPriority from './assess_priority';
 
 /**
  * Generates a prioritized file list for transcoding jobs.
@@ -35,6 +36,7 @@ export default async function generate_filelist ({
     clearTimeout(global.fileListTimeout);
   }
 
+  await assessPriority();
   // Only fetch the fields required for scheduling and reporting.
   // When writing to file, include minimal probe stream info for summary.
   const projection = {
