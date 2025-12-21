@@ -29,16 +29,13 @@ export async function getReclaimedSpace () {
 export default async function update_status ({ startup = false }) {
   try {
     logger.debug('Updating status metrics...');
+    const processed_files = await File.countDocuments({ status: 'complete' });
+    const total_files = await File.countDocuments();
     const data = {
-      processed_files: await File.countDocuments({ status: 'complete' }),
-      total_files: await File.countDocuments(),
-      unprocessed_files: await File.countDocuments({
-        encode_version: { $ne: encode_version }
-      }),
-      library_coverage:
-      ((await File.countDocuments({ encode_version })) /
-        (await File.countDocuments())) *
-      100,
+      processed_files,
+      total_files,
+      unprocessed_files: total_files - processed_files,
+      library_coverage: processed_files / total_files * 100,
       reclaimedSpace: await getReclaimedSpace()
     };
 
