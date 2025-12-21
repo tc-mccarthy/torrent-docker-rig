@@ -83,13 +83,13 @@ export default async function probe_and_upsert (file, record_id = null, opts = {
     // Fast-path: unchanged file with an existing probe payload.
     // Skip ffprobe + enrichment, no last_seen update for performance.
     if (!force_probe && alreadyHasProbe && fingerprintMatches) {
-      logger.info(`Skipping probe for unchanged file: ${file}`);
+      logger.debug(`Skipping probe for unchanged file: ${file}`);
       return video_record?.probe || false;
     }
 
     // If we are probing, log which fingerprint fields did not match, or if there was no fingerprint
     if (!prev) {
-      logger.info(`Probing file: ${file} (no existing fingerprint)`);
+      logger.debug(`Probing file: ${file} (no existing fingerprint)`);
     } else {
       const mismatches = [];
       if (prev.size !== fsFingerprint.size) mismatches.push(`size (prev: ${prev.size}, curr: ${fsFingerprint.size})`);
