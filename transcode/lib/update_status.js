@@ -17,8 +17,12 @@ export async function getReclaimedSpace () {
 
   logger.debug('Reclaimed space value not found in cache, calculating...');
 
-  // if we don't have a number in cache, calculate it
-  reclaimedSpace = (await File.find({ encode_version }).lean()).reduce((total, file) => total + (file.reclaimedSpace || 0), 0);
+  // Use MongoDB aggregation to sum reclaimedSpace efficiently
+  const aggResult = await File.aggregate([
+    { $match: { encode_version } },
+    { $group: { _id: null, total: { $sum: { $ifNull: ['$reclaimedSpace', 0] } } } }
+  ]);
+  reclaimedSpace = aggResult[0]?.total || 0;
 
   // store the reclaimed space in cache for 15 minutes
   await redisClient.set('transcode_reclaimed_space', reclaimedSpace, { EX: 15 * 60 });
@@ -31,12 +35,14 @@ export default async function update_status ({ startup = false }) {
     logger.debug('Updating status metrics...');
     const processed_files = await File.countDocuments({ status: 'complete' });
     const total_files = await File.countDocuments();
+    const reclaimedSpace = await getReclaimedSpace();
+
     const data = {
       processed_files,
       total_files,
       unprocessed_files: total_files - processed_files,
       library_coverage: processed_files / total_files * 100,
-      // reclaimedSpace: await getReclaimedSpace()
+      reclaimedSpace
     };
 
     logger.debug('Status data complete');
