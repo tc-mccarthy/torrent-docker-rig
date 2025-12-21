@@ -36,7 +36,7 @@ export default async function update_status ({ startup = false }) {
       total_files,
       unprocessed_files: total_files - processed_files,
       library_coverage: processed_files / total_files * 100,
-      reclaimedSpace: await getReclaimedSpace()
+      // reclaimedSpace: await getReclaimedSpace()
     };
 
     logger.debug('Status data complete');
