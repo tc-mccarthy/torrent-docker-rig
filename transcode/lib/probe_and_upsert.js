@@ -51,17 +51,12 @@ export default async function probe_and_upsert (file, record_id = null, opts = {
     // NOTE: stat is extremely cheap compared to ffprobe or hashing. It reads inode metadata only.
     const st = fs.statSync(file);
 
-    // On Linux, these fields are stable and very effective for change detection.
+    // Only include size and mtimeMs in the fingerprint for change detection.
     // - size: content size in bytes
-    // - mtimeMs: last content modification timestamp (can be preserved by some copy tools)
-    // - ctimeMs: inode change timestamp (updates when content changes even if mtime preserved)
-    // - ino: inode number (helps distinguish replace-vs-edit scenarios)
+    // - mtimeMs: last content modification timestamp
     const fsFingerprint = {
       size: st.size,
-      mtimeMs: st.mtimeMs,
-      ctimeMs: st.ctimeMs,
-      inode: st.ino,
-      dev: st.dev
+      mtimeMs: st.mtimeMs
     };
 
     // Prefer looking up by path. record_id is preserved for callers that want to force a specific doc.
@@ -74,11 +69,7 @@ export default async function probe_and_upsert (file, record_id = null, opts = {
     const fingerprintMatches =
       prev &&
       prev.size === fsFingerprint.size &&
-      prev.mtimeMs === fsFingerprint.mtimeMs &&
-      prev.ctimeMs === fsFingerprint.ctimeMs &&
-      // inode/dev comparisons are best-effort: if not present, don't block skip.
-      (prev.inode == null || prev.inode === fsFingerprint.inode) &&
-      (prev.dev == null || prev.dev === fsFingerprint.dev);
+      prev.mtimeMs === fsFingerprint.mtimeMs;
 
     // Fast-path: unchanged file with an existing probe payload.
     // Skip ffprobe + enrichment, no last_seen update for performance.
@@ -94,9 +85,6 @@ export default async function probe_and_upsert (file, record_id = null, opts = {
       const mismatches = [];
       if (prev.size !== fsFingerprint.size) mismatches.push(`size (prev: ${prev.size}, curr: ${fsFingerprint.size})`);
       if (prev.mtimeMs !== fsFingerprint.mtimeMs) mismatches.push(`mtimeMs (prev: ${prev.mtimeMs}, curr: ${fsFingerprint.mtimeMs})`);
-      if (prev.ctimeMs !== fsFingerprint.ctimeMs) mismatches.push(`ctimeMs (prev: ${prev.ctimeMs}, curr: ${fsFingerprint.ctimeMs})`);
-      if (prev.inode != null && prev.inode !== fsFingerprint.inode) mismatches.push(`inode (prev: ${prev.inode}, curr: ${fsFingerprint.inode})`);
-      if (prev.dev != null && prev.dev !== fsFingerprint.dev) mismatches.push(`dev (prev: ${prev.dev}, curr: ${fsFingerprint.dev})`);
       if (mismatches.length > 0) {
         logger.info(`Probing file: ${file} (fingerprint mismatch: ${mismatches.join(', ')})`);
       } else {

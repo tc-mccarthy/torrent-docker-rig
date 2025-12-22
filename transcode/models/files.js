@@ -106,10 +106,7 @@ const schema = new Schema(
      */
     fsFingerprint: {
       size: { type: Number, required: false, index: true }, // bytes
-      mtimeMs: { type: Number, required: false, index: true }, // milliseconds since epoch
-      ctimeMs: { type: Number, required: false, index: true }, // milliseconds since epoch
-      inode: { type: Number, required: false }, // st.ino
-      dev: { type: Number, required: false } // st.dev (optional)
+      mtimeMs: { type: Number, required: false, index: true } // milliseconds since epoch
     },
 
     /**
