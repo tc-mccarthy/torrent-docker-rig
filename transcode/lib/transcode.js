@@ -40,7 +40,7 @@ const { encode_version } = config;
  * Converts seconds into a zero-padded HH:mm:ss string.
  * Used for ETA and progress reporting in the UI and logs.
  *
- * @param {number} totalSeconds Number of seconds to format.
+ * @param {number} totalSeconds - Number of seconds to format.
  * @returns {string} Formatted time string (HH:mm:ss) or 'calculating' if input is NaN.
  */
 export function formatSecondsToHHMMSS (totalSeconds) {
@@ -59,6 +59,8 @@ export function formatSecondsToHHMMSS (totalSeconds) {
  * A tiny ring buffer for log lines.
  * Keeps the last `maxLines` lines to avoid unbounded memory growth when ffmpeg is chatty.
  * Used for capturing stderr output for error reporting and debugging.
+ *
+ * @class
  */
 class LineRingBuffer {
   constructor (maxLines) {
@@ -87,12 +89,12 @@ class LineRingBuffer {
  * - Uses `-v fatal` and `-nostats` to minimize stderr noise.
  * - Preserves stream mapping, metadata, and chapters.
  *
- * @param {Object} params
- * @param {string} params.inputFile Path to the input file.
- * @param {string} params.outputFile Path to the output file.
- * @param {Object} params.ffprobeData ffprobe metadata for the input file.
- * @param {Object} params.instructions Transcode instructions (from generateTranscodeInstructions).
- * @param {string} params.hwaccel Hardware acceleration mode ('auto' or 'none').
+ * @param {Object} params - Parameters for ffmpeg argument construction.
+ * @param {string} params.inputFile - Path to the input file.
+ * @param {string} params.outputFile - Path to the output file.
+ * @param {Object} params.ffprobeData - ffprobe metadata for the input file.
+ * @param {Object} params.instructions - Transcode instructions (from generateTranscodeInstructions).
+ * @param {string} params.hwaccel - Hardware acceleration mode ('auto' or 'none').
  * @returns {{ args: string[], inputMaps: string[] }} ffmpeg argument list and input stream mappings.
  */
 function buildFfmpegArgs ({
@@ -179,7 +181,7 @@ function buildFfmpegArgs ({
  * Extracts a best-effort total frame count, FPS, and duration from ffprobe data.
  * Used for percent calculations and progress reporting.
  *
- * @param {Object} ffprobeData ffprobe metadata for the input file.
+ * @param {Object} ffprobeData - ffprobe metadata for the input file.
  * @returns {{ totalFrames: number, fps: number|null, durationSeconds: number|null }}
  */
 function getProgressReference (ffprobeData) {
@@ -210,8 +212,8 @@ function getProgressReference (ffprobeData) {
  * Updates the in-memory runningJobs entry with new fields, if it exists.
  * Keeps this helper small so we don't accidentally retain huge objects.
  *
- * @param {string} recordId The MongoDB _id of the job record.
- * @param {Object} patch Fields to merge into the running job entry.
+ * @param {string} recordId - The MongoDB _id of the job record.
+ * @param {Object} patch - Fields to merge into the running job entry.
  */
 function patchRunningJob (recordId, patch) {
   if (!global.transcodeQueue || !recordId) return;
@@ -237,7 +239,9 @@ function patchRunningJob (recordId, patch) {
  *   8. Spawns ffmpeg and parses progress output.
  *   9. Handles completion, error, and cleanup.
  *
- * @param {Object} file MongoDB File record (must include ._id and .path).
+ * @async
+ * @function transcode
+ * @param {Object} file - MongoDB File record (must include ._id and .path).
  * @returns {Promise<Object>} Resolves when transcode completes or fails.
  */
 export default function transcode (file) {
@@ -286,6 +290,8 @@ export default function transcode (file) {
       /**
        * If stage_file is set, copy the source file to stage_file and use stage_file for transcoding.
        * Progress is reported every second to transcodeQueue.runningJobs for real-time monitoring.
+       *
+       * This step is used to optimize I/O by staging files on a fast disk before transcoding.
        */
       if (stage_file) {
         try {
@@ -496,17 +502,19 @@ export default function transcode (file) {
        * or `progress=end` at completion.
        *
        * We update UI state on each block boundary (`progress=`).
+       *
+       * This allows for real-time, frame-accurate progress reporting in the UI and logs.
        */
       const stderrRing = new LineRingBuffer(500);
       let lastTimemark = null;
 
-      // Spawn ffmpeg
+      // Spawn ffmpeg process for transcoding
       child = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
-      // Track PID in job state
+      // Track PID in job state for monitoring and potential cancellation
       patchRunningJob(video_record._id, { pid: child.pid });
 
-      // Parse progress from stdout
+      // Parse progress from ffmpeg stdout
       const rlOut = readline.createInterface({ input: child.stdout });
       let progressBlock = {};
 
@@ -666,7 +674,7 @@ export default function transcode (file) {
         stderrRing.push(msg);
       });
 
-      // Handle process completion
+      // Handle process completion and errors
       child.on('error', async (err) => {
         // Spawn-level error (e.g., ffmpeg not found)
         try {
@@ -725,7 +733,7 @@ export default function transcode (file) {
           logger.warn('Failed to flush progress block', { error: e });
         }
 
-        // Success path
+        // Success path: transcode completed without error
         if (code === 0) {
           try {
             logger.info(`Transcode complete for file: ${inputFile}`);
@@ -868,12 +876,33 @@ export default function transcode (file) {
             signal || 'none'
           }`;
 
-          // Detect hwaccel init failures (your prior retry logic looked for "251")
+          // Detect hwaccel init failures
           if (/251/i.test(stderr) || /251/i.test(errMsg)) {
             logger.warn(
               'FFmpeg error 251 detected. Disabling hardware acceleration for this video.'
             );
             video_record.permitHWDecode = false;
+          }
+
+          // these fatal errors merit deleting the stage, scratch and source files
+          const fatalErrors = [
+            /could\s+not\s+open\s+input\s+file/gi,
+            /error\s+while\s+decoding\s+stream/gi,
+            /invalid\s+data\s+found\s+when\s+processing\s+input/gi
+          ];
+
+          const shouldDeleteFiles = fatalErrors.some((regex) =>
+            regex.test(stderr));
+
+          if (shouldDeleteFiles) {
+            logger.warn(
+              'Fatal ffmpeg error detected. Deleting source, stage, and scratch files to prevent reprocessing.'
+            );
+            await trash(original_file, true);
+            if (stage_file && fs.existsSync(stage_file)) {
+              await trash(stage_file, false);
+            }
+            await trash(scratch_file, false);
           }
 
           logger.error(
