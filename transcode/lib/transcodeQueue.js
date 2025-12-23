@@ -214,7 +214,15 @@ export default class TranscodeQueue {
     // Find the first job in the queue that cannot run due to lack of compute
     const blockedEntry = jobs.find((job) => {
       const alreadyRunning = this.runningJobs.some((j) => j._id.toString() === job._id.toString());
-      return !alreadyRunning && job.computeScore > availableCompute;
+      if (alreadyRunning) {
+        logger.info(`[QUEUE][SKIP] Job ${job.path} (compute: ${job.computeScore}) is already running.`);
+        return false;
+      }
+      if (job.computeScore > availableCompute) {
+        logger.info(`[QUEUE][SKIP] Job ${job.path} (compute: ${job.computeScore}) exceeds available compute (${availableCompute}).`);
+        return true;
+      }
+      return false;
     });
 
     if (blockedEntry) {
@@ -231,13 +239,25 @@ export default class TranscodeQueue {
     // Select the next job that fits within the compute and respects priority/starvation rules
     const nextJob = jobs.find((job) => {
       const alreadyRunning = this.runningJobs.some((j) => j._id.toString() === job._id.toString());
-      if (alreadyRunning) return false;
+      if (alreadyRunning) {
+        logger.info(`[QUEUE][SKIP] Job ${job.path} (compute: ${job.computeScore}) is already running.`);
+        return false;
+      }
 
-      if (job.computeScore > availableCompute) return false;
+      if (job.computeScore > availableCompute) {
+        logger.info(`[QUEUE][SKIP] Job ${job.path} (compute: ${job.computeScore}) exceeds available compute (${availableCompute}).`);
+        return false;
+      }
 
-      if (blockedEntry && job.sortFields.priority > blockedEntry.sortFields.priority) return false;
+      if (blockedEntry && job.sortFields.priority > blockedEntry.sortFields.priority) {
+        logger.info(`[QUEUE][SKIP] Job ${job.path} (priority: ${job.sortFields.priority}) is lower than blocked job's priority (${blockedEntry.sortFields.priority}).`);
+        return false;
+      }
 
-      if (blockedEntry && job.sortFields.priority === blockedEntry.sortFields.priority && this.starvationCounter >= 5) return false;
+      if (blockedEntry && job.sortFields.priority === blockedEntry.sortFields.priority && this.starvationCounter >= 5) {
+        logger.info(`[QUEUE][SKIP] Job ${job.path} (priority: ${job.sortFields.priority}) is blocked due to starvation protection (counter: ${this.starvationCounter}).`);
+        return false;
+      }
 
       return true;
     });
