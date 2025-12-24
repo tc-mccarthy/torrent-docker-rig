@@ -326,6 +326,7 @@ services:
         condition: service_healthy
     mem_limit: 56g
     memswap_limit: 64g
+    cpu_shares: 256
     networks:
       - default
     logging: 
@@ -341,6 +342,7 @@ services:
     container_name: plex
     image: lscr.io/linuxserver/plex:latest
     network_mode: host
+    cpu_shares: 2048
     devices:
       - "/dev/dri:/dev/dri" # Intel Quick Sync
     environment:
