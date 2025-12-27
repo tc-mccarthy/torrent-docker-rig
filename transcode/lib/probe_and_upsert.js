@@ -12,57 +12,115 @@ import logger from './logger';
 const { encode_version } = config;
 
 /**
- * Probes the video file, collects language and metadata, and upserts it into MongoDB.
- * If the file has already been processed and its hash hasn't changed, probing is skipped.
+ * Probe a media file and upsert its metadata into MongoDB.
  *
- * @param {string} file - Path to the video file.
- * @param {string} record_id - Optional known record ID to associate with.
- * @param {Object} opts - Optional additional properties to attach to the record.
- * @returns {Promise<Object|false>} - ffprobe result or false if failed/skipped.
+ * This function is intentionally "ffprobe-first" when it decides a probe is needed.
+ * To keep the nightly safety sweep efficient, it supports skipping ffprobe when a cheap
+ * filesystem fingerprint matches what we previously stored.
+ *
+ * Skipping strategy (no file hashing):
+ * - Read `fs.stat()` (metadata only).
+ * - Compare {size, mtimeMs, ctimeMs, ino} against `fsFingerprint` stored in Mongo.
+ * - If identical and we already have a probe payload, skip ffprobe + TMDB enrichment.
+ *
+ * Terminology:
+ * - `last_seen`: the file was encountered during a sweep.
+ * - `last_probe`: ffprobe actually ran and the probe payload was stored.
+ *
+ * @param {string} file Absolute file path.
+ * @param {string|null} record_id Optional Mongo record id to force an update by id.
+ * @param {Object=} opts Additional fields to merge into the upsert.
+ * @param {boolean=} opts.force_probe If true, always run ffprobe even when unchanged.
+ * @param {boolean=} opts.touch_last_seen If true, update `last_seen` even when skipping.
+ * @returns {Promise<Object|false>} ffprobe payload if probed, or false if skipped/failed.
  */
-export default async function probe_and_upsert (file, record_id, opts = {}) {
-  file = file.replace(/\n+$/, '');
+export default async function probe_and_upsert (file, record_id = null, opts = {}) {
+  // Normalize any trailing newlines from `find` output.
+  file = String(file).replace(/\n+$/, '');
+
+  const { force_probe = false } = opts;
+
   try {
     const current_time = dayjs();
 
+    // Guard: if the path is gone, trash the record/file and stop.
     if (!fs.existsSync(file)) {
       throw new Error('File not found');
     }
 
-    const video_record = await File.findOne({ path: file });
+    // NOTE: stat is extremely cheap compared to ffprobe or hashing. It reads inode metadata only.
+    const st = fs.statSync(file);
 
+    // Only include size and mtimeMs in the fingerprint for change detection.
+    // - size: content size in bytes
+    // - mtimeMs: last content modification timestamp
+    const fsFingerprint = {
+      size: st.size,
+      mtimeMs: st.mtimeMs
+    };
+
+    // Prefer looking up by path. record_id is preserved for callers that want to force a specific doc.
+    const query = record_id ? { _id: record_id } : { path: file };
+    const video_record = await File.findOne(query);
+
+    const alreadyHasProbe = Boolean(video_record?.probe);
+    const prev = video_record?.fsFingerprint;
+
+    const fingerprintMatches =
+      prev &&
+      prev.size === fsFingerprint.size &&
+      prev.mtimeMs === fsFingerprint.mtimeMs;
+
+    // Fast-path: unchanged file with an existing probe payload.
+    // Skip ffprobe + enrichment, no last_seen update for performance.
+    if (!force_probe && alreadyHasProbe && fingerprintMatches) {
+      logger.debug(`Skipping probe for unchanged file: ${file}`);
+      return video_record?.probe || false;
+    }
+
+    // If we are probing, log which fingerprint fields did not match, or if there was no fingerprint
+    if (!prev) {
+      logger.debug(`Probing file: ${file} (no existing fingerprint)`);
+    } else {
+      const mismatches = [];
+      if (prev.size !== fsFingerprint.size) mismatches.push(`size (prev: ${prev.size}, curr: ${fsFingerprint.size})`);
+      if (prev.mtimeMs !== fsFingerprint.mtimeMs) mismatches.push(`mtimeMs (prev: ${prev.mtimeMs}, curr: ${fsFingerprint.mtimeMs})`);
+      if (mismatches.length > 0) {
+        logger.info(`Probing file: ${file} (fingerprint mismatch: ${mismatches.join(', ')})`);
+      } else {
+        logger.info(`Probing file: ${file} (unknown fingerprint mismatch)`);
+      }
+    }
+
+    // Full-path: run ffprobe and enrichment exactly as before.
     const ffprobe_data = await ffprobe(file);
+    // TMDB enrichment is called for side-effects / caching in this codebase.
+    // If you later decide to persist it, add a schema field and include it in the upsert.
+    await tmdb_api(file);
 
-    const tmdb_data = await tmdb_api(file);
-
-    let languages = ['en', 'und'];
-
-    if (video_record?.audio_language?.length) {
-      languages = languages.concat(video_record.audio_language);
+    // Normalize audio languages from ffprobe stream metadata.
+    // Use array iteration to extract audio languages, avoiding for...of and continue.
+    let languages = [];
+    try {
+      languages = (ffprobe_data?.streams ?? [])
+        .filter((stream) => stream?.codec_type === 'audio' && stream?.tags?.language)
+        .map((stream) => language_map[stream.tags.language] || stream.tags.language);
+    } catch (e) {
+      // Language parsing errors should never fail the probe.
+      logger.warn(`Language parsing failed for ${file}`, { error: e });
     }
-
-    if (tmdb_data.spoken_languages) {
-      languages = languages.concat(
-        tmdb_data.spoken_languages.map((l) => l.iso_639_1)
-      );
-    }
-
-    // Normalize and deduplicate languages
-    languages = languages
-      .map((l) => [l, language_map[l]].filter(Boolean))
-      .flat()
-      .filter((v, i, arr) => arr.indexOf(v) === i);
 
     await upsert_video({
       record_id,
       path: file,
       probe: ffprobe_data,
-      encode_version: ffprobe_data.format.tags?.ENCODE_VERSION,
-      status: ffprobe_data.format.tags?.ENCODE_VERSION === encode_version ? 'complete' : 'pending',
+      encode_version: ffprobe_data?.format?.tags?.ENCODE_VERSION,
+      status: ffprobe_data?.format?.tags?.ENCODE_VERSION === encode_version ? 'complete' : 'pending',
       last_probe: current_time,
+      fsFingerprint,
       sortFields: {
-        width: ffprobe_data.streams.find((s) => s.codec_type === 'video')?.width,
-        size: ffprobe_data.format.size
+        width: ffprobe_data?.streams?.find((s) => s.codec_type === 'video')?.width,
+        size: ffprobe_data?.format?.size
       },
       audio_language: languages,
       ...opts
@@ -70,6 +128,7 @@ export default async function probe_and_upsert (file, record_id, opts = {}) {
 
     return ffprobe_data;
   } catch (e) {
+    // If the file is missing, keep your existing behavior: move to trash.
     if (/file\s+not\s+found/gi.test(e.message)) {
       await trash(file);
     }

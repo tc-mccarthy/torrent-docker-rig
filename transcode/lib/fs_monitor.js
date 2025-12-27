@@ -1,6 +1,8 @@
 import chokidar from 'chokidar';
+import async, { asyncify } from 'async';
+import { setTimeout as delay } from 'timers/promises';
 import config from './config';
-import rabbit_connect from './rabbitmq';
+import redisClient, { nsKey } from './redis';
 import logger from './logger';
 import probe_and_upsert from './probe_and_upsert';
 
@@ -10,10 +12,64 @@ const { get_paths } = config;
 
 const PATHS = get_paths(config);
 
-// connect to rabbit
-const { send, receive } = await rabbit_connect();
+const STREAM_KEY = nsKey('file_events_20251212a');
+
+async function sendToStream (msg) {
+  try {
+    logger.debug(msg, { label: 'REDIS STREAM SEND' });
+    const result = await redisClient.xAdd(STREAM_KEY, '*', { ...msg });
+    logger.debug(`Message added to stream with ID: ${result}`, { label: 'REDIS STREAM SEND' });
+  } catch (e) {
+    logger.error(e, { label: 'REDIS STREAM SEND ERROR' });
+  }
+}
+
+export async function processFSEventQueue () {
+  try {
+    logger.debug(`About to call xRead for stream '${STREAM_KEY}'`, { label: 'REDIS STREAM RECEIVE' });
+    const response = await redisClient.xRead(
+      [{ key: STREAM_KEY, id: '0-0' }],
+      { BLOCK: 5000, COUNT: 100 }
+    );
+    logger.debug({ response }, { label: 'REDIS STREAM READ RESPONSE' });
+
+    if (response && response.length > 0) {
+      const [stream] = response;
+      const messages = stream.messages;
+      logger.debug(`xRead returned ${messages.length} messages`, { label: 'REDIS STREAM READ RESPONSE' });
+      await async.eachLimit(messages, 5, asyncify(async ({ message, id }) => {
+        try {
+          logger.debug({ message, STREAM_KEY, id }, { label: 'REDIS STREAM READ' });
+          if (!message.processed) {
+            await probe_and_upsert(message.path);
+            // Mark message as processed in the stream
+            await sendToStream({ path: message.path, processed: 'true' });
+            logger.debug(`Marked message for path ${message.path} as processed`, { label: 'REDIS STREAM PROCESSED' });
+          }
+          const trim_results = await redisClient.xTrim(STREAM_KEY, 'MINID', id);
+          logger.debug({ trim_results }, { label: 'REDIS STREAM TRIM' });
+        } catch (e) {
+          logger.error(e, { label: 'REDIS STREAM READ LOOP ERROR' });
+        } finally {
+          return true;
+        }
+      }));
+    } else {
+      logger.debug('xRead returned no messages (timeout or empty stream)', { label: 'REDIS STREAM READ RESPONSE' });
+    }
+    logger.debug('Finished processing Redis stream messages', { label: 'REDIS STREAM RECEIVE COMPLETE' });
+  } catch (e) {
+    logger.error(e, { label: 'REDIS STREAM RECEIVE ERROR' });
+  } finally {
+    // 5-second cool-off before next pass
+    await delay(5000);
+    // Continue processing from the last ID
+    processFSEventQueue();
+  }
+}
 
 export default function fs_watch () {
+  logger.debug('Starting file system monitor...', { label: 'FS MONITOR' });
   const watcher = chokidar.watch(PATHS, {
     ignored: (file, stats) => {
       // if .deletedByTMM is in the path, ignore
@@ -33,39 +89,45 @@ export default function fs_watch () {
     awaitWriteFinish: true
   });
 
+  // Debounce map: path -> timer
+  const debounceTimers = new Map();
+  const DEBOUNCE_MS = 10000; // 10 seconds
+
+  function debounceSend (path) {
+    if (debounceTimers.has(path)) {
+      clearTimeout(debounceTimers.get(path));
+    }
+    debounceTimers.set(path, setTimeout(() => {
+      logger.debug('>> DEBOUNCED FILE EVENT >>', path);
+      sendToStream({ path });
+      debounceTimers.delete(path);
+    }, DEBOUNCE_MS));
+  }
+
   watcher
     .on('ready', () => {
       logger.debug('>> WATCHER IS READY AND WATCHING >>', watcher.getWatched());
+      logger.debug('File system monitor is now watching for changes.', { label: 'FS MONITOR READY' });
     })
     .on('error', (error) => logger.error(`Watcher error: ${error}`))
     .on('add', (path) => {
       if (file_ext.some((ext) => new RegExp(`.${ext}$`, 'i').test(path))) {
         logger.debug('>> NEW FILE DETECTED >>', path);
-        send({ path });
+        debounceSend(path);
       }
     })
     .on('change', (path) => {
       if (file_ext.some((ext) => new RegExp(`.${ext}$`, 'i').test(path))) {
         logger.debug('>> FILE CHANGE DETECTED >>', path);
-        send({ path });
+        debounceSend(path);
       }
     })
     .on('unlink', (path) => {
       if (file_ext.some((ext) => new RegExp(`.${ext}$`, 'i').test(path))) {
         logger.debug('>> FILE DELETE DETECTED >>', path);
-        send({ path });
+        debounceSend(path);
       }
     });
-
-  receive(async (msg, message_content, channel) => {
-    try {
-      channel.ack(msg);
-      await probe_and_upsert(message_content.path);
-    } catch (e) {
-      logger.error(e, { label: 'RABBITMQ ERROR' });
-      channel.ack(msg);
-    }
-  });
 
   return watcher;
 }

@@ -3,50 +3,65 @@ import File from '../models/files';
 import config from './config';
 import { formatSecondsToHHMMSS } from './transcode';
 import logger from './logger';
-import memcached from './memcached';
+import redisClient, { nsKey } from './redis';
 
 const { encode_version } = config;
 
 export async function getReclaimedSpace () {
-  let reclaimedSpace = await memcached.get('transcode_reclaimed_space');
+  const reclaimedSpaceKey = nsKey('reclaimed_space');
+  let reclaimedSpace = await redisClient.get(reclaimedSpaceKey);
 
-  // if reclaimed space is a number, return it
-  if (typeof reclaimedSpace === 'number') {
-    return reclaimedSpace;
+  // Redis returns strings, so parse to number if possible
+  if (reclaimedSpace !== null && !Number.isNaN(Number(reclaimedSpace))) {
+    // Stale-while-revalidate: trigger background refresh
+    (async () => {
+      try {
+        const aggResult = await File.aggregate([
+          { $match: { encode_version } },
+          { $group: { _id: null, total: { $sum: { $ifNull: ['$reclaimedSpace', 0] } } } }
+        ]);
+        const freshValue = aggResult[0]?.total || 0;
+        await redisClient.set(reclaimedSpaceKey, freshValue, { EX: 7 * 24 * 60 * 60 }); // 7 days
+      } catch (err) {
+        logger.error(err, { label: 'getReclaimedSpace background refresh error' });
+      }
+    })();
+    return Number(reclaimedSpace);
   }
 
-  logger.debug('Reclaimed space value not found in cache, calculating...');
+  logger.debug('Reclaimed space value not found in cache, calculating (blocking)...');
 
-  // if we don't have a number in cache, calculate it
-  reclaimedSpace = (await File.find({ encode_version }).lean()).reduce((total, file) => total + (file.reclaimedSpace || 0), 0);
-
-  // store the reclaimed space in cache for 15 minutes
-  await memcached.set('transcode_reclaimed_space', reclaimedSpace, 15 * 60);
-
+  // Blocking: no cache, must query Mongo
+  const aggResult = await File.aggregate([
+    { $match: { encode_version } },
+    { $group: { _id: null, total: { $sum: { $ifNull: ['$reclaimedSpace', 0] } } } }
+  ]);
+  reclaimedSpace = aggResult[0]?.total || 0;
+  await redisClient.set(reclaimedSpaceKey, reclaimedSpace, { EX: 7 * 24 * 60 * 60 }); // 7 days
   return reclaimedSpace;
 }
 
-export default async function update_status () {
+export default async function update_status ({ startup = false } = {}) {
   try {
     logger.debug('Updating status metrics...');
+    const processed_files = await File.countDocuments({ status: 'complete' });
+    const total_files = await File.countDocuments();
+    const reclaimedSpace = await getReclaimedSpace();
+
     const data = {
-      processed_files: await File.countDocuments({ status: 'complete' }),
-      total_files: await File.countDocuments(),
-      unprocessed_files: await File.countDocuments({
-        encode_version: { $ne: encode_version }
-      }),
-      library_coverage:
-      ((await File.countDocuments({ encode_version })) /
-        (await File.countDocuments())) *
-      100,
-      reclaimedSpace: await getReclaimedSpace()
+      processed_files,
+      total_files,
+      unprocessed_files: total_files - processed_files,
+      library_coverage: processed_files / total_files * 100,
+      reclaimedSpace
     };
 
     logger.debug('Status data complete');
 
-    if (typeof global.processedOnStart === 'undefined') {
-      global.processedOnStart = data.processed_files;
+    // Always set serviceStartTime to now on startup
+    if (startup) {
       global.serviceStartTime = Date.now();
+      global.processedOnStart = data.processed_files;
       global.processed_files_delta = 0;
     }
 

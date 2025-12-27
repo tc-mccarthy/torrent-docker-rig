@@ -14,7 +14,7 @@
 import cron from 'node-cron';
 import mongo_connect from './lib/mongo_connection';
 import update_queue from './lib/update_queue';
-import fs_monitor from './lib/fs_monitor';
+import fs_monitor, { processFSEventQueue } from './lib/fs_monitor';
 import redisClient from './lib/redis';
 import logger from './lib/logger';
 import { get_utilization, get_disk_space } from './lib/metrics';
@@ -33,6 +33,24 @@ const {
   concurrent_integrity_checks,
   application_version
 } = config;
+
+async function pre_start () {
+  // Update the transcode queue and status, and generate the initial filelist
+  logger.info('Updating system status metrics');
+  await update_status({ startup: true });
+
+  logger.info('Refreshing transcode queue');
+  await update_queue();
+
+  logger.info('Refreshing indexer data');
+  await refresh_indexer_data();
+
+  logger.info('Adjusting custom format scores for FDK AAC surround files');
+  await downgradeAudio();
+
+  logger.info('Generating initial filelist');
+  await generate_filelist({ limit: 1000, writeToFile: true });
+}
 
 /**
  * Main startup routine for the transcode service.
@@ -69,12 +87,11 @@ async function run () {
     get_disk_space();
 
     // Start the file system monitor (watches for new/changed files)
+    logger.info('Starting file system monitor');
+    processFSEventQueue();
     fs_monitor();
 
-    // Update the transcode queue and status, and generate the initial filelist
-    update_status();
-    update_queue().then(() => { refresh_indexer_data(); downgradeAudio(); });
-    generate_filelist({ limit: 1000, writeToFile: true });
+    pre_start();
 
     // Start the main transcode queue (handles video jobs)
     const transcodeQueue = new TranscodeQueue({ maxMemoryComputeScore: max_memory_score, maxCpuComputeScore: max_cpu_score, pollDelay: 10000 });
@@ -84,11 +101,7 @@ async function run () {
     // Start the integrity queue (handles file integrity checks)
     const integrityQueue = new IntegrityQueue({ maxScore: concurrent_integrity_checks });
     integrityQueue.start();
-
-    // Schedule filelist regeneration every 5 minutes
-    cron.schedule('*/5 * * * *', () => {
-      generate_filelist({ limit: 1000, writeToFile: true });
-    });
+    global.integrityQueue = integrityQueue; // Make the queue globally accessible
 
     // Schedule pre-sanitize cleanup every 3 hours
     cron.schedule('0 */3 * * *', () => {
@@ -102,8 +115,9 @@ async function run () {
       });
     });
 
-    // update indexer data every hour
-    cron.schedule('0 1-23 * * *', () => {
+    // update indexer data every hour from 3am to 11pm
+    // to avoid peak usage times during the update_queue logic
+    cron.schedule('0 3-23 * * *', () => {
       refresh_indexer_data();
     });
   } catch (e) {

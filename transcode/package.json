@@ -1,6 +1,6 @@
 {
   "name": "plex-transcoder",
-  "version": "25.6.2",
+  "version": "25.7.0",
   "private": true,
   "scripts": {
     "dev": "npx eslint --fix '**/*.js'; npx webpack watch --mode development",
@@ -9,15 +9,12 @@
     "lint:fix": "npx eslint --fix '**/*.js'"
   },
   "dependencies": {
-    "amqplib": "^0.10.5",
     "async": "^3.2.6",
     "axios": "^1.11.0",
     "chokidar": "^4.0.3",
     "dayjs": "^1.11.13",
     "fast-copy": "^3.0.2",
     "fluent-ffmpeg": "^2.1.3",
-    "memcached": "^2.2.2",
-    "memcached-promise": "^1.0.1",
     "mongoose": "^8.10.1",
     "node-cron": "^4.1.0",
     "redis": "^4.7.0",

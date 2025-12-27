@@ -2,13 +2,17 @@ import { setTimeout as delay } from 'timers/promises';
 import integrityCheck from './integrityCheck';
 import logger from './logger';
 import generate_integrity_filelist from './generate_integrity_filelist';
+import File from '../models/files';
 
 export default class IntegrityQueue {
   constructor ({ maxScore = 4, pollDelay = 2000 }) {
     // start the integrity check loops
     logger.debug(`Initiating integrity check queue for a max compute of ${maxScore}...`);
     this.maxScore = maxScore; // Max compute units allowed simultaneously
-    this.pollDelay = pollDelay; // Delay between scheduling attempts (ms)
+    // Adaptive polling: back off when idle to reduce resource churn.
+    this.basePollDelay = pollDelay;
+    this.pollDelay = pollDelay; // Current delay between scheduling attempts (ms)
+    this.maxPollDelay = 15000;
     this.runningJobs = []; // In-memory list of currently active jobs
     this._isRunning = false; // Flag for controlling the loop
   }
@@ -40,8 +44,17 @@ export default class IntegrityQueue {
   // Main loop: tries to schedule jobs and waits before the next run
   async loop () {
     while (this._isRunning) {
-      await this.scheduleJobs();
-      await delay(this.pollDelay); // Wait before checking again
+      const { scheduled, candidates } = await this.scheduleJobs();
+
+      if (!candidates) {
+        this.pollDelay = Math.min(Math.ceil(this.pollDelay * 1.5), this.maxPollDelay);
+      } else if (scheduled) {
+        this.pollDelay = this.basePollDelay;
+      } else {
+        this.pollDelay = Math.min(this.pollDelay, this.basePollDelay);
+      }
+
+      await delay(this.pollDelay);
     }
   }
 
@@ -50,9 +63,12 @@ export default class IntegrityQueue {
     const availableCompute = this.getAvailableCompute();
     logger.debug(`Available integrity check compute: ${availableCompute}.`);
 
-    if (availableCompute <= 0) return;
+    if (availableCompute <= 0) return { scheduled: false, candidates: true };
 
+    // IMPORTANT:
+    // generate_integrity_filelist returns lean, projected jobs.
     const jobs = await generate_integrity_filelist({ limit: 50 });
+    if (!jobs || jobs.length === 0) return { scheduled: false, candidates: false };
 
     // Are there any jobs being blocked due to lack of compute?
     const blockedHighPriorityJob = jobs.find((job) => {
@@ -74,14 +90,30 @@ export default class IntegrityQueue {
 
     if (nextJob) {
       this.runJob(nextJob);
+      return { scheduled: true, candidates: true };
     }
+
+    return { scheduled: false, candidates: true };
   }
 
   // Handles job execution and cleanup
   async runJob (job) {
     try {
-      this.runningJobs.push(job);
-      await integrityCheck(job); // Await external ffmpeg logic
+      // Keep a minimal in-memory record.
+      const runtimeJob = {
+        _id: job._id,
+        path: job.path,
+        computeScore: job.computeScore,
+        sortFields: job.sortFields,
+        action: 'queued',
+        refreshed: Date.now()
+      };
+      this.runningJobs.push(runtimeJob);
+
+      // Load the full Mongoose document only for the job being executed.
+      const fullDoc = await File.findById(job._id);
+      if (!fullDoc) throw new Error(`File record not found: ${job._id}`);
+      await integrityCheck(fullDoc); // Await external ffmpeg logic
     } catch (err) {
       console.error(`Integrity check failed for ${job.inputPath}: ${err.message}`);
     } finally {

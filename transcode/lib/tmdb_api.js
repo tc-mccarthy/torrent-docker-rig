@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { parseStringPromise } from 'xml2js';
 import logger from './logger';
-import redisClient from './redis';
+import redisClient, { nsKey } from './redis';
 
 function query_tmdb (url) {
   return fetch(url, {
@@ -38,7 +38,7 @@ export default async function tmdb_api (file_path) {
       const { id: tmdb_id } = nfo_data.movie;
 
       // check redis for the movie details
-      const redis_key = `tmdb:${tmdb_id}`;
+      const redis_key = nsKey(`tmdb:${tmdb_id}`);
       const redis_data = await redisClient.get(redis_key);
 
       // if the movie details are in redis, return them
@@ -63,7 +63,7 @@ export default async function tmdb_api (file_path) {
       const { id: tvdb_id, showtitle } = nfo_data.episodedetails;
 
       // check redis for the series details
-      const redis_key = `tvdb:${showtitle[0].toLowerCase().replace(/[^0-9A-Za-z]+/g, '')}`;
+      const redis_key = nsKey(`tvdb:${showtitle[0].toLowerCase().replace(/[^0-9A-Za-z]+/g, '')}`);
       const redis_data = await redisClient.get(redis_key);
 
       // if the series details are in redis, return them
