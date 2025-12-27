@@ -495,6 +495,31 @@ services:
       options: 
         max-size: "200k"
         max-file: "10"
+  # --------------------------------------------------------------------------
+  # Agregarr (direct, not VPN-routed)
+  # --------------------------------------------------------------------------
+  agregarr:
+    container_name: agregarr
+    ports:
+      - 7171:7171   # agregarr
+    image: agregarr/agregarr:latest
+    networks:
+      - default
+    environment:
+      - TZ
+    volumes:
+      - ./agregarr:/app/config
+    restart: unless-stopped
+    depends_on:
+      radarr:
+        condition: service_healthy
+      sonarr:
+        condition: service_healthy
+    logging: 
+      driver: "json-file"
+      options: 
+        max-size: "200k"
+        max-file: "10"
 
   # --------------------------------------------------------------------------
   # BAZARR (direct, not VPN-routed)
