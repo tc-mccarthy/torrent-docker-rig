@@ -353,20 +353,12 @@ services:
     volumes:
       - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE}
       - ./plex:/config
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:32400/identity"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
     restart: unless-stopped
     logging: 
       driver: "json-file"
       options: 
         max-size: "200k"
         max-file: "10"
-    labels:
-      - "autoheal=true"
 
   # --------------------------------------------------------------------------
   # MyMedia (ALEXA playback)
@@ -667,10 +659,9 @@ services:
     networks:
       - default
     healthcheck:
-      test: [
-        "CMD-SHELL",
-        "curl -fsSL --max-time 5 http://127.0.0.1:8181/tautulli/home 2>/dev/null | grep -qi '<title>.*tautulli' || exit 1"
-      ]
+      test: >
+        CMD-SHELL
+        if [ -z "$TAUTULLI_API_KEY" ]; then exit 0; fi; curl -fsSL --max-time 5 "http://127.0.0.1:8181/tautulli/api/v2?cmd=status&apikey=$TAUTULLI_API_KEY" 2>/dev/null | grep -q '"response":' || exit 1
       interval: 30s
       timeout: 5s
       retries: 5
