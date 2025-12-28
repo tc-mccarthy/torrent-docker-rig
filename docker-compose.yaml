@@ -353,12 +353,20 @@ services:
     volumes:
       - ${TRANSCODE_STORAGE}:${TRANSCODE_STORAGE}
       - ./plex:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:32400/identity"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     restart: unless-stopped
     logging: 
       driver: "json-file"
       options: 
         max-size: "200k"
         max-file: "10"
+    labels:
+      - "autoheal=true"
 
   # --------------------------------------------------------------------------
   # MyMedia (ALEXA playback)
