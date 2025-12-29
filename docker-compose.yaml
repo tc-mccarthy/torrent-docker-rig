@@ -22,46 +22,6 @@
 
 version: "3.8"
 
-
-# ==============================================================================
-# CPU Affinity & Priority Policy (Plex-first)
-#
-# This rig uses an Intel 13th-gen hybrid CPU (i9-13900H):
-#   - P-cores (latency / interactive): CPUs 0-11  (6 cores w/ HT)
-#   - E-cores (background / batch):    CPUs 12-19 (8 cores)
-#
-# Goal:
-#   - Plex must ALWAYS be able to feed the iGPU (Quick Sync) without scheduler delay.
-#   - Background workloads (batch transcodes, arr stack, downloads, misc services)
-#     should never steal time from Plex's P-cores.
-#
-# How it works:
-#   - Services merge one of the YAML anchors below via `<<: *pcore_service`
-#     or `<<: *ecore_service`.
-#   - Override per-service by setting `cpuset`, `cpu_shares`, or `cpus`
-#     below the merge line.
-#
-# Notes:
-#   - `cpuset` hard-pins which logical CPUs the container may run on.
-#   - `cpu_shares` is a relative weight under contention (default 1024).
-#   - `cpus` is a hard quota (fractional CPUs allowed) to keep background work tame.
-# ==============================================================================
-
-x-cpu-profiles:
-  # Google-style docstring (comment form)
-  # Summary: P-core profile for latency-critical services (Plex).
-  # Args:
-  #   cpuset: Logical CPU list for P-cores (0-11).
-  #   cpu_shares: Higher weight to win CPU time under contention.
-  pcore: &pcore_service
-    cpuset: "0-11"
-  # Google-style docstring (comment form)
-  # Summary: E-core profile for background services.
-  # Args:
-  #   cpuset: Logical CPU list for E-cores (12-19).
-  #   cpu_shares: Moderate weight; lower for very background tasks.
-  ecore: &ecore_service
-    cpuset: "12-19"
 services:
   # --------------------------------------------------------------------------
   # VPN GATEWAY
@@ -69,9 +29,6 @@ services:
   # Healthcheck ensures tunnel + qbittorrent reachability before dependents start.
   # --------------------------------------------------------------------------
   vpn:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     image: ghcr.io/bubuntux/nordlynx
     container_name: nordlynx
     cap_add:
@@ -118,9 +75,6 @@ services:
   # Labeled for autoheal; healthcheck fails if the tunnel or qBittorrent goes down.
   # --------------------------------------------------------------------------
   torrent:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     image: linuxserver/qbittorrent
     container_name: qbittorrent
     network_mode: service:vpn # Route all traffic through the VPN container
@@ -158,9 +112,6 @@ services:
   # Monitors qBittorrent; not VPN-routed, but depends on torrent+redis.
   # --------------------------------------------------------------------------
   torrent-monitor:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     build: ./torrent-monitor
     container_name: torrent-monitor
     depends_on:
@@ -189,9 +140,6 @@ services:
   # Periodically checks containers with "autoheal=true" and restarts if unhealthy.
   # --------------------------------------------------------------------------
   autoheal:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     image: willfarrell/autoheal:latest
     tty: true
     container_name: autoheal
@@ -210,9 +158,6 @@ services:
   # Not VPN-routed (by design).
   # --------------------------------------------------------------------------
   proxy:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     image: nginx:1.23.3-alpine
     container_name: proxy
     restart: unless-stopped
@@ -245,9 +190,6 @@ services:
   # Generates wildcard/host certs for the reverse proxy.
   # --------------------------------------------------------------------------
   certbot:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: certbot
     image: certbot/dns-cloudflare
     volumes:
@@ -274,9 +216,6 @@ services:
   # Keep public DNS records in sync with your IP / endpoints.
   # --------------------------------------------------------------------------
   ddns_torrent:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: ddns_torrent
     restart: unless-stopped
     image: oznu/cloudflare-ddns
@@ -291,9 +230,6 @@ services:
         max-file: "10"
   
   ddns_overseerr:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: ddns_overseerr
     restart: unless-stopped
     image: oznu/cloudflare-ddns
@@ -308,9 +244,6 @@ services:
         max-file: "10"
 
   ddns_backup:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: ddns_backup
     restart: unless-stopped
     image: oznu/cloudflare-ddns
@@ -328,9 +261,6 @@ services:
   # DUPLICATI (Backups)
   # --------------------------------------------------------------------------
   duplicati:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     image: lscr.io/linuxserver/duplicati:latest
     container_name: duplicati
     environment:
@@ -359,15 +289,11 @@ services:
   # Not VPN-routed: interacts with local media and infra.
   # --------------------------------------------------------------------------
   transcode:
-    # CPU-only background transcoder: intentionally NOT granted /dev/dri (iGPU belongs to Plex).
-    # Pinned to E-cores and rate-limited so Plex always wins during seeks/subtitles.
-    <<: *ecore_service
-    cpu_shares: 128
-    cpus: 6.0
-
     container_name: transcode
     build:
       context: ./transcode
+    devices:
+      - "/dev/dri:/dev/dri" # Intel Quick Sync
     environment:
       - TZ
       - TRANSCODE_PATHS
@@ -400,6 +326,7 @@ services:
         condition: service_healthy
     mem_limit: 56g
     memswap_limit: 64g
+    cpu_shares: 256
     networks:
       - default
     logging: 
@@ -412,13 +339,10 @@ services:
   # PLEX (host network for DLNA/UPnP discovery)
   # --------------------------------------------------------------------------
   plex:
-    # Pinned to P-cores for lowest latency and to keep the iGPU fed (Quick Sync).
-    # Policy: Plex stays on P-cores; move other services off P-cores instead of relaxing this.
-    <<: *pcore_service
-
     container_name: plex
     image: lscr.io/linuxserver/plex:latest
     network_mode: host
+    cpu_shares: 2048
     devices:
       - "/dev/dri:/dev/dri" # Intel Quick Sync
     environment:
@@ -440,9 +364,6 @@ services:
   # MyMedia (ALEXA playback)
   # --------------------------------------------------------------------------  
   mymedia:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     image: bizmodeller/mymediaforalexa:latest
     container_name: mymedia
     ports:
@@ -464,9 +385,6 @@ services:
   # MONGO (local)
   # --------------------------------------------------------------------------
   mongo:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: torrent-mongo-local
     image: mongo:8.0.4-noble
     hostname: torrent-mongo-local
@@ -504,9 +422,6 @@ services:
   # Waits for VPN, Prowlarr, Torrent; labeled for autoheal + instant restart.
   # --------------------------------------------------------------------------
   sonarr:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: sonarr
     ports:
       - 8989:8989   # sonarr
@@ -546,9 +461,6 @@ services:
   # RADARR (direct, not VPN-routed)
   # --------------------------------------------------------------------------
   radarr:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: radarr
     ports:
       - 7878:7878   # radarr
@@ -587,9 +499,6 @@ services:
   # Agregarr (direct, not VPN-routed)
   # --------------------------------------------------------------------------
   agregarr:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: agregarr
     ports:
       - 7171:7171   # agregarr
@@ -616,9 +525,6 @@ services:
   # BAZARR (direct, not VPN-routed)
   # --------------------------------------------------------------------------
   bazarr:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: bazarr
     ports:
       - 6767:6767   # bazarr
@@ -660,9 +566,6 @@ services:
   # OVERSEERR (direct, not VPN-routed)
   # --------------------------------------------------------------------------
   overseerr:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: overseerr
     ports:
       - 5055:5055   # overseerr
@@ -703,9 +606,6 @@ services:
   # PROWLARR (direct, not VPN-routed)
   # --------------------------------------------------------------------------
   prowlarr:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: prowlarr
     ports:
       - 9696:9696   # prowlarr
@@ -745,9 +645,6 @@ services:
   # TAUTULLI (local analytics, not VPN-routed)
   # --------------------------------------------------------------------------
   tautulli:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: tautulli
     ports:
       - 8181:8181   # tautulli
@@ -783,9 +680,6 @@ services:
   # Uses autoheal so it recovers quickly from failures (no special VPN restart logic).
   # --------------------------------------------------------------------------
   huntarr:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: huntarr
     ports:
       - 9705:9705   # huntarr
@@ -820,9 +714,6 @@ services:
   # TINYMEDIA MANAGER (direct, not VPN-routed)
   # --------------------------------------------------------------------------
   tmm:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: tinymediamanager
     ports:
       - 4000:4000   # tinyMediaManager VNC (if enabled)
@@ -859,9 +750,6 @@ services:
   # Runs on the LAN for direct access; autoheal helps recover from failures.
   # --------------------------------------------------------------------------
   portainer:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: portainer
     ports:
       - 9443:9443   # portainer
@@ -884,9 +772,6 @@ services:
   # REDIS (local cache/queue)
   # --------------------------------------------------------------------------
   redis:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: torrent-redis-local
     image: redis:latest
     hostname: torrent-redis-local
@@ -915,9 +800,6 @@ services:
   # SAMBA (host network for LAN file shares)
   # --------------------------------------------------------------------------
   samba:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     container_name: samba
     image: crazymax/samba:latest
     network_mode: host
@@ -940,9 +822,6 @@ services:
   # SABNZBD / USENET (VPN-routed)
   # --------------------------------------------------------------------------
   usenet:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     image: linuxserver/sabnzbd
     container_name: usenet
     network_mode: service:vpn
@@ -971,9 +850,6 @@ services:
   # GLANCES (web UI monitoring)
   # --------------------------------------------------------------------------
   monitoring:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     image: nicolargo/glances:latest-full
     container_name: monitoring
     environment:
@@ -997,17 +873,8 @@ services:
 # ------------------------------------------------------------------------------
 volumes:
   mongo_db_8:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
   portainer_db:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
   redis_data:
-
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
 
 # ------------------------------------------------------------------------------
 # NETWORKS
@@ -1016,8 +883,5 @@ volumes:
 # ------------------------------------------------------------------------------
 networks:
   default:
-    # Default/background: pinned to E-cores so Plex keeps P-cores for playback/transcodes.
-    <<: *ecore_service
-
     name: torrent-rig
     external: true
